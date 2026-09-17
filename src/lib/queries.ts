@@ -2,7 +2,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { getCurrentFirmaId } from "@/lib/auth";
-import { istanbulGunAraligi } from "@/lib/zaman";
+import { istanbulGunAraligi, istanbulTarihAnahtari } from "@/lib/zaman";
 import type { AlimFisi, Satis, Masraf, FinansHareket, KasaHesap, CariKart } from "@/generated/prisma/client";
 
 async function firmaId(): Promise<string> {
@@ -110,6 +110,51 @@ export async function getDashboardOzet() {
     emanetKgBorcumuz: emanetKg,
     sonFisler,
   };
+}
+
+// ─── Pano: günlük alım trendi ───────────────────────────────
+
+export type GunlukAlim = {
+  anahtar: Date;
+  baslangic: Date;
+  bitis: Date;
+  kg: number;
+  tutar: number;
+  adet: number;
+};
+
+/**
+ * Son N günün onaylı alım toplamları. Aralıklar İstanbul iş günü sınırlarıdır;
+ * sonuç en eski günden bugüne sıralıdır ve boş günler 0 ile yer alır.
+ */
+export async function getSonGunlerAlim(gunSayisi = 7): Promise<GunlukAlim[]> {
+  const fid = await firmaId();
+  const bugun = Date.now();
+  const gunler: GunlukAlim[] = [];
+  for (let geri = gunSayisi - 1; geri >= 0; geri -= 1) {
+    const { baslangic, bitis } = istanbulGunAraligi(new Date(bugun - geri * 86_400_000));
+    gunler.push({ anahtar: istanbulTarihAnahtari(baslangic), baslangic, bitis, kg: 0, tutar: 0, adet: 0 });
+  }
+  if (gunler.length === 0) return gunler;
+
+  const fisler = await prisma.alimFisi.findMany({
+    where: {
+      tarih: { gte: gunler[0].baslangic, lt: gunler[gunler.length - 1].bitis },
+      durum: "ONAYLI",
+      cari: { firmaId: fid },
+    },
+    select: { tarih: true, kg: true, tutar: true },
+  });
+
+  const indeks = new Map(gunler.map((gun, i) => [gun.anahtar.getTime(), i]));
+  for (const fis of fisler) {
+    const i = indeks.get(istanbulTarihAnahtari(fis.tarih).getTime());
+    if (i === undefined) continue;
+    gunler[i].kg += n(fis.kg);
+    gunler[i].tutar += n(fis.tutar);
+    gunler[i].adet += 1;
+  }
+  return gunler;
 }
 
 // ─── Cari ───────────────────────────────────────────────────
