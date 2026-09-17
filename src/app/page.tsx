@@ -7,7 +7,7 @@ import {
 import { prisma } from "@/lib/db";
 import { getDashboardOzet, getSonGunlerAlim, getStokOzet } from "@/lib/queries";
 import { izinVar, requirePagePermission } from "@/lib/rbac/guard";
-import { kg, paraTL, tarihSaat, puan } from "@/lib/format";
+import { kg, tarihSaat, puan } from "@/lib/format";
 import { DurumRozet } from "@/components/rozetler";
 import { istanbulGunAraligi } from "@/lib/zaman";
 
@@ -38,19 +38,19 @@ export default async function AnaSayfa() {
     emanet: izinli("EMANET", "GORUNTULE"),
     finans: izinli("FINANS", "GORUNTULE"),
   };
+  // İş günü sınırı İstanbul'a göre belirlenir; başlıktaki tarih de buradan gelir.
   const { baslangic: bugunBas } = istanbulGunAraligi();
   const bosTrend: Awaited<ReturnType<typeof getSonGunlerAlim>> = [];
   const bosStok: Awaited<ReturnType<typeof getStokOzet>> = [];
-  const [ozet, bekleyenFinansTaslagi, odeme, alimTrendi, depoStok] = await Promise.all([
+  // Pano parasal veri çekmez: tutar/kur yalnızca finans ve rapor ekranlarında okunur.
+  const [ozet, bekleyenFinansTaslagi, alimTrendi, depoStok] = await Promise.all([
     getDashboardOzet(),
     izinler.finans ? prisma.finansTaslagi.count({ where: { firmaId: actor.firmaId, durum: { in: ["INCELEME_BEKLIYOR", "EKSIK_BILGI"] }, hatirlatmaAt: { lte: new Date() } } }) : Promise.resolve(0),
-    izinler.finans ? prisma.finansHareket.aggregate({ where: { createdAt: { gte: bugunBas }, tip: "ODEME", durum: "ONAYLI", hesap: { firmaId: actor.firmaId } }, _sum: { tutar: true } }) : Promise.resolve({ _sum: { tutar: null } }),
     izinler.alim ? getSonGunlerAlim(7) : Promise.resolve(bosTrend),
     izinler.stok ? getStokOzet() : Promise.resolve(bosStok),
   ]);
   const bekleyenRandiman = ozet.bekleyenRandiman;
   const sonFisler = ozet.sonFisler;
-  const odemeTutar = Number(odeme._sum.tutar ?? 0);
   const trendToplamKg = alimTrendi.reduce((toplam, gun) => toplam + gun.kg, 0);
   const enYuksekGunKg = alimTrendi.reduce((enBuyuk, gun) => Math.max(enBuyuk, gun.kg), 0);
   const depoSirali = [...depoStok].sort((a, b) => b.kendiKg - a.kendiKg).slice(0, 5);
@@ -78,11 +78,11 @@ export default async function AnaSayfa() {
           {izinli("CARI", "GORUNTULE") && <MobilModul href="/mod/musteri" etiket={"Müşteri\nİşlemleri"} ikon={Users} />}
           {izinli("RAPORLAR", "GORUNTULE") && <MobilModul href="/mod/rapor" etiket="Raporlar" ikon={FileBarChart} />}
         </div>
-        {(izinler.alim || izinler.finans) && <div className="rounded-2xl border border-[var(--surface-border)] bg-white/5 px-4 py-3">
+        {izinler.alim && <div className="rounded-2xl border border-[var(--surface-border)] bg-white/5 px-4 py-3">
           <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-sky-100">BUGÜN</div>
           <div className="mt-1.5 flex items-center justify-between text-sm">
-            {izinler.alim && <><span className="text-sky-100"><b className="tabular-nums text-white">{ozet.bugunFisAdet}</b> fiş · <b className="tabular-nums text-white">{kg(ozet.bugunAlimKg)}</b></span><span className="text-sky-100">Alım <b className="tabular-nums text-[#f5c518]">{paraTL(ozet.bugunAlimTutar)}</b></span></>}
-            {izinler.finans && <span className="text-sky-100">Ödeme <b className="tabular-nums text-[#f5c518]">{paraTL(odemeTutar)}</b></span>}
+            <span className="text-sky-100"><b className="tabular-nums text-white">{ozet.bugunFisAdet}</b> fiş</span>
+            <span className="text-sky-100">Alım <b className="tabular-nums text-[#f5c518]">{kg(ozet.bugunAlimKg)}</b></span>
           </div>
         </div>}
         <FinansTaslagiUyarisi adet={bekleyenFinansTaslagi} />
@@ -95,7 +95,7 @@ export default async function AnaSayfa() {
         <section className="flex flex-wrap items-end justify-between gap-3 md:col-span-12">
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold tracking-tight text-white">Pano</h1>
-            <p className="mt-0.5 text-xs font-semibold text-sky-100">{BUGUN_UZUN.format(new Date())}</p>
+            <p className="mt-0.5 text-xs font-semibold text-sky-100">{BUGUN_UZUN.format(bugunBas)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {izinli("ALIM", "OLUSTUR") && <HizliButon href="/alim/yeni" ikon={Plus} etiket="Yeni Alım Fişi" birincil />}
@@ -107,12 +107,11 @@ export default async function AnaSayfa() {
         </section>
 
         {/* ── Metrik şeridi: tek yüzey, aradaki çizgiler yüzeyden gelir ── */}
-        <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-border)] sm:grid-cols-3 md:col-span-12 xl:grid-cols-5">
-          {izinler.alim && <Metrik baslik="BUGÜNKÜ ALIM" deger={kg(ozet.bugunAlimKg)} alt={`${ozet.bugunFisAdet} fiş · ${paraTL(ozet.bugunAlimTutar)}`} href="/alim" />}
+        <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-border)] sm:grid-cols-3 md:col-span-12 xl:grid-cols-4">
+          {izinler.alim && <Metrik baslik="BUGÜNKÜ ALIM" deger={kg(ozet.bugunAlimKg)} alt={`${ozet.bugunFisAdet} fiş`} href="/alim" />}
           {izinler.randiman && <Metrik baslik="RANDIMAN BEKLEYEN" deger={String(bekleyenRandiman)} alt={bekleyenRandiman > 0 ? "giriş bekliyor" : "bekleyen yok"} vurgu={bekleyenRandiman > 0} href="/randiman" />}
           {izinler.stok && <Metrik baslik="STOK (KENDİ)" deger={kg(ozet.stokKendi)} alt={izinler.emanet ? `Emanette ${kg(ozet.stokEmanet)}` : undefined} href="/stok" />}
           {izinler.emanet && <Metrik baslik="EMANET BORCUMUZ" deger={kg(ozet.emanetKgBorcumuz)} alt="üreticilere kg olarak" vurgu={ozet.emanetKgBorcumuz > 0} href="/emanet" />}
-          {izinler.finans && <Metrik baslik="BUGÜNKÜ ÖDEME" deger={paraTL(odemeTutar)} alt="onaylı ödemeler" href="/finans" />}
         </section>
 
         {/* ── Alım trendi + bekleyen işler ── */}
@@ -197,7 +196,6 @@ export default async function AnaSayfa() {
                   <th className="px-3 py-2.5 font-bold">Tarih</th>
                   <th className="px-3 py-2.5 font-bold text-right">Net kg</th>
                   <th className="px-3 py-2.5 font-bold text-right">Randıman</th>
-                  <th className="px-3 py-2.5 font-bold text-right">Tutar</th>
                   <th className="px-4 py-2.5 font-bold">Durum</th>
                 </tr>
               </thead>
@@ -211,12 +209,11 @@ export default async function AnaSayfa() {
                     <td className="px-3 py-2.5 text-xs tabular-nums text-sky-100">{tarihSaat(f.tarih)}</td>
                     <td className="px-3 py-2.5 text-right font-bold tabular-nums text-white">{kg(Number(f.kg))}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-sky-100">{f.randimanPuan ? puan(f.randimanPuan) : "—"}</td>
-                    <td className="px-3 py-2.5 text-right font-extrabold tabular-nums text-[#f5c518]">{paraTL(f.tutar)}</td>
                     <td className="px-4 py-2.5"><DurumRozet durum={f.randimanDurumu} /></td>
                   </tr>
                 ))}
                 {sonFisler.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-sky-100">Henüz alım fişi yok. İlk fişi oluşturduğunuzda burada listelenir.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-sky-100">Henüz alım fişi yok. İlk fişi oluşturduğunuzda burada listelenir.</td></tr>
                 )}
               </tbody>
             </table>

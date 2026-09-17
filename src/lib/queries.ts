@@ -77,7 +77,7 @@ export async function getDashboardOzet() {
   const [bugunFisler, bekleyenRandiman, stokGr, emanetGr, sonFisler] = await Promise.all([
     prisma.alimFisi.aggregate({
       where: { tarih: { gte: bugunBas }, durum: "ONAYLI", cari: { firmaId: fid } },
-      _sum: { kg: true, tutar: true },
+      _sum: { kg: true },
       _count: true,
     }),
     bekleyenRandimanSayisi(fid),
@@ -87,10 +87,16 @@ export async function getDashboardOzet() {
       where: { bakiyeTuru: "FINDIK_KG", cari: { firmaId: fid } },
       _sum: { tutar: true },
     }),
+    // Pano yalnızca fiziksel büyüklükleri gösterir; tutar gibi parasal alanlar
+    // buraya hiç çekilmez, finans ekranlarında okunur.
     prisma.alimFisi.findMany({
       orderBy: { createdAt: "desc" },
       take: 5,
-      where: { cari: { firmaId: fid } }, include: { cari: true },
+      where: { cari: { firmaId: fid } },
+      select: {
+        id: true, fisNo: true, satinAlmaKodu: true, tarih: true, kg: true,
+        randimanPuan: true, randimanDurumu: true, cari: { select: { ad: true } },
+      },
     }),
   ]);
 
@@ -102,7 +108,6 @@ export async function getDashboardOzet() {
 
   return {
     bugunAlimKg: n(bugunFisler._sum.kg),
-    bugunAlimTutar: n(bugunFisler._sum.tutar),
     bugunFisAdet: bugunFisler._count,
     bekleyenRandiman,
     stokKendi: stok.KENDI,
