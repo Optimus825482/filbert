@@ -129,6 +129,7 @@ Ayrıntılı saklama ve geri yükleme tatbikatı için [Yedekleme ve geri yükle
 
 | Belirti | Olası neden ve çözüm |
 |---|---|
+| Giriş yapılıyor ama **hiçbir hata vermeden** tekrar giriş ekranına dönüyor | Oturum çerezi `Secure` işaretli ve tarayıcı düz HTTP üzerinde; tarayıcı böyle bir çerezi sessizce atar, bu yüzden hata görünmez. Nedeni neredeyse her zaman eksik TLS'tir: Coolify'da alan adı **şemasız** yazıldıysa (ör. `akaydin.erkanerdem.online`) Traefik yalnız HTTP router'ı kurar; TLS router'ı ve Let's Encrypt sertifikası hiç oluşmaz, HTTP de HTTPS'e yönlendirmez. Alan adını `https://akaydin.erkanerdem.online` biçiminde düzeltip yeniden dağıtın. Doğrulama: `https://<alan-adı>/giris` `200` dönmeli ve `http://` isteği `302` ile HTTPS'e yönlenmelidir. |
 | Derleme `pnpm install` adımında `ERR_UNKNOWN_BUILTIN_MODULE: No such built-in module: node:sqlite` ile duruyor | Dockerfile tabanı Node 20 kalmış. `FROM node:24-bookworm-slim` olmalı; pnpm 11 en az Node 22.13 ister. (`warn: This version of pnpm requires at least Node.js v22.13` satırı da aynı sorunu gösterir.) |
 | Derleme günlüğünde `Added N ARG declarations to Dockerfile` görünüyor | **Inject Build Args to Dockerfile** açık. Coolify ortam değişkenlerini derleme argümanı olarak geçiriyor. Bölüm 2.3'teki gibi kapatın. |
 | Tarayıcıda `No available server` | `app` sağlık denetimini geçemiyor. `Deployments → Logs` ve `/api/health` yanıtına bakın. Alan adı `_3066` port ekiyle tanımlı olmalı. |
