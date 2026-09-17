@@ -12,15 +12,12 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { KG_MAKS, RANDIMAN_MAKS, gecerliSayi } from "@/lib/dogrulama";
 
-const GECERLI_CINSLER = new Set(["GIRESUN", "LEVANT", "ORDU", "DIGER"]);
-
 export interface SevkiyatGirdi {
   cariId: string; // fabrika
   aracId?: string;
   plaka: string;
   sofor: string;
   depoId: string; // hangi depodan alındı
-  cins: "GIRESUN" | "LEVANT" | "ORDU" | "DIGER";
   kg: number;
   randimanPuan?: number; // fabrika tarafından ölçülen randıman
   aciklama?: string;
@@ -46,7 +43,6 @@ export async function createSevkiyat(
   if (!plakaSnap) return { ok: false, hata: "Plaka girilmedi" };
   if (!soforSnap) return { ok: false, hata: "Şoför adı girilmedi" };
   if (!g.depoId) return { ok: false, hata: "Sevk edilecek depo seçilmedi" };
-  if (!GECERLI_CINSLER.has(g.cins)) return { ok: false, hata: "Geçersiz ürün cinsi" };
   if (!gecerliSayi(g.kg, 0.001, KG_MAKS)) return { ok: false, hata: "Geçerli kg girilmeli" };
   if (g.randimanPuan !== undefined && g.randimanPuan !== null && !gecerliSayi(g.randimanPuan, 0.01, RANDIMAN_MAKS)) {
     return { ok: false, hata: "Randıman 0-100 arasında bir rakam olmalı" };
@@ -94,7 +90,6 @@ export async function createSevkiyat(
           data: {
             sevkiyatId: yeni.id,
             depoId: depo.id,
-            cins: g.cins,
             kg: g.kg,
           },
         });
@@ -112,7 +107,7 @@ export async function createSevkiyat(
           },
         });
 
-        await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "SEVKIYAT", eylem: "OLUSTUR", hedefTipi: "Sevkiyat", hedefId: yeni.id, sonrakiVeri: { fisNo, cariId: g.cariId, depoId: depo.id, cins: g.cins, kg: g.kg, randimanPuan: g.randimanPuan ?? null, durum: "FABRIKA_EMANET" }, aciklama: "Fındık fabrikaya sevk edildi; fabrika emanet durumuna alındı." } });
+        await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "SEVKIYAT", eylem: "OLUSTUR", hedefTipi: "Sevkiyat", hedefId: yeni.id, sonrakiVeri: { fisNo, cariId: g.cariId, depoId: depo.id, kg: g.kg, randimanPuan: g.randimanPuan ?? null, durum: "FABRIKA_EMANET" }, aciklama: "Fındık fabrikaya sevk edildi; fabrika emanet durumuna alındı." } });
 
         return yeni;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -179,7 +174,6 @@ export async function muhasebelestirSevkiyat(
           cariId: sevkiyat.cariId!,
           fisNo,
           tarih: new Date(),
-          cins: kalem.cins ?? "DIGER",
           kg,
           birimFiyat,
           tutar,

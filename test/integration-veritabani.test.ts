@@ -31,7 +31,6 @@ test("aynı satın alma kodu ile ikinci alım fişi veritabanı düzeyinde redde
             firmaId: firma.id,
             cariId: cari.id,
             depoId: depo.id,
-            cins: "GIRESUN" as const,
             kg: 100,
             birimFiyat: 10,
             tutar: 1000,
@@ -95,7 +94,7 @@ test("firma sıfırlama yalnız hedef firmayı siler, diğer kiracıyı ve FK s�
           await tx.auditKaydi.create({ data: { firmaId: firmaA.id, kullaniciId: kullaniciA.id, eylem: "OLUSTUR" } });
           const cariA = await tx.cariKart.create({ data: { firmaId: firmaA.id, tur: "URETICI", ad: "IT Cari A" } });
           const depoA = await tx.depo.create({ data: { firmaId: firmaA.id, ad: "IT Depo A" } });
-          await tx.alimFisi.create({ data: { firmaId: firmaA.id, fisNo: "IT-A-1", satinAlmaKodu: "001", cariId: cariA.id, depoId: depoA.id, cins: "GIRESUN", kg: 10, birimFiyat: 1, tutar: 10, durum: "TASLAK" } });
+          await tx.alimFisi.create({ data: { firmaId: firmaA.id, fisNo: "IT-A-1", satinAlmaKodu: "001", cariId: cariA.id, depoId: depoA.id, kg: 10, birimFiyat: 1, tutar: 10, durum: "TASLAK" } });
           // Kullanici'ya Restrict ile bağlı iki model: helper bunları Kullanici'dan önce silmeli.
           const notA = await tx.sesliNot.create({ data: { firmaId: firmaA.id, kullaniciId: kullaniciA.id, hamMetin: "it a" } });
           await tx.finansTaslagi.create({ data: { firmaId: firmaA.id, cariId: cariA.id, sesliNotId: notA.id, olusturanId: kullaniciA.id, hatirlatmaAt: new Date() } });

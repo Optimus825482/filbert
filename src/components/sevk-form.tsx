@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createSevkiyat } from "@/lib/actions/sevkiyat";
 import { sunucuIslemi } from "@/lib/istemci-guvenli";
-import { kg as formatKg, sayiCevir, CINS_ETIKET } from "@/lib/format";
+import { kg as formatKg, sayiCevir } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,9 +32,6 @@ export interface AracSecenek {
 // Select bileşeni boş string value kabul etmediği için manuel giriş sentinel değeri
 const MANUEL_GIRIS = "__MANUEL__";
 
-const CINSLER = ["LEVANT", "GIRESUN", "ORDU", "DIGER"] as const;
-type Cins = (typeof CINSLER)[number];
-
 export function SevkForm({
   depolar,
   cariler,
@@ -49,7 +46,6 @@ export function SevkForm({
 
   const [cariId, setCariId] = useState("");
   const [depoId, setDepoId] = useState(depolar[0]?.id ?? "");
-  const [cins, setCins] = useState<Cins>("LEVANT");
   const [kgGirdi, setKgGirdi] = useState("");
   const [randiman, setRandiman] = useState("");
   const [aracSecim, setAracSecim] = useState(MANUEL_GIRIS); // aracId veya MANUEL_GIRIS
@@ -89,7 +85,6 @@ export function SevkForm({
         plaka,
         sofor,
         depoId,
-        cins,
         // Türkçe ondalık (virgül) ve binlik (nokta) gösterimini güvenli çözer.
         kg: kgDeger,
         randimanPuan: sayiCevir(randiman) > 0 ? sayiCevir(randiman) : undefined,
@@ -198,23 +193,6 @@ export function SevkForm({
                 {depolar.map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.ad}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cins */}
-          <div className="space-y-1">
-            <Label htmlFor="sevk-cins" className="text-[10px] uppercase text-sky-500">Cins</Label>
-            <Select value={cins} onValueChange={(v) => setCins(v as Cins)}>
-              <SelectTrigger id="sevk-cins" className="min-h-11 h-11 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CINSLER.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {CINS_ETIKET[c]}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createSatis } from "@/lib/actions/satis";
 import { sunucuIslemi } from "@/lib/istemci-guvenli";
-import { paraTL, sayiCevir, CINS_ETIKET } from "@/lib/format";
+import { paraTL, sayiCevir } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,8 +22,6 @@ export interface DepoSecenek {
   ad: string;
 }
 
-const CINSLER = ["LEVANT", "GIRESUN", "ORDU", "DIGER"];
-
 export function SatisForm({
   musteriler,
   depolar,
@@ -36,7 +34,6 @@ export function SatisForm({
 
   const [cariId, setCariId] = useState("");
   const [depoId, setDepoId] = useState("");
-  const [cins, setCins] = useState("LEVANT");
   const [kgGirdi, setKgGirdi] = useState("");
   const [birimFiyat, setBirimFiyat] = useState("");
   const [aciklama, setAciklama] = useState("");
@@ -67,7 +64,6 @@ export function SatisForm({
       const sonuc = await sunucuIslemi(() => createSatis({
         cariId,
         depoId,
-        cins: cins as "LEVANT",
         kg: kgDeger,
         birimFiyat: fiyatDeger,
         aciklama: aciklama || undefined,
@@ -115,23 +111,6 @@ export function SatisForm({
           </SelectContent>
         </Select>
         {depolar.length === 0 ? <p className="text-sm font-semibold text-red-300">Satıştan önce aktif bir depo tanımlanmalı.</p> : null}
-      </div>
-
-      {/* Cins */}
-      <div className="space-y-1.5">
-        <Label htmlFor="satis-cins" className="text-base font-bold text-[var(--app-fg)]">Cins</Label>
-        <Select value={cins} onValueChange={setCins}>
-          <SelectTrigger id="satis-cins" className="saha-input bg-slate-800">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CINSLER.map((c) => (
-              <SelectItem key={c} value={c} className="text-base">
-                {CINS_ETIKET[c]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Miktar ve fiyat */}

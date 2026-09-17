@@ -12,15 +12,12 @@ import { KG_MAKS, BIRIM_FIYAT_MAKS, gecerliSayi } from "@/lib/dogrulama";
 
 export interface SatisGirdi {
   cariId: string;
-  cins: "GIRESUN" | "LEVANT" | "ORDU" | "DIGER";
   kg: number;
   birimFiyat: number;
   depoId: string;
   aciklama?: string;
   durum?: "TASLAK" | "ONAYLI";
 }
-
-const GECERLI_CINSLER = new Set(["GIRESUN", "LEVANT", "ORDU", "DIGER"]);
 
 async function depoKendiStogu(tx: Prisma.TransactionClient, depoId: string) {
   const sonuc = await tx.stokHareket.aggregate({
@@ -35,7 +32,6 @@ export async function createSatis(g: SatisGirdi): Promise<{ ok: boolean; hata?: 
   if (g.durum === "ONAYLI" && !izinVar(actor, "SATIS", "ONAYLA")) return { ok: false, hata: "Onaylı satış oluşturma yetkiniz yok" };
   if (!g.cariId) return { ok: false, hata: "Müşteri seçilmedi" };
   if (!g.depoId) return { ok: false, hata: "Satış için depo seçilmedi" };
-  if (!GECERLI_CINSLER.has(g.cins)) return { ok: false, hata: "Geçersiz ürün cinsi" };
   if (!gecerliSayi(g.kg, 0.001, KG_MAKS)) return { ok: false, hata: "Geçerli kg girilmeli" };
   if (!gecerliSayi(g.birimFiyat, 0.0001, BIRIM_FIYAT_MAKS)) return { ok: false, hata: "Geçerli birim fiyat girilmeli" };
 
@@ -70,7 +66,6 @@ export async function createSatis(g: SatisGirdi): Promise<{ ok: boolean; hata?: 
             cariId: g.cariId,
             fisNo,
             tarih: new Date(),
-            cins: g.cins,
             kg: g.kg,
             birimFiyat: g.birimFiyat,
             tutar,

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DurumRozet } from "@/components/rozetler";
-import { kg, paraTL, tarihSaat, CINS_ETIKET } from "@/lib/format";
+import { kg, paraTL, tarihSaat } from "@/lib/format";
 import { RandimanForm } from "@/components/randiman-form";
 import { FlaskConical } from "lucide-react";
 
@@ -11,7 +11,6 @@ interface BekleyenFis {
   id: string;
   fisNo: string;
   cariAd: string;
-  cins: string;
   tarih: string;
   kg: number;
   birimFiyat: number | null;
@@ -45,7 +44,7 @@ export function BekleyenRandimanlar({ fisler, guncelleYetkisi }: { fisler: Bekle
                   <DurumRozet durum="BEKLIYOR" />
                 </div>
                 <div className="text-xs text-sky-100">
-                  {f.fisNo} · {tarihSaat(f.tarih)} · {f.bolge ?? "—"} · {CINS_ETIKET[f.cins] ?? f.cins}
+                  {f.fisNo} · {tarihSaat(f.tarih)} · {f.bolge ?? "—"}
                 </div>
               </div>
               <div className="text-right">

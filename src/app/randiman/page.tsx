@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { PageBaslik } from "@/components/page-baslik";
 import { DurumRozet } from "@/components/rozetler";
-import { kg, paraTL, puan as fmtPuan, tarihSaat, CINS_ETIKET } from "@/lib/format";
+import { kg, paraTL, puan as fmtPuan, tarihSaat } from "@/lib/format";
 import { CheckCircle2, Clock, Calculator } from "lucide-react";
 import { BekleyenRandimanlar } from "@/app/randiman/bekleyen-randimanlar";
 import { getCurrentFirmaId } from "@/lib/auth";
@@ -50,7 +50,6 @@ export default async function RandimanPage() {
               id: f.id,
               fisNo: f.fisNo,
               cariAd: f.cari.ad,
-              cins: f.cins,
               tarih: f.tarih.toISOString(),
               kg: Number(f.kg),
               birimFiyat: f.birimFiyat === null ? null : Number(f.birimFiyat),
@@ -77,7 +76,7 @@ export default async function RandimanPage() {
                   <DurumRozet durum="TAMAM" />
                 </div>
                 <div className="text-xs text-sky-100">
-                  {f.fisNo} · {tarihSaat(f.tarih)} · {f.bolge ?? "—"} · {CINS_ETIKET[f.cins] ?? f.cins}
+                  {f.fisNo} · {tarihSaat(f.tarih)} · {f.bolge ?? "—"}
                 </div>
               </div>
               <div className="text-right">

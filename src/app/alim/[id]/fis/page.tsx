@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentFirma } from "@/lib/auth";
 import { requirePagePermission } from "@/lib/rbac/guard";
-import { CINS_ETIKET, kg, paraTL, puan, tarih } from "@/lib/format";
+import { kg, paraTL, puan, tarih } from "@/lib/format";
 import { YazdirBaslat } from "@/components/yazdir-baslat";
 
 export const dynamic = "force-dynamic";
@@ -54,10 +54,6 @@ export default async function AlimFisPage({ params }: { params: Promise<{ id: st
             <tr className="border-b border-slate-300">
               <td className="py-2 font-bold">Depo</td>
               <td className="py-2">{fis.depo.ad}</td>
-            </tr>
-            <tr className="border-b border-slate-300">
-              <td className="py-2 font-bold">Cins</td>
-              <td className="py-2">{CINS_ETIKET[fis.cins] ?? fis.cins}</td>
             </tr>
             <tr className="border-b border-slate-300">
               <td className="py-2 font-bold">Miktar</td>

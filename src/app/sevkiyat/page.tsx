@@ -132,7 +132,7 @@ export default async function SevkiyatPage() {
                     key={k.id}
                     className="inline-flex items-center rounded-md bg-slate-800 px-2 py-0.5 text-[11px] text-sky-100"
                   >
-                    {k.depo?.ad ?? "—"} · {k.cins ?? "—"} · {kg(k.kg)}
+                    {k.depo?.ad ?? "—"} · {kg(k.kg)}
                   </span>
                 ))}
               </div>

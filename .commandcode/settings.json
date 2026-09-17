@@ -12,7 +12,9 @@
       "Shell(netstat:*)",
       "Shell(findstr:*)",
       "Shell(del /q \"src\\components\\desktop\\wallpaper-context.tsx\" && rmdir \"src\\components\\desktop\" 2>nul && echo DESKTOP_DIR_REMOVED || echo DESKTOP_DIR_KEPT)",
-      "Shell(node \"%COMMANDCODE_SCRATCHPAD%\\db-check.cjs\")"
+      "Shell(node \"%COMMANDCODE_SCRATCHPAD%\\db-check.cjs\")",
+      "mcp__jcodemunch__order",
+      "mcp__jcodemunch__menu"
     ],
     "deny": [],
     "defaultMode": "default"

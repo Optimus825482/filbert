@@ -11,13 +11,11 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { KG_MAKS, RANDIMAN_MAKS, BIRIM_FIYAT_MAKS, gecerliSayi } from "@/lib/dogrulama";
 
-const GECERLI_CINSLER = new Set(["GIRESUN", "LEVANT", "ORDU", "DIGER"]);
 const GECERLI_MULKIYETLER = new Set(["KENDI", "EMANET"]);
 
 export interface AlimGirdi {
   cariId: string;
   depoId: string;
-  cins: "GIRESUN" | "LEVANT" | "ORDU" | "DIGER";
   kg: number;
   randimanPuan?: number;
   mulkiyet: "KENDI" | "EMANET";
@@ -35,7 +33,6 @@ export async function createAlimFisi(g: AlimGirdi): Promise<{ ok: boolean; hata?
   if (g.durum === "ONAYLI" && !izinVar(actor, "ALIM", "ONAYLA")) return { ok: false, hata: "Onaylı alım oluşturma yetkiniz yok" };
   if (!g.cariId) return { ok: false, hata: "Müstahsil seçilmedi" };
   if (!g.depoId) return { ok: false, hata: "Alım için depo seçilmedi" };
-  if (!GECERLI_CINSLER.has(g.cins)) return { ok: false, hata: "Geçersiz ürün cinsi" };
   if (!GECERLI_MULKIYETLER.has(g.mulkiyet)) return { ok: false, hata: "Geçersiz mülkiyet türü" };
   if (!gecerliSayi(g.kg, 0.001, KG_MAKS)) return { ok: false, hata: "Geçerli kg girilmeli" };
   if (g.randimanPuan !== undefined && g.randimanPuan !== null && !gecerliSayi(g.randimanPuan, 0.01, RANDIMAN_MAKS)) {
@@ -93,7 +90,6 @@ export async function createAlimFisi(g: AlimGirdi): Promise<{ ok: boolean; hata?
             depoId: depo.id,
             sezonId: sezon?.id,
             tarih: new Date(),
-            cins: g.cins,
             kg: g.kg,
             randimanPuan: puan,
             randimanDurumu: puan !== null ? "TAMAM" : "BEKLIYOR",

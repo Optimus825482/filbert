@@ -29,7 +29,7 @@ export default async function SatisYonetimiPage() {
       <div className="md:hidden">
         <PageBaslik
           baslik="Satış Yönetimi"
-          alt="Müşteri · cins · miktar · fiyat"
+          alt="Müşteri · miktar · fiyat"
           geri="/findik-islemleri"
         />
       </div>
@@ -38,7 +38,7 @@ export default async function SatisYonetimiPage() {
       <div className="mb-4 hidden items-center justify-between md:flex">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--app-fg)]">Satış Yönetimi</h1>
-          <p className="text-sm text-sky-100">Müşteri · cins · miktar · fiyat</p>
+          <p className="text-sm text-sky-100">Müşteri · miktar · fiyat</p>
         </div>
         {olusturmaYetkisi && <Link
           href="/satis/yeni"
@@ -68,7 +68,7 @@ export default async function SatisYonetimiPage() {
                 <DurumRozet durum={s.durum} />
               </div>
               <div className="mt-0.5 text-xs text-sky-100">
-                {s.fisNo} · {tarihSaat(s.tarih)} · {s.cins}
+                {s.fisNo} · {tarihSaat(s.tarih)}
                 {s.aciklama ? ` · ${s.aciklama}` : ""}
               </div>
             </div>
@@ -99,7 +99,6 @@ export default async function SatisYonetimiPage() {
             <tr className="border-b border-[var(--surface-border)] text-left text-[10px] uppercase tracking-wider text-sky-500">
               <th className="px-5 py-2.5 font-bold">Fiş No</th>
               <th className="px-3 py-2.5 font-bold">Müşteri</th>
-              <th className="px-3 py-2.5 font-bold">Cins</th>
               <th className="px-3 py-2.5 font-bold">Tarih</th>
               <th className="px-3 py-2.5 font-bold text-right">Net kg</th>
               <th className="px-3 py-2.5 font-bold text-right">Birim Fiyat</th>
@@ -118,7 +117,6 @@ export default async function SatisYonetimiPage() {
                 <td className="px-3 py-3">
                   <span className="font-bold text-[var(--app-fg)]">{s.cari.ad}</span>
                 </td>
-                <td className="px-3 py-3 text-xs text-sky-100">{s.cins}</td>
                 <td className="px-3 py-3 text-xs tabular-nums text-sky-100">{tarih(s.tarih)}</td>
                 <td className="px-3 py-3 text-right font-bold tabular-nums text-[var(--app-fg)]">
                   {kg(Number(s.kg))}

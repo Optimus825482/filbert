@@ -178,13 +178,6 @@ enum StokHareketTip {
   MULKIYET_DONUSUM
 }
 
-enum Cins {
-  GIRESUN
-  LEVANT
-  ORDU
-  DIGER
-}
-
 // ─── ORGANİZASYON ───────────────────────────────────────────
 
 model Firma {
@@ -459,7 +452,6 @@ model AlimFisi {
   subeId         String?
   sezonId        String?
   tarih          DateTime      @default(now())
-  cins           Cins
   kg             Decimal       @db.Decimal(12, 3)
   randimanPuan   Decimal?      @db.Decimal(5, 2)
   randimanDurumu RandimanDurum @default(BEKLIYOR)
@@ -729,7 +721,6 @@ model Satis {
   cari       CariKart @relation(fields: [cariId], references: [id])
   fisNo      String?
   tarih      DateTime @default(now()) @db.Date
-  cins       Cins
   kg         Decimal  @db.Decimal(12, 3)
   birimFiyat Decimal  @db.Decimal(10, 2)
   tutar      Decimal  @db.Decimal(14, 2)
@@ -795,7 +786,6 @@ model SevkiyatKalem {
   depoId String
   depo   Depo   @relation(fields: [depoId], references: [id], onDelete: Restrict)
 
-  cins Cins?
   kg   Decimal @db.Decimal(12, 3)
   not  String?
 }

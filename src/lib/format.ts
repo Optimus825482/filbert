@@ -79,10 +79,3 @@ export const BAKIYE_ETIKET: Record<string, string> = {
   XAU: "Altın (gr)",
   FINDIK_KG: "Fındık (kg)",
 };
-
-export const CINS_ETIKET: Record<string, string> = {
-  GIRESUN: "Giresun",
-  LEVANT: "Levant",
-  ORDU: "Ordu",
-  DIGER: "Diğer",
-};

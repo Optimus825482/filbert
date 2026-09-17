@@ -186,9 +186,7 @@ export default async function KarZararPage({
                 className="ozet-kart flex items-center justify-between py-3"
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-bold">
-                    {s.cins ? cinsLabel(s.cins) : "Satış"}
-                  </div>
+                  <div className="text-sm font-bold">Satış</div>
                   <div className="text-xs text-muted-foreground">
                     {s.fisNo || `#${s.id.slice(0, 8)}`} · {tarih(s.tarih)}
                     {s.aciklama ? ` · ${s.aciklama}` : ""}
@@ -377,14 +375,4 @@ export default async function KarZararPage({
         )}
     </div>
   );
-}
-
-function cinsLabel(c: string): string {
-  const map: Record<string, string> = {
-    GIRESUN: "Giresun",
-    LEVANT: "Levant",
-    ORDU: "Ordu",
-    DIGER: "Diğer",
-  };
-  return map[c] ?? c;
 }

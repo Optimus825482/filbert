@@ -7,7 +7,7 @@ import { createAlimFisi } from "@/lib/actions/alim";
 import { cariOlustur } from "@/lib/actions/cari";
 import { sunucuIslemi } from "@/lib/istemci-guvenli";
 import { tutarHesapla } from "@/lib/hesap";
-import { paraTL, sayiCevir, CINS_ETIKET } from "@/lib/format";
+import { paraTL, sayiCevir } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +31,6 @@ export interface DepoSecenek {
   ad: string;
 }
 
-const CINSLER = ["LEVANT", "GIRESUN", "ORDU", "DIGER"];
 const HIZLI_KAYIT_DEGERI = "__HIZLI_KAYIT__";
 
 export function AlimForm({
@@ -51,7 +50,6 @@ export function AlimForm({
   const [cariId, setCariId] = useState("");
   const [hizliKayitAd, setHizliKayitAd] = useState("");
   const [depoId, setDepoId] = useState("");
-  const [cins, setCins] = useState("LEVANT");
   const [mulkiyet, setMulkiyet] = useState<"KENDI" | "EMANET">("KENDI");
   const [netKg, setNetKg] = useState("");
   const [randiman, setRandiman] = useState("");
@@ -116,7 +114,6 @@ export function AlimForm({
       const sonuc = await sunucuIslemi(() => createAlimFisi({
         cariId,
         depoId,
-        cins: cins as "LEVANT",
         kg: kgDegeri,
         randimanPuan: randimanGecerli ? randimanPuan : undefined,
         mulkiyet,
@@ -207,39 +204,22 @@ export function AlimForm({
         {depolar.length === 0 ? <p className="text-sm font-semibold text-red-300">Alımdan önce aktif bir depo tanımlanmalı.</p> : null}
       </div>
 
-      {/* Cins + Mülkiyet */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="alim-cins" className="text-base font-bold">Cins</Label>
-          <Select value={cins} onValueChange={setCins}>
-            <SelectTrigger id="alim-cins" className="saha-input bg-slate-800">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CINSLER.map((c) => (
-                <SelectItem key={c} value={c} className="text-base">
-                  {CINS_ETIKET[c]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-base font-bold">Alım Şekli</Label>
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border bg-slate-800">
-            {(["KENDI", "EMANET"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMulkiyet(m)}
-                className={`min-h-14 text-sm font-bold transition-colors ${
-                  mulkiyet === m ? "bg-filbert-600 text-white" : "text-sky-100"
-                }`}
-              >
-                {m === "KENDI" ? "Peşin / Bozdur" : "Emanet"}
-              </button>
-            ))}
-          </div>
+      {/* Alım şekli (mülkiyet) */}
+      <div className="space-y-1.5">
+        <Label className="text-base font-bold">Alım Şekli</Label>
+        <div className="grid grid-cols-2 overflow-hidden rounded-xl border bg-slate-800">
+          {(["KENDI", "EMANET"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMulkiyet(m)}
+              className={`min-h-14 text-sm font-bold transition-colors ${
+                mulkiyet === m ? "bg-filbert-600 text-white" : "text-sky-100"
+              }`}
+            >
+              {m === "KENDI" ? "Peşin / Bozdur" : "Emanet"}
+            </button>
+          ))}
         </div>
       </div>
 

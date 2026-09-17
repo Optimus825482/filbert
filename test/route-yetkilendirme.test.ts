@@ -344,7 +344,6 @@ test("finansal mutasyonlar geçersiz enum değerlerini sunucuda reddeder", () =>
   assert.match(avans, /\["TL", "USD", "EUR", "XAU"\]/);
   assert.match(masraf, /masrafTuru\.findFirst/);
   assert.match(masraf, /Masraf türü bulunamadı/);
-  assert.match(alim, /Geçersiz ürün cinsi/);
   assert.match(alim, /Geçersiz mülkiyet türü/);
 });
 

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentFirma } from "@/lib/auth";
 import { requirePagePermission } from "@/lib/rbac/guard";
-import { CINS_ETIKET, kg, paraTL, tarih } from "@/lib/format";
+import { kg, paraTL, tarih } from "@/lib/format";
 import { YazdirBaslat } from "@/components/yazdir-baslat";
 
 export const dynamic = "force-dynamic";
@@ -47,10 +47,6 @@ export default async function SatisFisPage({ params }: { params: Promise<{ id: s
             <tr className="border-b border-slate-300">
               <td className="w-1/3 py-2 font-bold">Müşteri / Fabrika</td>
               <td className="py-2">{satis.cari.ad}</td>
-            </tr>
-            <tr className="border-b border-slate-300">
-              <td className="py-2 font-bold">Cins</td>
-              <td className="py-2">{CINS_ETIKET[satis.cins] ?? satis.cins}</td>
             </tr>
             <tr className="border-b border-slate-300">
               <td className="py-2 font-bold">Miktar</td>
