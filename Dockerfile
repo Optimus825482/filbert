@@ -10,16 +10,18 @@
 # zamanı imajında motor ikilisi bulunmak zorunda değildir.
 
 # ─── Ortak taban ─────────────────────────────────────────────
-FROM node:20-bookworm-slim AS base
-ENV PNPM_HOME=/pnpm \
-    PATH=/pnpm:$PATH \
-    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
-    NEXT_TELEMETRY_DISABLED=1
+# Node 24 LTS zorunlu: pnpm 11 `node:sqlite` yerleşik modülünü kullanır ve bu
+# modül Node 22.5+ ile gelir (pnpm 11 en az Node 22.13 ister). Prisma 7 de
+# `>=24.0` bildirir. Node 20 ile `pnpm install` ERR_UNKNOWN_BUILTIN_MODULE
+# hatasıyla çöker.
+FROM node:24-bookworm-slim AS base
+ENV NEXT_TELEMETRY_DISABLED=1
 # openssl: Prisma CLI'ın platform/motor seçimi için gerekir.
+# pnpm sürümü burada sabitlenir; corepack'e bağımlı kalınmaz.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
- && corepack enable
+ && npm install -g pnpm@11.19.0
 WORKDIR /app
 
 # ─── Bağımlılıklar ───────────────────────────────────────────
@@ -57,8 +59,8 @@ ENV NODE_ENV=production \
     PORT=3066 \
     HOSTNAME=0.0.0.0
 
-RUN groupadd --system --gid 1001 nodejs \
- && useradd --system --uid 1001 --gid nodejs --create-home nextjs
+RUN groupadd --gid 1001 nodejs \
+ && useradd --uid 1001 --gid nodejs --create-home nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

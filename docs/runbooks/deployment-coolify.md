@@ -21,6 +21,7 @@ Başlatma sırası `docker-compose.yaml` içinde zorlanır: **db sağlıklı →
 1. `akaydin.erkanerdem.online` için A kaydı Coolify sunucusunun IP adresine yönlendirilmiş olmalı.
 2. Kod GitHub deposunda olmalı — Coolify imajı bu depodan derler.
 3. Coolify'da en az bir sunucu ve destination tanımlı olmalı.
+4. İmaj tabanı **Node 24 LTS**'tir. Bu zorunludur: pnpm 11, yalnızca Node 22.5+ ile gelen `node:sqlite` yerleşik modülünü kullanır ve en az Node 22.13 ister; Prisma 7 ise `>=24.0` bildirir. Node 20 tabanlı bir imajda `pnpm install` şu hatayla çöker: `ERR_UNKNOWN_BUILTIN_MODULE: No such built-in module: node:sqlite`. Depodaki `.nvmrc` ve Dockerfile bu sürümü birlikte sabitler.
 
 ## 2. Coolify kaynağını oluşturma
 
@@ -29,7 +30,10 @@ Başlatma sırası `docker-compose.yaml` içinde zorlanır: **db sağlıklı →
    - **Build Pack**: `Docker Compose`
    - **Base Directory**: `/`
    - **Docker Compose Location**: `/docker-compose.yaml`
-3. **Configuration → Advanced** altında **Inject Build Args to Dockerfile** seçeneğini **kapatın**. Dockerfile hiçbir `ARG` tüketmediği için bu ayar yalnızca ortam değişkenlerinin imaj katmanlarına sızma riskini ortadan kaldırır.
+3. **Configuration → Advanced** altında **Inject Build Args to Dockerfile** seçeneğini **kapatın**.
+
+   Bu ayar açıkken Coolify, ortam değişkenlerini Dockerfile'a `ARG` olarak enjekte eder ve derlemeye `--build-arg SYSTEM_ADMIN_PASS --build-arg SERVICE_PASSWORD_64_DB ...` şeklinde geçirir. Dağıtım günlüğünde `Added 50 ARG declarations to Dockerfile` satırı bunun işaretidir. Uygulama bu değerleri derleme sırasında kullanmadığı için enjeksiyonun hiçbir faydası yoktur; buna karşılık veritabanı ve yönetici parolaları imaj derleme meta verisine sızabilir.
+
 4. Kaydedin ve **Docker Compose Content** alanında üç servisin de göründüğünü doğrulayın.
 
 ## 3. Alan adı
@@ -125,6 +129,8 @@ Ayrıntılı saklama ve geri yükleme tatbikatı için [Yedekleme ve geri yükle
 
 | Belirti | Olası neden ve çözüm |
 |---|---|
+| Derleme `pnpm install` adımında `ERR_UNKNOWN_BUILTIN_MODULE: No such built-in module: node:sqlite` ile duruyor | Dockerfile tabanı Node 20 kalmış. `FROM node:24-bookworm-slim` olmalı; pnpm 11 en az Node 22.13 ister. (`warn: This version of pnpm requires at least Node.js v22.13` satırı da aynı sorunu gösterir.) |
+| Derleme günlüğünde `Added N ARG declarations to Dockerfile` görünüyor | **Inject Build Args to Dockerfile** açık. Coolify ortam değişkenlerini derleme argümanı olarak geçiriyor. Bölüm 2.3'teki gibi kapatın. |
 | Tarayıcıda `No available server` | `app` sağlık denetimini geçemiyor. `Deployments → Logs` ve `/api/health` yanıtına bakın. Alan adı `_3066` port ekiyle tanımlı olmalı. |
 | `/api/health` `503` döndürüyor | Uygulama ayakta ama veritabanına erişemiyor. `DATABASE_URL` içindeki parolanın `SERVICE_PASSWORD_64_DB` ile aynı olduğunu ve `db` konteynerinin `healthy` olduğunu doğrulayın. |
 | `migrate` konteyneri sıfırdan farklı kodla çıkıyor | Günlükteki Prisma hatasına bakın. En sık neden: parola uyuşmazlığı veya `db` henüz `healthy` değilken başlatılması. |
