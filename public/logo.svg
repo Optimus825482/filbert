@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Filbert logo">
+  <defs>
+    <linearGradient id="yaprak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="yaprakKoyu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#14532d"/>
+    </linearGradient>
+    <radialGradient id="findikGovde" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#b45309"/>
+      <stop offset="1" stop-color="#78350f"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Dış yıldız: 8 köşeli çam yaprağı çerçevesi -->
+  <path d="M256 8 L288 64 L352 40 L360 112 L432 120 L408 184 L472 208 L440 256 L472 304 L408 328 L432 392 L360 400 L352 472 L288 448 L256 504 L224 448 L160 472 L152 400 L80 392 L104 328 L40 304 L72 256 L40 208 L104 184 L80 120 L152 112 L160 40 L224 64 Z"
+        fill="url(#yaprakKoyu)" opacity="0.35"/>
+
+  <!-- 4 ana yaprak (pusula) -->
+  <g stroke-linecap="round">
+    <path d="M256 256 C216 176 224 96 256 44 C288 96 296 176 256 256 Z" fill="url(#yaprak)"/>
+    <path d="M256 256 C336 216 416 224 468 256 C416 288 336 296 256 256 Z" fill="url(#yaprak)"/>
+    <path d="M256 256 C296 336 288 416 256 468 C224 416 216 336 256 256 Z" fill="url(#yaprak)"/>
+    <path d="M256 256 C176 296 96 288 44 256 C96 224 176 216 256 256 Z" fill="url(#yaprak)"/>
+  </g>
+
+  <!-- Devre hatları (dijital akıl) -->
+  <g stroke="#22d3ee" stroke-width="7" fill="none" opacity="0.95">
+    <path d="M256 240 L256 120 L236 100"/>
+    <path d="M272 256 L392 256 L412 236"/>
+    <path d="M256 272 L256 392 L276 412"/>
+    <path d="M240 256 L120 256 L100 276"/>
+  </g>
+  <g fill="#22d3ee">
+    <circle cx="256" cy="120" r="10"/>
+    <circle cx="392" cy="256" r="10"/>
+    <circle cx="256" cy="392" r="10"/>
+    <circle cx="120" cy="256" r="10"/>
+    <circle cx="236" cy="100" r="8"/>
+    <circle cx="412" cy="236" r="8"/>
+    <circle cx="276" cy="412" r="8"/>
+    <circle cx="100" cy="276" r="8"/>
+  </g>
+
+  <!-- Fındık -->
+  <circle cx="256" cy="256" r="58" fill="url(#findikGovde)"/>
+  <ellipse cx="256" cy="228" rx="34" ry="16" fill="#92400e" opacity="0.85"/>
+  <path d="M256 206 C248 190 250 178 256 168 C262 178 264 190 256 206 Z" fill="#65a30d"/>
+  <ellipse cx="238" cy="244" rx="12" ry="20" fill="#d97706" opacity="0.5"/>
+</svg>

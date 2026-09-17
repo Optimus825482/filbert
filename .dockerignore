@@ -1,0 +1,37 @@
+# Sürüm kontrolü ve yerel araç dizinleri
+/.git
+/.gitignore
+/.github
+/.agents
+/.claude
+/.commandcode
+/.windsurf
+/.vscode
+
+# Bağımlılıklar ve derleme çıktıları (imaj içinde yeniden üretilir)
+node_modules
+/.next
+/out
+/build
+/coverage
+/test-results
+*.tsbuildinfo
+
+# Sırlar — imaja asla girmemeli
+.env
+.env.*
+!.env.example
+
+# Yerel geliştirme ve doğrulama dosyaları (imajda gerekmez)
+/test
+/e2e
+/playwright.config.ts
+/docs
+*.log
+/filbert-dev.ps1
+/_tmp_hash.txt
+
+# Belgeler (derleme önbelleğini gereksiz bozmasın)
+/README.md
+/AGENTS.md
+/CLAUDE.md

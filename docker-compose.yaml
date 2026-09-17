@@ -1,0 +1,89 @@
+# Filbert — Coolify üzerinde tek proje, iki kalıcı konteyner + bir tek seferlik göç konteyneri.
+#
+#   db      → PostgreSQL 17 (kalıcı veri hacmi: filbert-db-data)
+#   migrate → "prisma migrate deploy"; tabloları, indeksleri ve kısıtları kurar
+#   app     → Next.js 16 standalone sunucusu (https://akaydin.erkanerdem.online)
+#
+# Dağıtım sırası: db sağlıklı olur → migrate başarıyla biter → app ayağa kalkar.
+# Böylece uygulama, şeması hazır olmayan bir veritabanına hiçbir zaman bağlanmaz.
+#
+# Dışarıya açılan tek servis app'tir. Domain, Coolify'ın SERVICE_FQDN_APP_3066
+# değişkeni üzerinden tanımlanır; bu yüzden `ports:` yayınlanmaz (yayınlanan bir
+# ana makine portu, alan adı yönlendirmesini devre dışı bırakır).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: filbert
+      POSTGRES_DB: filbert
+      # Coolify bu parolayı ilk dağıtımda üretir ve sonraki dağıtımlarda aynı
+      # değeri korur; Environment Variables ekranından görülebilir ve
+      # değiştirilebilir. Parola URL'e gömüldüğü için Coolify'ın simgesiz
+      # (alfanümerik) üreteci bilinçli olarak seçilmiştir.
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_DB}
+    volumes:
+      - filbert-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U filbert -d filbert"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://filbert:${SERVICE_PASSWORD_64_DB}@db:5432/filbert?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    # Tek seferlik iş: başarıyla bitip çıkar, bu yüzden genel uygulama
+    # sağlık durumunu belirlememelidir.
+    exclude_from_hc: true
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://filbert:${SERVICE_PASSWORD_64_DB}@db:5432/filbert?schema=public
+      # Sistem yöneticisi kimliği: /giris ekranında bu e-posta + parola ile
+      # oturum açılır, ardından tek seferlik /setup ekranı tamamlanır.
+      SYSTEM_ADMIN_MAIL: ${SYSTEM_ADMIN_MAIL:?}
+      SYSTEM_ADMIN_PASS: ${SYSTEM_ADMIN_PASS:?}
+      # Yalnızca /setup ekranını açan tek kullanımlık kurulum parolası.
+      # İlk kurulum tamamlandıktan sonra değeri boşaltılabilir; zorunlu
+      # tutulmamasının sebebi budur.
+      SYSTEM_MAIN_PASS: ${SYSTEM_MAIN_PASS}
+      # Coolify, alan adını bu değişkenden okur ve 3066 portuna yönlendirir.
+      SERVICE_FQDN_APP_3066: ${SERVICE_FQDN_APP_3066:-akaydin.erkanerdem.online}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # İmajda curl/wget yok; Node 20'nin yerleşik fetch'i kullanılıyor.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3066/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Next.js, kapanış sinyalinde uçuştaki istekleri ve after() geri çağrılarını
+    # tamamlar; veritabanı işlemlerinin yarıda kesilmemesi için süre tanınır.
+    stop_grace_period: 30s
+
+volumes:
+  # Sabit ad: Coolify kaynağı silinip yeniden oluşturulsa bile ticari veriler korunur.
+  filbert-db-data:
+    name: filbert-db-data

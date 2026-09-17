@@ -1,0 +1,839 @@
+// Filbert — Kapalı-devre fındık ticareti şeması
+// Akış: müstahsil alım → emanet → muhasebeleştir → fabrika sevk
+//       → fabrika emanet → muhasebeleştir (satış) 
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUM'LAR ───────────────────────────────────────────────
+
+enum Rol {
+  PATRON
+  MUHASEBE
+  KANTAR
+  SAHA
+  SALT_OKUNUR
+}
+
+// Eski Rol enumu, mevcut kayıtlar ve geçiş dönemi ekranları için korunur.
+// Yeni yetkilendirme, YetkiRolu/RolIzni/KullaniciRol modelleri üzerinden yapılır.
+enum PlatformRol {
+  SISTEM_YONETICISI
+}
+
+enum UygulamaModulu {
+  DASHBOARD
+  ALIM
+  RANDIMAN
+  EMANET
+  AVANS
+  CARI
+  FINANS
+  MASRAF
+  STOK
+  SATIS
+  SEVKIYAT
+  TANIMLAR
+  RAPORLAR
+  AYARLAR
+  KULLANICI_YONETIMI
+  SESLI_NOT
+}
+
+enum IzinEylemi {
+  GORUNTULE
+  OLUSTUR
+  GUNCELLE
+  SIL
+  ONAYLA
+  IPTAL
+  YONET
+}
+
+enum AuditEylemi {
+  KURULUM
+  GIRIS
+  CIKIS
+  OLUSTUR
+  GUNCELLE
+  SIL
+  ONAYLA
+  IPTAL
+  YETKILENDIR
+}
+
+enum SesliNotDurum {
+  TASLAK
+  ONAYLANDI
+  IPTAL
+}
+
+enum FinansTaslakDurum {
+  INCELEME_BEKLIYOR
+  EKSIK_BILGI
+  ONAYLANDI
+  REDDEDILDI
+}
+
+enum FinansTaslakTipi {
+  ODEME
+  TAHSILAT
+  MASRAF
+  BELIRSIZ
+}
+
+enum CariTur {
+  URETICI
+  TUCCAR
+  FABRIKA
+}
+
+enum BakiyeTuru {
+  TL
+  USD
+  EUR
+  XAU // gram altın
+  FINDIK_KG // emanet fındık bakiyesi
+}
+
+enum Yon {
+  BORC // firmanın borcu artar (ör: alım)
+  ALACAK // firmanın alacağı artar / borcu azalır (ör: ödeme)
+}
+
+enum KaynakTipi {
+  ACILIS
+  ALIM
+  EMANET_BOZMA
+  AVANS
+  ODEME
+  TAHSILAT
+  MASRAF
+  SATIS
+  KUR_FARKI
+}
+
+enum FisDurum {
+  TASLAK
+  ONAYLI
+  IPTAL
+}
+
+enum RandimanDurum {
+  BEKLIYOR
+  TAMAM
+}
+
+enum Mulkiyet {
+  KENDI
+  EMANET
+}
+
+enum EmanetDurum {
+  ACIK
+  KISMI_BOZULDU
+  KAPANDI
+}
+
+enum EmanetHareketTip {
+  GIRIS
+  BOZMA
+  IADE
+}
+
+enum AvansTur {
+  NAKIT
+  AYNI
+  FINDIK_KARSILIGI
+}
+
+enum AvansDurum {
+  ACIK
+  KAPANDI
+}
+
+enum FinansTip {
+  ODEME
+  TAHSILAT
+  VIRMAN
+}
+
+enum HesapTip {
+  KASA
+  BANKA
+}
+
+enum StokHareketTip {
+  ALIM_GIRIS
+  SATIS_CIKIS
+  SEVK_CIKIS
+  TRANSFER
+  DUZELTME
+  MULKIYET_DONUSUM
+}
+
+enum Cins {
+  GIRESUN
+  LEVANT
+  ORDU
+  DIGER
+}
+
+// ─── ORGANİZASYON ───────────────────────────────────────────
+
+model Firma {
+  id                      String    @id @default(uuid())
+  unvan                   String
+  vergiNo                 String?
+  vergiDairesi            String?
+  adres                   String?
+  il                      String?
+  ilce                    String?
+  postaKodu               String?
+  telefon                 String?
+  eposta                  String?
+  ayarlar                 Json?
+  aktif                   Boolean   @default(true)
+  kurulumTamamlandiAt     DateTime?
+  kuranSistemYoneticisiId String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([vergiNo])
+
+  subeler               Sube[]
+  kullanicilar          Kullanici[]
+  yetkiRolleri          YetkiRolu[]
+  auditKayitlari        AuditKaydi[]
+  kuranSistemYoneticisi SistemYoneticisi? @relation("FirmaKurucu", fields: [kuranSistemYoneticisiId], references: [id], onDelete: SetNull)
+  sezonlar              Sezon[]
+  cariler               CariKart[]
+  hesaplar              KasaHesap[]
+  masraflar             Masraf[]
+  depolar               Depo[]
+  alimFisleri           AlimFisi[]
+  satisler              Satis[]
+  sevkiyatlar           Sevkiyat[]
+  araclar               Arac[]
+  personeller           Personel[]
+  sesliNotlar           SesliNot[]
+  finansTaslaklari      FinansTaslagi[]
+  finansHareketleri     FinansHareket[]
+  masrafTurleri         MasrafTuru[]
+}
+
+// İşletmenin operasyonlarında yer almaz; ilk kurulum, firma provizyonu ve
+// platform bakımı için uygulama geliştiricisinin hesabıdır.
+model SistemYoneticisi {
+  id         String      @id @default(uuid())
+  ad         String
+  eposta     String      @unique
+  sifreHash  String
+  rol        PlatformRol @default(SISTEM_YONETICISI)
+  aktif      Boolean     @default(true)
+  sonGirisAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  kurduguFirmalar Firma[]           @relation("FirmaKurucu")
+  kurulumKaydi    UygulamaKurulumu?
+  auditKayitlari  AuditKaydi[]
+  oturumlar       Oturum[]
+}
+
+// Tek satırlık uygulama seviyesi kurulum işareti. `id` uygulama kodu
+// tarafından "global" olarak kullanılır; ilk setup ikinci kez çalıştırılamaz.
+model UygulamaKurulumu {
+  id                     String   @id @default("global")
+  ilkKurulumTamamlandiAt DateTime @default(now())
+  sistemYoneticisiId     String   @unique
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  sistemYoneticisi SistemYoneticisi @relation(fields: [sistemYoneticisiId], references: [id], onDelete: Restrict)
+}
+
+model Sube {
+  id      String  @id @default(uuid())
+  firmaId String
+  firma   Firma   @relation(fields: [firmaId], references: [id])
+  ad      String
+  tip     String  @default("MERKEZ")
+  aktif   Boolean @default(true)
+}
+
+model Kullanici {
+  id         String    @id @default(uuid())
+  firmaId    String
+  firma      Firma     @relation(fields: [firmaId], references: [id])
+  subeId     String?
+  ad         String
+  telefon    String?
+  eposta     String?   @unique
+  sifreHash  String?
+  // Legacy görüntü/taşıma etiketi. Yeni erişim denetimi rol atamalarından okunur.
+  rol        Rol?
+  aktif      Boolean   @default(true)
+  sonGirisAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  roller           KullaniciRol[]
+  auditKayitlari   AuditKaydi[]
+  oturumlar        Oturum[]
+  sesliNotlar      SesliNot[]
+  finansTaslaklari FinansTaslagi[] @relation("FinansTaslagiOlusturan")
+
+  @@index([firmaId, aktif])
+}
+
+model YetkiRolu {
+  id         String   @id @default(uuid())
+  firmaId    String
+  firma      Firma    @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  kod        String
+  ad         String
+  aciklama   String?
+  sistemRolu Boolean  @default(false)
+  aktif      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  izinler      RolIzni[]
+  kullanicilar KullaniciRol[]
+
+  @@unique([firmaId, kod])
+  @@index([firmaId, aktif])
+}
+
+model RolIzni {
+  rolId     String
+  rol       YetkiRolu      @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  modul     UygulamaModulu
+  eylem     IzinEylemi
+  createdAt DateTime       @default(now())
+
+  @@id([rolId, modul, eylem])
+}
+
+model KullaniciRol {
+  kullaniciId String
+  kullanici   Kullanici @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  rolId       String
+  rol         YetkiRolu @relation(fields: [rolId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@id([kullaniciId, rolId])
+  @@index([rolId])
+}
+
+// Yalnız token özeti saklanır; ham oturum tokenı veritabanına yazılmaz.
+// Bir kaydın ya firma kullanıcısına ya da sistem yöneticisine ait olması,
+// oturum oluşturma katmanında zorunlu tutulur.
+model Oturum {
+  id                 String            @id @default(uuid())
+  tokenHash          String            @unique
+  kullaniciId        String?
+  kullanici          Kullanici?        @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  sistemYoneticisiId String?
+  sistemYoneticisi   SistemYoneticisi? @relation(fields: [sistemYoneticisiId], references: [id], onDelete: Cascade)
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  ipAdresi           String?
+  kullaniciAracisi   String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([kullaniciId, expiresAt])
+  @@index([sistemYoneticisiId, expiresAt])
+}
+
+// Değiştirilemez denetim izi. Uygulama katmanı her işlevsel mutasyonda bir
+// kayıt oluşturur; hem firma hem de platform yöneticisi eylemleri izlenebilir.
+model AuditKaydi {
+  id                 String            @id @default(uuid())
+  firmaId            String?
+  firma              Firma?            @relation(fields: [firmaId], references: [id], onDelete: SetNull)
+  kullaniciId        String?
+  kullanici          Kullanici?        @relation(fields: [kullaniciId], references: [id], onDelete: SetNull)
+  sistemYoneticisiId String?
+  sistemYoneticisi   SistemYoneticisi? @relation(fields: [sistemYoneticisiId], references: [id], onDelete: SetNull)
+  modul              UygulamaModulu?
+  eylem              AuditEylemi
+  hedefTipi          String?
+  hedefId            String?
+  oncekiVeri         Json?
+  sonrakiVeri        Json?
+  ipAdresi           String?
+  kullaniciAracisi   String?
+  aciklama           String?
+  basarili           Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+
+  @@index([firmaId, createdAt])
+  @@index([kullaniciId, createdAt])
+  @@index([sistemYoneticisiId, createdAt])
+  @@index([hedefTipi, hedefId])
+}
+
+model Sezon {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id])
+  ad        String // '2026-27'
+  baslangic DateTime @db.Date
+  bitis     DateTime @db.Date
+  aktif     Boolean  @default(true)
+
+  @@unique([firmaId, ad])
+}
+
+// ─── CARİ & DEFTER ──────────────────────────────────────────
+
+model CariKart {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id])
+  tur       CariTur
+  ad        String
+  tckn      String?
+  vergiNo   String?
+  telefon   String?
+  bolge     String?
+  favori    Boolean  @default(false)
+  notAlani  String?
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  hareketler       CariHareket[]
+  alimFisleri      AlimFisi[]
+  emanetler        Emanet[]
+  avanslar         Avans[]
+  finansTaslaklari FinansTaslagi[]
+  satisler         Satis[]
+  sevkiyatlar      Sevkiyat[]
+  masraflar        Masraf[]
+
+  @@index([firmaId, tur])
+  @@index([firmaId, ad])
+}
+
+model CariHareket {
+  id          String     @id @default(uuid())
+  cariId      String
+  cari        CariKart   @relation(fields: [cariId], references: [id])
+  yon         Yon
+  bakiyeTuru  BakiyeTuru
+  tutar       Decimal    @db.Decimal(18, 3)
+  kaynakTipi  KaynakTipi
+  kaynakId    String?
+  vadeTarihi  DateTime?  @db.Date
+  sezonId     String?
+  aciklama    String?
+  olusturanId String?
+  createdAt   DateTime   @default(now())
+
+  @@index([cariId, bakiyeTuru])
+  @@index([createdAt])
+}
+
+// ─── ALIM ───────────────────────────────────────────────────
+
+model AlimFisi {
+  id             String        @id @default(uuid())
+  firmaId        String
+  firma          Firma         @relation(fields: [firmaId], references: [id], onDelete: Restrict)
+  fisNo          String
+  // Firma bazlı sıralı 3 haneli satın alma kodu: 001, 002, ... (999 sonrası doğal büyür)
+  satinAlmaKodu  String
+  cariId         String
+  cari           CariKart      @relation(fields: [cariId], references: [id])
+  depoId         String
+  depo           Depo          @relation(fields: [depoId], references: [id], onDelete: Restrict)
+  subeId         String?
+  sezonId        String?
+  tarih          DateTime      @default(now())
+  cins           Cins
+  kg             Decimal       @db.Decimal(12, 3)
+  randimanPuan   Decimal?      @db.Decimal(5, 2)
+  randimanDurumu RandimanDurum @default(BEKLIYOR)
+  // Yalnız peşin (KENDİ) alımda kullanılır; emanet alımda fiyat
+  // muhasebeleştirme (hesap gör) anında girilir.
+  birimFiyat     Decimal?      @db.Decimal(10, 2)
+  tutar          Decimal?      @db.Decimal(14, 2)
+  bolge          String?
+  mulkiyetKaynak Mulkiyet      @default(KENDI)
+  durum          FisDurum      @default(ONAYLI)
+  onaylayanId    String?
+  createdAt      DateTime      @default(now())
+
+  // Taslak hâlinde seçilen avans mahsubu fişte hatırlanır; onaylandığında
+  // uygulanır. Doğrudan onaylı oluşturulan fişte mahsup anında işlenir.
+  avansMahsupId    String?
+  avansMahsupTutar Decimal?     @db.Decimal(14, 2)
+  avansMahsup      Avans?       @relation("AlimFisiAvans", fields: [avansMahsupId], references: [id], onDelete: SetNull)
+
+  emanet    Emanet?   @relation("AlimFisiEmanet")
+  masraflar Masraf[]
+
+  @@unique([firmaId, fisNo])
+  @@unique([firmaId, satinAlmaKodu])
+  @@index([tarih])
+  @@index([firmaId, tarih])
+  @@index([cariId, tarih])
+}
+
+// ─── EMANET ─────────────────────────────────────────────────
+
+model Emanet {
+  id           String      @id @default(uuid())
+  alimFisiId   String?     @unique
+  alimFisi     AlimFisi?   @relation("AlimFisiEmanet", fields: [alimFisiId], references: [id])
+  cariId       String
+  cari         CariKart    @relation(fields: [cariId], references: [id])
+  depoId       String
+  depo         Depo        @relation(fields: [depoId], references: [id], onDelete: Restrict)
+  sezonId      String?
+  durum        EmanetDurum @default(ACIK)
+  acilisTarihi DateTime    @default(now())
+
+  hareketler EmanetHareket[]
+}
+
+model EmanetHareket {
+  id        String           @id @default(uuid())
+  emanetId  String
+  emanet    Emanet           @relation(fields: [emanetId], references: [id])
+  tip       EmanetHareketTip
+  kg        Decimal          @db.Decimal(12, 3)
+  tutarTl   Decimal?         @db.Decimal(14, 2)
+  createdAt DateTime         @default(now())
+
+  @@index([emanetId])
+}
+
+// ─── AVANS ──────────────────────────────────────────────────
+
+model Avans {
+  id         String     @id @default(uuid())
+  cariId     String
+  cari       CariKart   @relation(fields: [cariId], references: [id])
+  tur        AvansTur
+  tutarTl    Decimal    @db.Decimal(14, 2)
+  bakiyeTuru BakiyeTuru @default(TL)
+  tutarDoviz Decimal?   @db.Decimal(14, 3)
+  aciklama   String?
+  kalanTl    Decimal    @db.Decimal(14, 2)
+  durum      AvansDurum @default(ACIK)
+  tarih      DateTime   @default(now())
+
+  mahsuplar      AvansMahsup[]
+  alimMahsuplari AlimFisi[]    @relation("AlimFisiAvans")
+}
+
+model AvansMahsup {
+  id        String   @id @default(uuid())
+  avansId   String
+  avans     Avans    @relation(fields: [avansId], references: [id])
+  hedefTipi String // ALIM | EMANET_BOZMA
+  hedefId   String
+  tutarTl   Decimal  @db.Decimal(14, 2)
+  tarih     DateTime @default(now())
+}
+
+// ─── FİNANS ─────────────────────────────────────────────────
+
+model KasaHesap {
+  id         String     @id @default(uuid())
+  firmaId    String
+  firma      Firma      @relation(fields: [firmaId], references: [id])
+  subeId     String?
+  ad         String
+  tip        HesapTip
+  bakiyeTuru BakiyeTuru @default(TL)
+  bankaAdi   String?
+  iban       String?
+  aktif      Boolean    @default(true)
+
+  hareketler FinansHareket[]
+}
+
+model FinansHareket {
+  id           String     @id @default(uuid())
+  tip          FinansTip
+  firmaId      String
+  firma        Firma      @relation(fields: [firmaId], references: [id])
+  cariId       String?
+  hesapId      String
+  hesap        KasaHesap  @relation(fields: [hesapId], references: [id])
+  bakiyeTuru   BakiyeTuru @default(TL)
+  tutar        Decimal    @db.Decimal(14, 3)
+  kur          Decimal?   @db.Decimal(12, 6)
+  vadeTarihi   DateTime?  @db.Date
+  dekontNo     String?
+  iliskiliTipi String?
+  iliskiliId   String?
+  durum        FisDurum   @default(ONAYLI)
+  aciklama     String?
+  createdAt    DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([cariId])
+  @@index([firmaId])
+}
+
+// Firma bazlı masraf türü tanımı (Nakliye, Kantar, ...) — kurulumda ve
+// Ayarlar > Tanımlar bölümünden yönetilir.
+model MasrafTuru {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  ad        String
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([firmaId, ad])
+  @@index([firmaId, aktif])
+}
+
+model Masraf {
+  id             String      @id @default(uuid())
+  firmaId        String
+  firma          Firma       @relation(fields: [firmaId], references: [id])
+  tur            String
+  tutar          Decimal     @db.Decimal(14, 2)
+  bakiyeTuru     BakiyeTuru  @default(TL)
+  cariId         String?
+  cari           CariKart?   @relation(fields: [cariId], references: [id], onDelete: SetNull)
+  iliskiliAlimId String?
+  iliskiliAlim   AlimFisi?   @relation(fields: [iliskiliAlimId], references: [id], onDelete: SetNull)
+  maliyeteYansit Boolean     @default(false)
+  tarih          DateTime    @default(now())
+  aciklama       String?
+
+  @@index([firmaId, tarih])
+}
+
+// Ses çözümlemesi operasyon kaydından ayrıdır; kullanıcı onayı olmadan
+// muhasebe, alım veya stok hareketi üretmez.
+model SesliNot {
+  id               String         @id @default(uuid())
+  firmaId          String
+  firma            Firma          @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  kullaniciId      String
+  kullanici        Kullanici      @relation(fields: [kullaniciId], references: [id], onDelete: Restrict)
+  hamMetin         String
+  duzeltilmisMetin String?
+  durum            SesliNotDurum  @default(TASLAK)
+  offlineId        String?        @unique
+  sesKaydi         SesKaydi?
+  finansTaslagi    FinansTaslagi?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([firmaId, durum, createdAt])
+  @@index([kullaniciId, createdAt])
+}
+
+// Ses kaydı erişimi firmaya ve not sahibinin yetkilerine bağlı olarak API
+// üzerinden sunulur; dosya URL'si herkese açık depolama alanına yazılmaz.
+model SesKaydi {
+  id         String   @id @default(uuid())
+  sesliNotId String   @unique
+  sesliNot   SesliNot @relation(fields: [sesliNotId], references: [id], onDelete: Cascade)
+  mimeTipi   String
+  veri       Bytes
+  boyutByte  Int
+  sureSaniye Int?
+  createdAt  DateTime @default(now())
+}
+
+// Sesle anlatılan finans işlemi doğrudan deftere yazılmaz. Bu taslak normal
+// finans formunda incelenip onaylandığında tek bir gerçek finans kaydına döner.
+model FinansTaslagi {
+  id                 String            @id @default(uuid())
+  firmaId            String
+  firma              Firma             @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  cariId             String
+  cari               CariKart          @relation(fields: [cariId], references: [id], onDelete: Restrict)
+  sesliNotId         String            @unique
+  sesliNot           SesliNot          @relation(fields: [sesliNotId], references: [id], onDelete: Restrict)
+  olusturanId        String
+  olusturan          Kullanici         @relation("FinansTaslagiOlusturan", fields: [olusturanId], references: [id], onDelete: Restrict)
+  onerilenTip        FinansTaslakTipi  @default(BELIRSIZ)
+  onerilenTutar      Decimal?          @db.Decimal(14, 3)
+  onerilenParaBirimi BakiyeTuru?
+  onerilenAciklama   String?
+  durum              FinansTaslakDurum @default(INCELEME_BEKLIYOR)
+  hatirlatmaAt       DateTime
+  sonHatirlatmaAt    DateTime?
+  hatirlatmaSayisi   Int               @default(0)
+  onaylayanId        String?
+  finansHareketId    String?           @unique
+  redNedeni          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([firmaId, durum, hatirlatmaAt])
+  @@index([cariId, createdAt])
+}
+
+// ─── STOK ───────────────────────────────────────────────────
+
+model Depo {
+  id      String  @id @default(uuid())
+  firmaId String
+  firma   Firma   @relation(fields: [firmaId], references: [id])
+  subeId  String?
+  ad      String
+  aktif   Boolean @default(true)
+
+  hareketler       StokHareket[]
+  emanetler        Emanet[]
+  alimFisleri      AlimFisi[]
+  satisKalemler    SatisKalem[]
+  sevkiyatKalemler SevkiyatKalem[]
+}
+
+model StokHareket {
+  id             String         @id @default(uuid())
+  depoId         String
+  depo           Depo           @relation(fields: [depoId], references: [id])
+  tip            StokHareketTip
+  kg             Decimal        @db.Decimal(12, 3)
+  mulkiyet       Mulkiyet
+  sezonId        String?
+  bolge          String?
+  randimanPuan   Decimal?       @db.Decimal(5, 2)
+  maliyetBirimTl Decimal?       @db.Decimal(10, 2)
+  kaynakTipi     String?
+  kaynakId       String?
+  createdAt      DateTime       @default(now())
+
+  @@index([depoId, mulkiyet])
+}
+
+// ─── SATIŞ ──────────────────────────────────────────────────
+
+model Satis {
+  id         String   @id @default(uuid())
+  firmaId    String
+  firma      Firma    @relation(fields: [firmaId], references: [id])
+  cariId     String
+  cari       CariKart @relation(fields: [cariId], references: [id])
+  fisNo      String?
+  tarih      DateTime @default(now()) @db.Date
+  cins       Cins
+  kg         Decimal  @db.Decimal(12, 3)
+  birimFiyat Decimal  @db.Decimal(10, 2)
+  tutar      Decimal  @db.Decimal(14, 2)
+  durum      FisDurum @default(TASLAK)
+  aciklama   String?
+  createdAt  DateTime @default(now())
+
+  // Fabrika muhasebeleştirmesiyle oluşan satışın kaynağı sevkiyattır.
+  sevkiyatId String?
+  sevkiyat   Sevkiyat? @relation("SevkiyatSatis", fields: [sevkiyatId], references: [id], onDelete: SetNull)
+
+  kalemler SatisKalem[]
+
+  @@unique([firmaId, fisNo])
+  @@index([tarih])
+  @@index([cariId, tarih])
+}
+
+model SatisKalem {
+  id         String   @id @default(uuid())
+  satisId    String
+  satis      Satis    @relation(fields: [satisId], references: [id])
+  depoId     String
+  depo       Depo     @relation(fields: [depoId], references: [id], onDelete: Restrict)
+  kg         Decimal  @db.Decimal(12, 3)
+  birimFiyat Decimal? @db.Decimal(10, 2)
+  tutar      Decimal? @db.Decimal(14, 2)
+}
+
+// ─── SEVKİYAT ──────────────────────────────────────────────
+
+model Sevkiyat {
+  id      String @id @default(uuid())
+  firmaId String
+  firma   Firma  @relation(fields: [firmaId], references: [id], onDelete: Restrict)
+
+  cariId String?
+  cari   CariKart? @relation(fields: [cariId], references: [id])
+
+  aracId String?
+  arac   Arac?   @relation(fields: [aracId], references: [id])
+
+  fisNo     String?
+  tarih     DateTime      @default(now()) @db.Date
+  plaka     String?
+  sofor     String?
+  durum     SevkiyatDurum @default(FABRIKA_EMANET)
+  aciklama  String?
+  createdAt DateTime      @default(now())
+
+  kalemler  SevkiyatKalem[]
+  satisler  Satis[]          @relation("SevkiyatSatis")
+
+  @@unique([firmaId, fisNo])
+  @@index([firmaId, tarih])
+}
+
+model SevkiyatKalem {
+  id         String   @id @default(uuid())
+  sevkiyatId String
+  sevkiyat   Sevkiyat @relation(fields: [sevkiyatId], references: [id], onDelete: Cascade)
+
+  depoId String
+  depo   Depo   @relation(fields: [depoId], references: [id], onDelete: Restrict)
+
+  cins Cins?
+  kg   Decimal @db.Decimal(12, 3)
+  not  String?
+}
+
+enum SevkiyatDurum {
+  FABRIKA_EMANET
+  SATILDI
+  IPTAL
+}
+
+// ─── ARAÇ & PERSONEL ────────────────────────────────────────
+
+model Arac {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id], onDelete: Restrict)
+  plaka     String
+  marka     String?
+  tip       String   @default("KAMYON") // KAMYON | TIR | PIKAP | MINIVAN
+  sofor     String?
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  sevkiyatlar Sevkiyat[]
+
+  @@unique([firmaId, plaka])
+}
+
+model Personel {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id], onDelete: Restrict)
+  ad        String
+  tckn      String?
+  telefon   String?
+  gorev     String   @default("SAHA") // SOFOR | KANTAR | HAMALI | DEPOCI | SAHA
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([firmaId, aktif])
+}

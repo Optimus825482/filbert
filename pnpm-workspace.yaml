@@ -1,3 +1,18 @@
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+  unrs-resolver: true
+# pnpm 11, bağımlılık ağacı yamalarını package.json yerine burada okur.
+overrides:
+  "brace-expansion@1.1.16": "1.1.18"
+  "brace-expansion@5.0.8": "5.0.9"
+  "js-yaml@4.3.0": "4.3.1"
+  "deepmerge-ts@7.1.5": "8.0.0"
+
+# pnpm 11 güvenlik politikası: yalnız derleme/Prisma için gerekli betikler çalışır.
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - "esbuild"
+  - "prisma"
+  - "unrs-resolver"

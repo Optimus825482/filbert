@@ -1,0 +1,8 @@
+# Taste
+- Communicates in Turkish and expects work products (code, comments, commit/summary text, explanations) in Turkish. Confidence: 0.8
+- Wants issues fixed end-to-end in a single autonomous pass: don't stop to ask which findings to prioritize — resolve everything reported, and only report back when done ("TÜMÜNÜ DÜZELT, BİTİRENE KADAR DURMA"). Confidence: 0.85
+- Expects complete, error-free results ("eksiksiz hatasız"): validate with typecheck, lint, tests, and a production build before declaring the work finished. Confidence: 0.7
+- Deploys via Coolify on a self-hosted server: code is pushed to GitHub first, then Coolify builds/deploys it and it is served on a custom (sub)domain under erkanerdem.online. Confidence: 0.6
+- Prefers deploying with a single docker-compose.yaml: the app and its database run as two separate containers within the same project (nothing deployed piecemeal/separately), and the very first startup must create the database, tables, indexes and constraints automatically (e.g. via migrations-run-as-a-compose-step) rather than requiring manual SQL setup. Confidence: 0.6
+- Reports bugs by pasting raw terminal/dev-server logs verbatim (request traces, full stack traces, Prisma error dumps) and expects root-cause diagnosis plus a real fix — not just an explanation of the error. Confidence: 0.6
+- A fix is only "verified" when exercised against the real runtime/database, not just mocked or skipped tests: guardrail tests that only regex-inspect source files aren't enough, and verification is expected to run against a real DB (rollback-isolated so no dev data is mutated). Confidence: 0.6

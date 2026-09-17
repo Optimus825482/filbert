@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ilkKurulumuTamamla } from "@/lib/actions/setup";
+export function SetupForm() { const router=useRouter(),[hata,setHata]=useState<string>(),[busy,setBusy]=useState(false); async function submit(data:FormData){setBusy(true);try{const r=await ilkKurulumuTamamla(data);if(!r.ok){setHata(r.hata);return;}router.replace("/platform");router.refresh();}catch{setHata("Kurulum şu anda doğrulanamadı. Lütfen tekrar deneyin.");}finally{setBusy(false);}} return <form action={submit} className="mt-7 space-y-3"><label className="block text-sm font-bold">Kurulum parolası<input name="anaParola" required type="password" autoComplete="off" className="mt-1 w-full rounded-lg border p-3" placeholder="Sistem ana parolası"/></label>{hata&&<p role="alert" className="text-sm text-red-600">{hata}</p>}<button disabled={busy} className="w-full rounded-lg bg-filbert-600 p-3 font-bold text-white">{busy?"Doğrulanıyor…":"Sistem kurulumunu tamamla"}</button></form>; }

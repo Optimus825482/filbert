@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "powershell",
+      "Shell(git status --short && echo \"---\" && dir /b 0 2>nul || echo \"0 absent\")",
+      "Shell(pnpm:*)",
+      "Shell(del:*)",
+      "Shell(dir:*)",
+      "Shell(psql --version 2>nul || echo NO_PSQL; where createdb 2>nul || echo NO_CREATEDB)",
+      "Shell(node %COMMANDCODE_SCRATCHPAD%\\db-setup.cjs create)",
+      "Shell(set:*)",
+      "Shell(netstat:*)",
+      "Shell(findstr:*)",
+      "Shell(del /q \"src\\components\\desktop\\wallpaper-context.tsx\" && rmdir \"src\\components\\desktop\" 2>nul && echo DESKTOP_DIR_REMOVED || echo DESKTOP_DIR_KEPT)",
+      "Shell(node \"%COMMANDCODE_SCRATCHPAD%\\db-check.cjs\")"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}
