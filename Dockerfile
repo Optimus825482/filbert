@@ -51,7 +51,7 @@ RUN DATABASE_URL="$DERLEME_DATABASE_URL" pnpm prisma generate \
 # Prisma CLI, prisma.config.ts ve prisma/migrations birlikte bulunur.
 FROM builder AS migrator
 ENV NODE_ENV=production
-CMD ["pnpm", "prisma", "migrate", "deploy"]
+CMD ["node", "scripts/deploy-migrate.mjs"]
 
 # ─── Çalışma zamanı ──────────────────────────────────────────
 FROM base AS runner
