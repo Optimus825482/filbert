@@ -3,10 +3,25 @@ import { getCurrentOturum } from "@/lib/auth";
 import type { IzinEylemi, UygulamaModulu } from "@/generated/prisma/client";
 import { redirect } from "next/navigation";
 
-type YetkiBaglami = { roller: { rol: { aktif: boolean; izinler: { modul: UygulamaModulu; eylem: IzinEylemi }[] } }[] };
+type YetkiBaglami = {
+  roller: {
+    rol: {
+      aktif: boolean;
+      sistemRolu?: boolean;
+      kod?: string;
+      izinler: { modul: UygulamaModulu; eylem: IzinEylemi }[];
+    };
+  }[];
+};
 
 export function izinVar(user: YetkiBaglami, modul: UygulamaModulu, eylem: IzinEylemi) {
-  return user.roller.some((assignment) => assignment.rol.aktif && assignment.rol.izinler.some((permission) => permission.modul === modul && permission.eylem === eylem));
+  return user.roller.some(
+    (assignment) =>
+      assignment.rol.aktif &&
+      (Boolean(assignment.rol.sistemRolu) ||
+        assignment.rol.kod === "FIRMA_SAHIBI" ||
+        assignment.rol.izinler.some((permission) => permission.modul === modul && permission.eylem === eylem))
+  );
 }
 
 export async function requirePermission(modul: UygulamaModulu, eylem: IzinEylemi) {
