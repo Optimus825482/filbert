@@ -26,7 +26,7 @@ import {
   iptalHizmetKaydi,
   hizmetTahsilatKaydet,
 } from "@/lib/actions/hizmet";
-import { telefonTemizle } from "@/lib/sms/sms-servisi";
+import { telefonTemizle } from "@/lib/sms/utils";
 import {
   Dialog,
   DialogContent,
