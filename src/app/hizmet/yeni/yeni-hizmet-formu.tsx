@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,7 @@ import {
   Scale,
   FileText,
   MessageSquare,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { createHizmetKaydi } from "@/lib/actions/hizmet";
@@ -27,14 +28,29 @@ interface HizmetTipiSecenek {
   varsayilanBirimFiyat: number;
 }
 
+export interface MusteriOneri {
+  id?: string;
+  ad: string;
+  telefon: string;
+  tur?: string;
+  kaynak?: "CARI" | "GECMIS";
+}
+
 interface Props {
   hizmetTipleri: HizmetTipiSecenek[];
   cariler?: Array<{ id: string; ad: string; telefon: string; tur: string }>;
+  musteriOnerileri?: MusteriOneri[];
   smsAktif: boolean;
   otomatikGirisSms: boolean;
 }
 
-export function YeniHizmetFormu({ hizmetTipleri, cariler = [], smsAktif, otomatikGirisSms }: Props) {
+export function YeniHizmetFormu({
+  hizmetTipleri,
+  cariler = [],
+  musteriOnerileri = [],
+  smsAktif,
+  otomatikGirisSms,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -42,6 +58,53 @@ export function YeniHizmetFormu({ hizmetTipleri, cariler = [], smsAktif, otomati
   const [seciliCariId, setSeciliCariId] = useState("");
   const [musteriAdi, setMusteriAdi] = useState("");
   const [telefon, setTelefon] = useState("");
+  const [aramaOdak, setAramaOdak] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Tüm müşteri önerilerini birleştir
+  const tumOneriler: MusteriOneri[] = useMemo(() => {
+    if (musteriOnerileri.length > 0) return musteriOnerileri;
+    return cariler.map((c) => ({
+      id: c.id,
+      ad: c.ad,
+      telefon: c.telefon,
+      tur: c.tur,
+      kaynak: "CARI" as const,
+    }));
+  }, [musteriOnerileri, cariler]);
+
+  // Canlı arama filtresi (Ad veya Telefon)
+  const filtrelenmisOneriler = useMemo(() => {
+    const q = musteriAdi.trim().toLocaleLowerCase("tr-TR");
+    if (!q || q.length < 1) return [];
+    const qRakam = q.replace(/\D/g, "");
+    return tumOneriler
+      .filter((m) => {
+        const adUygun = m.ad.toLocaleLowerCase("tr-TR").includes(q);
+        const telUygun = qRakam.length >= 2 && m.telefon.replace(/\D/g, "").includes(qRakam);
+        return adUygun || telUygun;
+      })
+      .slice(0, 8);
+  }, [musteriAdi, tumOneriler]);
+
+  // Tıklama dışı algılama (Açılır listeyi kapatmak için)
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setAramaOdak(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleMusteriSec(m: MusteriOneri) {
+    setMusteriAdi(m.ad);
+    setTelefon(m.telefon || "");
+    setSeciliCariId(m.id || "");
+    setAramaOdak(false);
+    toast.info(`${m.ad} seçildi, telefon numarası otomatik dolduruldu.`);
+  }
   const [kiloStr, setKiloStr] = useState("");
   const [kirma, setKirma] = useState(true);
   const [kavurma, setKavurma] = useState(false);
@@ -242,21 +305,80 @@ export function YeniHizmetFormu({ hizmetTipleri, cariler = [], smsAktif, otomati
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-200">
-                <User className="h-3.5 w-3.5 text-[#f5c518]" /> Müşteri Adı Soyadı *
-              </label>
+            {/* Müşteri Adı ve Canlı Öneri Listesi */}
+            <div className="relative" ref={containerRef}>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-200">
+                  <User className="h-3.5 w-3.5 text-[#f5c518]" /> Müşteri Adı Soyadı *
+                </label>
+                {seciliCariId && (
+                  <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="h-3 w-3" /> Rehber Kayıtlı
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 required
-                placeholder="Örn: Ahmet Yılmaz"
+                autoComplete="off"
+                placeholder="İsim yazmaya başlayın (örn: Ahmet)..."
                 value={musteriAdi}
+                onFocus={() => setAramaOdak(true)}
                 onChange={(e) => {
                   setMusteriAdi(e.target.value);
+                  setAramaOdak(true);
                   if (seciliCariId) setSeciliCariId("");
                 }}
                 className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
               />
+
+              {/* Canlı Eşleşen Müşteriler Listesi */}
+              {aramaOdak && filtrelenmisOneriler.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-sky-400/30 bg-[#081226]/98 p-1.5 shadow-2xl backdrop-blur-md">
+                  <div className="mb-1 flex items-center justify-between border-b border-white/10 px-2 py-1 text-[11px] font-bold text-sky-300">
+                    <span>Kayıtlı Müşteri Önerileri ({filtrelenmisOneriler.length})</span>
+                    <span className="text-[10px] text-sky-400/70">Seçmek için dokunun</span>
+                  </div>
+                  {filtrelenmisOneriler.map((m, idx) => (
+                    <button
+                      key={m.id || `${m.ad}-${m.telefon}-${idx}`}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleMusteriSec(m);
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/10 focus:bg-white/10 focus:outline-none"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f5c518]/15 text-[#f5c518]">
+                          <User className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">{m.ad}</p>
+                          <p className="font-mono text-[11px] text-sky-300">
+                            {m.telefon || "Telefon kayıtlı değil"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-bold border ${
+                            m.kaynak === "CARI"
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                              : "bg-sky-500/20 text-sky-200 border-sky-500/40"
+                          }`}
+                        >
+                          {m.kaynak === "CARI"
+                            ? m.tur === "URETICI"
+                              ? "Müstahsil"
+                              : "Cari Kart"
+                            : "Önceki Hizmet"}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
