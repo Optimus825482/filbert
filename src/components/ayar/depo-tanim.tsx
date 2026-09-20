@@ -126,7 +126,7 @@ export function DepoTanim({ depolar, subeler, olusturYetkisi, guncelleYetkisi }:
             <div className="space-y-1.5">
               <Label htmlFor="depo-sube">Şube</Label>
               <Select value={subeId} onValueChange={setSubeId}>
-                <SelectTrigger id="depo-sube" className="saha-input w-full bg-slate-800">
+                <SelectTrigger id="depo-sube" className="saha-input w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

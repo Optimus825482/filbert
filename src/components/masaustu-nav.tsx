@@ -8,6 +8,7 @@ import {
   Wallet, Banknote, HandCoins, ArrowDownUp, Receipt, PiggyBank,
   Users, FileText, Warehouse, FileBarChart, TrendingUp, Settings, Home,
   ChevronRight,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ const GRUPLAR: NavGrup[] = [
     ogeler: [
       { href: "/alim", etiket: "Alım Yönetimi", ikon: ClipboardList },
       { href: "/alim/yeni", etiket: "Yeni Alım Fişi", ikon: ShoppingBasket },
+      { href: "/hizmet", etiket: "Kırma & Paketleme", ikon: PackageCheck },
       { href: "/randiman", etiket: "Randıman Takibi", ikon: Calculator },
       { href: "/emanet", etiket: "Emanetler", ikon: PackageOpen },
       { href: "/virman", etiket: "Virman Kontrolü", ikon: ArrowLeftRight },

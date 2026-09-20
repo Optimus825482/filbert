@@ -23,6 +23,8 @@ const ROTA_IZINLERI: Readonly<Record<string, Izin>> = {
   "/kar-zarar": ["RAPORLAR", "GORUNTULE"],
   "/fiyatlar": ["AYARLAR", "GORUNTULE"],
   "/stok": ["STOK", "GORUNTULE"],
+  "/hizmet": ["HIZMET", "GORUNTULE"],
+  "/hizmet/yeni": ["HIZMET", "OLUSTUR"],
 };
 
 type ModulGrubu<Tile extends { href: string }> = { altModuller: Tile[] };

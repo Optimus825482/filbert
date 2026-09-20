@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
   ShoppingBasket, Wallet, Users, FileBarChart, PackageOpen,
   HandCoins, PiggyBank, Receipt, Plus, ArrowRight, ChevronRight,
-  BellRing, CheckCircle2, Warehouse, type LucideIcon,
+  BellRing, CheckCircle2, Warehouse, PackageCheck, type LucideIcon,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getDashboardOzet, getSonGunlerAlim, getStokOzet } from "@/lib/queries";
@@ -37,17 +37,19 @@ export default async function AnaSayfa() {
     stok: izinli("STOK", "GORUNTULE"),
     emanet: izinli("EMANET", "GORUNTULE"),
     finans: izinli("FINANS", "GORUNTULE"),
+    hizmet: izinli("HIZMET", "GORUNTULE"),
   };
   // İş günü sınırı İstanbul'a göre belirlenir; başlıktaki tarih de buradan gelir.
   const { baslangic: bugunBas } = istanbulGunAraligi();
   const bosTrend: Awaited<ReturnType<typeof getSonGunlerAlim>> = [];
   const bosStok: Awaited<ReturnType<typeof getStokOzet>> = [];
   // Pano parasal veri çekmez: tutar/kur yalnızca finans ve rapor ekranlarında okunur.
-  const [ozet, bekleyenFinansTaslagi, alimTrendi, depoStok] = await Promise.all([
+  const [ozet, bekleyenFinansTaslagi, alimTrendi, depoStok, bekleyenHizmetSayisi] = await Promise.all([
     getDashboardOzet(),
     izinler.finans ? prisma.finansTaslagi.count({ where: { firmaId: actor.firmaId, durum: { in: ["INCELEME_BEKLIYOR", "EKSIK_BILGI"] }, hatirlatmaAt: { lte: new Date() } } }) : Promise.resolve(0),
     izinler.alim ? getSonGunlerAlim(7) : Promise.resolve(bosTrend),
     izinler.stok ? getStokOzet() : Promise.resolve(bosStok),
+    izinler.hizmet ? prisma.hizmetIslemi.count({ where: { firmaId: actor.firmaId, durum: { in: ["SIRAYA_ALINDI", "HAZIRLANIYOR"] } } }) : Promise.resolve(0),
   ]);
   const bekleyenRandiman = ozet.bekleyenRandiman;
   const sonFisler = ozet.sonFisler;
@@ -66,6 +68,9 @@ export default async function AnaSayfa() {
   }
   if (izinler.emanet && ozet.emanetKgBorcumuz > 0) {
     bekleyenler.push({ href: "/emanet", ikon: PackageOpen, etiket: "Üreticilere emanet borcu", rozet: kg(ozet.emanetKgBorcumuz) });
+  }
+  if (izinler.hizmet && bekleyenHizmetSayisi > 0) {
+    bekleyenler.push({ href: "/hizmet", ikon: PackageCheck, etiket: "Kırma/paketleme bekleyen", rozet: `${bekleyenHizmetSayisi} sipariş` });
   }
 
   return (
@@ -99,6 +104,7 @@ export default async function AnaSayfa() {
           </div>
           <div className="flex flex-wrap gap-2">
             {izinli("ALIM", "OLUSTUR") && <HizliButon href="/alim/yeni" ikon={Plus} etiket="Yeni Alım Fişi" birincil />}
+            {izinli("HIZMET", "OLUSTUR") && <HizliButon href="/hizmet/yeni" ikon={PackageCheck} etiket="Kırma & Paketleme" />}
             {izinli("EMANET", "OLUSTUR") && <HizliButon href="/emanet" ikon={PackageOpen} etiket="Emanet Boz" />}
             {izinli("FINANS", "OLUSTUR") && <HizliButon href="/finans/odeme" ikon={HandCoins} etiket="Ödeme" />}
             {izinli("AVANS", "OLUSTUR") && <HizliButon href="/avans" ikon={PiggyBank} etiket="Avans Ver" />}

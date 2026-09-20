@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createMasraf } from "@/lib/actions/masraf";
 import { sunucuIslemi } from "@/lib/istemci-guvenli";
-import { sayiCevir } from "@/lib/format";
+import { paraTL, sayiCevir } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Receipt } from "lucide-react";
+import { QuickNumberStepper } from "@/components/ui/quick-number-stepper";
+import { Receipt, RotateCcw } from "lucide-react";
 
 export function MasrafForm({
   cariler,
@@ -29,11 +30,13 @@ export function MasrafForm({
   const [maliyeteYansit, setMaliyeteYansit] = useState(true);
   const [aciklama, setAciklama] = useState("");
 
+  const sayisalTutar = sayiCevir(tutar);
+
   function gonder() {
     startTransition(async () => {
       const sonuc = await sunucuIslemi(() => createMasraf({
         tur,
-        tutar: sayiCevir(tutar),
+        tutar: sayisalTutar,
         cariId: cariId || undefined,
         hesapId: hesapId || undefined,
         maliyeteYansit,
@@ -41,7 +44,9 @@ export function MasrafForm({
       }));
       if (!sonuc) return;
       if (sonuc.ok) {
-        toast.success("Masraf kaydedildi");
+        toast.success("Masraf kaydedildi", {
+          description: `${tur} · ${paraTL(sayisalTutar)}`,
+        });
         setTutar("");
         setAciklama("");
         router.refresh();
@@ -52,19 +57,23 @@ export function MasrafForm({
   }
 
   return (
-    <div className="ozet-kart space-y-3">
-      <div className="flex items-center gap-2 text-sm font-bold text-sky-100">
-        <Receipt className="h-4 w-4" /> YENİ MASRAF
+    <div className="ozet-kart space-y-4">
+      <div className="flex items-center gap-2 text-sm font-bold text-[var(--app-fg)] border-b border-[var(--surface-border)] pb-2.5">
+        <Receipt className="h-4 w-4 text-[var(--primary)]" /> YENİ MASRAF KAYDI
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Masraf türü</Label>
+          <Label className="text-sm font-bold text-[var(--app-fg)]">
+            Masraf Türü <span className="text-red-400">*</span>
+          </Label>
           {masrafTurleri.length === 0 ? (
-            <p className="saha-input bg-slate-800 text-sm text-sky-100">Tanımlı masraf türü yok — Ayarlar &gt; Tanımlar&apos;dan ekleyin</p>
+            <p className="rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] p-3 text-xs text-muted-foreground">
+              Tanımlı masraf türü yok — Ayarlar &gt; Tanımlar sekmesinden ekleyin.
+            </p>
           ) : (
             <Select value={tur} onValueChange={setTur}>
-              <SelectTrigger className="saha-input bg-slate-800">
+              <SelectTrigger className="saha-input">
                 <SelectValue placeholder="Tür seçin..." />
               </SelectTrigger>
               <SelectContent>
@@ -75,18 +84,50 @@ export function MasrafForm({
             </Select>
           )}
         </div>
+
         <div className="space-y-1.5">
-          <Label>Tutar (TL)</Label>
-          <Input inputMode="decimal" value={tutar} onChange={(e) => setTutar(e.target.value)} placeholder="0,00" className="saha-input" />
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-bold text-[var(--app-fg)]">
+              Tutar (TL) <span className="text-red-400">*</span>
+            </Label>
+            {sayisalTutar > 0 && (
+              <button
+                type="button"
+                onClick={() => setTutar("")}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+              >
+                <RotateCcw className="h-3 w-3" /> Temizle
+              </button>
+            )}
+          </div>
+          <Input
+            inputMode="decimal"
+            value={tutar}
+            onChange={(e) => setTutar(e.target.value)}
+            placeholder="0,00 TL"
+            className="saha-input text-xl font-bold"
+          />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* Hızlı Tutar Stepper */}
+      <QuickNumberStepper
+        label="Hızlı Tutar Ekle:"
+        values={[250, 500, 1000, 2500, 5000, 10000]}
+        unit="TL"
+        mode="add"
+        onSelect={(ekle) => {
+          const cur = sayiCevir(tutar);
+          setTutar(String(cur + ekle));
+        }}
+      />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Kime ödendi (ops.)</Label>
+          <Label className="text-sm font-bold text-[var(--app-fg)]">Kime Ödendi (Opsiyonel)</Label>
           <Select value={cariId} onValueChange={setCariId}>
-            <SelectTrigger className="saha-input bg-slate-800">
-              <SelectValue placeholder="Seçin..." />
+            <SelectTrigger className="saha-input">
+              <SelectValue placeholder="Cari seçin..." />
             </SelectTrigger>
             <SelectContent>
               {cariler.map((c) => (
@@ -95,11 +136,12 @@ export function MasrafForm({
             </SelectContent>
           </Select>
         </div>
+
         <div className="space-y-1.5">
-          <Label>Kasa/Banka (ops.)</Label>
+          <Label className="text-sm font-bold text-[var(--app-fg)]">Kasa / Banka (Opsiyonel)</Label>
           <Select value={hesapId} onValueChange={setHesapId}>
-            <SelectTrigger className="saha-input bg-slate-800">
-              <SelectValue placeholder="Seçin..." />
+            <SelectTrigger className="saha-input">
+              <SelectValue placeholder="Hesap seçin..." />
             </SelectTrigger>
             <SelectContent>
               {hesaplar.map((h) => (
@@ -110,18 +152,36 @@ export function MasrafForm({
         </div>
       </div>
 
-      <label className="flex items-center gap-3 rounded-xl bg-slate-700/50 px-4 py-3">
-        <input type="checkbox" checked={maliyeteYansit} onChange={(e) => setMaliyeteYansit(e.target.checked)} className="h-5 w-5 accent-filbert-600" />
-        <span className="text-sm font-semibold">Stok maliyetine yansıt</span>
+      <label className="flex items-center gap-3 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-secondary)] px-4 py-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={maliyeteYansit}
+          onChange={(e) => setMaliyeteYansit(e.target.checked)}
+          className="h-5 w-5 rounded-md accent-[var(--primary)]"
+        />
+        <div>
+          <span className="text-sm font-bold text-[var(--app-fg)]">Stok Maliyetine Yansıt</span>
+          <p className="text-xs text-muted-foreground">İşaretlendiğinde bu gider depodaki fındığın birim maliyetine eklenir.</p>
+        </div>
       </label>
 
       <div className="space-y-1.5">
-        <Label>Açıklama (opsiyonel)</Label>
-        <Input value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder="ör: Kargalı'dan depoya nakliye" className="saha-input" />
+        <Label className="text-sm font-bold text-[var(--app-fg)]">Açıklama (Opsiyonel)</Label>
+        <Input
+          value={aciklama}
+          onChange={(e) => setAciklama(e.target.value)}
+          placeholder="Ör. Kargalı deposu hamaliye ve yükleme bedeli"
+          className="saha-input"
+        />
       </div>
 
-      <button type="button" disabled={pending || !tur || sayiCevir(tutar) <= 0} onClick={gonder} className="saha-btn w-full bg-slate-700 text-white">
-        {pending ? "Kaydediliyor..." : "Masrafı Kaydet"}
+      <button
+        type="button"
+        disabled={pending || !tur || sayiCevir(tutar) <= 0}
+        onClick={gonder}
+        className="saha-btn w-full bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/20 hover:opacity-95"
+      >
+        {pending ? "Kaydediliyor..." : "Masrafı Onayla & Kaydet"}
       </button>
     </div>
   );

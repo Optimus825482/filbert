@@ -18,6 +18,7 @@ export default async function FindikModulPage() {
       altModuller: [
         { href: "/alim/yeni", etiket: "Yeni Alım Fişi", ikon: "alim-yeni", dekont: "Müşteri, miktar, fiyat, kalite — tek işlemde." },
         { href: "/alim", etiket: "Alım Yönetimi", ikon: "alim-liste", badge: bekleyenRandiman > 0 ? bekleyenRandiman : undefined, dekont: "Fiş listesi, randıman tamamlama, emanet fişleri." },
+        { href: "/hizmet", etiket: "Kırma & Paketleme", ikon: "alim-liste", dekont: "Ev kullanımı fındık kırma, kavurma ve paketleme siparişleri." },
         { href: "/randiman", etiket: "Randıman Takibi", ikon: "randiman", dekont: "Kalite sonuçlarını ürün ve müşteri hareketleriyle birlikte değerlendirin." },
         { href: "/virman", etiket: "Virman Kontrolü", ikon: "virman", dekont: "Depolar veya hesaplar arasındaki miktar aktarımını izlenebilir biçimde yürütün." },
         { href: "/sevkiyat", etiket: "Sevk Planlama", ikon: "sevk", dekont: "Hazırlanan ürünleri araç, müşteri ve teslimat bilgileriyle sevke bağlayın." },

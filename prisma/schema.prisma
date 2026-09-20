@@ -44,6 +44,7 @@ enum UygulamaModulu {
   AYARLAR
   KULLANICI_YONETIMI
   SESLI_NOT
+  HIZMET
 }
 
 enum IzinEylemi {
@@ -219,6 +220,10 @@ model Firma {
   finansTaslaklari      FinansTaslagi[]
   finansHareketleri     FinansHareket[]
   masrafTurleri         MasrafTuru[]
+  hizmetIslemleri       HizmetIslemi[]
+  hizmetTipleri         HizmetTipi[]
+  smsAyari              SmsAyari?
+  hizmetSiraSayaci      HizmetSiraSayaci?
 }
 
 // İşletmenin operasyonlarında yer almaz; ilk kurulum, firma provizyonu ve
@@ -282,6 +287,7 @@ model Kullanici {
   oturumlar        Oturum[]
   sesliNotlar      SesliNot[]
   finansTaslaklari FinansTaslagi[] @relation("FinansTaslagiOlusturan")
+  hizmetIslemleri  HizmetIslemi[]   @relation("HizmetOlusturan")
 
   @@index([firmaId, aktif])
 }
@@ -412,6 +418,7 @@ model CariKart {
   satisler         Satis[]
   sevkiyatlar      Sevkiyat[]
   masraflar        Masraf[]
+  hizmetIslemleri  HizmetIslemi[]
 
   @@index([firmaId, tur])
   @@index([firmaId, ad])
@@ -553,27 +560,29 @@ model KasaHesap {
   iban       String?
   aktif      Boolean    @default(true)
 
-  hareketler FinansHareket[]
+  hareketler      FinansHareket[]
+  hizmetIslemleri HizmetIslemi[]
 }
 
 model FinansHareket {
-  id           String     @id @default(uuid())
-  tip          FinansTip
-  firmaId      String
-  firma        Firma      @relation(fields: [firmaId], references: [id])
-  cariId       String?
-  hesapId      String
-  hesap        KasaHesap  @relation(fields: [hesapId], references: [id])
-  bakiyeTuru   BakiyeTuru @default(TL)
-  tutar        Decimal    @db.Decimal(14, 3)
-  kur          Decimal?   @db.Decimal(12, 6)
-  vadeTarihi   DateTime?  @db.Date
-  dekontNo     String?
-  iliskiliTipi String?
-  iliskiliId   String?
-  durum        FisDurum   @default(ONAYLI)
-  aciklama     String?
-  createdAt    DateTime   @default(now())
+  id              String         @id @default(uuid())
+  tip             FinansTip
+  firmaId         String
+  firma           Firma          @relation(fields: [firmaId], references: [id])
+  cariId          String?
+  hesapId         String
+  hesap           KasaHesap      @relation(fields: [hesapId], references: [id])
+  bakiyeTuru      BakiyeTuru     @default(TL)
+  tutar           Decimal        @db.Decimal(14, 3)
+  kur             Decimal?       @db.Decimal(12, 6)
+  vadeTarihi      DateTime?      @db.Date
+  dekontNo        String?
+  iliskiliTipi    String?
+  iliskiliId      String?
+  durum           FisDurum       @default(ONAYLI)
+  aciklama        String?
+  createdAt       DateTime       @default(now())
+  hizmetIslemleri HizmetIslemi[]
 
   @@index([createdAt])
   @@index([cariId])
@@ -827,3 +836,115 @@ model Personel {
 
   @@index([firmaId, aktif])
 }
+
+// ─── FINDIK HİZMETLERİ (KIRMA / KAVURMA / PAKETLEME) ────────
+
+enum HizmetDurumu {
+  SIRAYA_ALINDI
+  HAZIRLANIYOR
+  TAMAMLANDI
+  TESLIM_EDILDI
+  IPTAL
+}
+
+model HizmetIslemi {
+  id                      String        @id @default(uuid())
+  firmaId                 String
+  firma                   Firma         @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  siraNo                  String        // 4 haneli formatlı sıra numarası (örn: "0001")
+  siraSayisi              Int           // Sıralama ve sayaç için nümerik değer
+  musteriAdi              String
+  telefon                 String
+  kilo                    Decimal       @db.Decimal(10, 2)
+  kirma                   Boolean       @default(false)
+  kavurma                 Boolean       @default(false)
+  paketleme               Boolean       @default(false)
+  // Vakumlu Paketleme Detayı
+  paketTipi               String?       // "1_KG", "500_GR", "250_GR", "OZEL"
+  paketAdedi              Int?          // Örn: 50 adet
+
+  // Cari / Rehber Bağlantısı (Opsiyonel)
+  cariId                  String?
+  cari                    CariKart?     @relation(fields: [cariId], references: [id], onDelete: SetNull)
+
+  hizmetTipiId            String?
+  hizmetTipi              HizmetTipi?   @relation(fields: [hizmetTipiId], references: [id], onDelete: SetNull)
+  hizmetTipiAdi           String?       // Seçilen hizmet tipi adı
+  birimFiyat              Decimal       @default(0) @db.Decimal(10, 2)
+  toplamTutar             Decimal       @default(0) @db.Decimal(10, 2)
+  notlar                  String?
+  durum                   HizmetDurumu  @default(SIRAYA_ALINDI)
+
+  // Kasa / Finans / Tahsilat
+  odemeDurumu             String        @default("BEKLIYOR") // "BEKLIYOR" | "ODENDI" | "VERESIYE"
+  odemeYontemi            String?       // "NAKIT" | "POS" | "HAVALE" | "VERESIYE"
+  kasaHesapId             String?
+  kasaHesap               KasaHesap?    @relation(fields: [kasaHesapId], references: [id], onDelete: SetNull)
+  finansHareketId         String?
+  finansHareket           FinansHareket? @relation(fields: [finansHareketId], references: [id], onDelete: SetNull)
+  tahsilatAt              DateTime?
+  tahsilEdilenTutar       Decimal?      @db.Decimal(10, 2)
+
+  girisSmsGonderildi      Boolean       @default(false)
+  tamamlandiSmsGonderildi Boolean       @default(false)
+  etiketBasildiSayisi     Int           @default(0)
+  olusturanKullaniciId    String?
+  olusturanKullanici      Kullanici?    @relation("HizmetOlusturan", fields: [olusturanKullaniciId], references: [id], onDelete: SetNull)
+  hazirlaniyorAt          DateTime?
+  tamamlandiAt            DateTime?
+  teslimAt                DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@unique([firmaId, siraNo])
+  @@index([firmaId, durum])
+  @@index([firmaId, odemeDurumu])
+  @@index([firmaId, createdAt])
+  @@index([firmaId, telefon])
+  @@index([firmaId, cariId])
+}
+
+model HizmetTipi {
+  id                   String         @id @default(uuid())
+  firmaId              String
+  firma                Firma          @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  ad                   String         // "Kırma", "Kırma + Paketleme", "Kırma + Kavurma + Paketleme" vb.
+  kirma                Boolean        @default(false)
+  kavurma              Boolean        @default(false)
+  paketleme            Boolean        @default(false)
+  varsayilanBirimFiyat Decimal        @default(0) @db.Decimal(10, 2)
+  sira                 Int            @default(0)
+  aktif                Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  islemler             HizmetIslemi[]
+
+  @@unique([firmaId, ad])
+  @@index([firmaId, aktif])
+}
+
+model SmsAyari {
+  id                String   @id @default(uuid())
+  firmaId           String   @unique
+  firma             Firma    @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  aktif             Boolean  @default(false)
+  saglayici         String   @default("TEST") // NETGSM | ILETIMERKEZI | GENERIC_HTTP | TEST
+  apiUrl            String?
+  kullaniciAdi      String?  // API Key / Kullanıcı adı
+  sifre             String?  // API Secret / Şifre
+  baslik            String?  // Gönderici başlığı (Originator)
+  kayitSablonu      String?  @db.Text
+  tamamlandiSablonu String?  @db.Text
+  otomatikGirisSms  Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model HizmetSiraSayaci {
+  id        String   @id @default(uuid())
+  firmaId   String   @unique
+  firma     Firma    @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  sonSira   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+

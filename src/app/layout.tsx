@@ -59,6 +59,8 @@ const MASAUSTU_ROTA_IZINLERI = [
   ["/kar-zarar", "RAPORLAR", "GORUNTULE"],
   ["/ayarlar", "AYARLAR", "GORUNTULE"],
   ["/sesli-not", "SESLI_NOT", "GORUNTULE"],
+  ["/hizmet", "HIZMET", "GORUNTULE"],
+  ["/hizmet/yeni", "HIZMET", "OLUSTUR"],
 ] as const;
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

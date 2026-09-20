@@ -12,6 +12,7 @@ import {
 import { PageBaslik } from "@/components/page-baslik";
 import { AyarIcerik } from "./ayar-icerik";
 import { izinVar, requireAnyPagePermission } from "@/lib/rbac/guard";
+import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export default async function AyarlarPage() {
     sezonlar,
     subeler,
     masrafTurleri,
+    hizmetTipleri,
+    smsAyari,
   ] = await Promise.all([
     ayarGoruntuleYetkisi ? prisma.firma.findUnique({ where: { id: firmaId } }) : Promise.resolve(null),
     ayarGoruntuleYetkisi ? prisma.sezon.findFirst({ where: { firmaId, aktif: true } }) : Promise.resolve(null),
@@ -56,6 +59,8 @@ export default async function AyarlarPage() {
     tanimGoruntuleYetkisi ? getSezonlar() : Promise.resolve([]),
     tanimGoruntuleYetkisi ? getSubeler() : Promise.resolve([]),
     tanimGoruntuleYetkisi ? getMasrafTurleri("TUMU") : Promise.resolve([]),
+    tanimGoruntuleYetkisi ? prisma.hizmetTipi.findMany({ where: { firmaId }, orderBy: { sira: "asc" } }) : Promise.resolve([]),
+    ayarGoruntuleYetkisi ? getFirmaSmsAyarlari(firmaId) : Promise.resolve(null),
   ]);
   const roller = kullaniciYonetYetkisi ? await prisma.yetkiRolu.findMany({ where: { firmaId, aktif: true }, select: { id: true, ad: true }, orderBy: { ad: "asc" } }) : [];
 
@@ -125,6 +130,29 @@ export default async function AyarlarPage() {
         subeler={subeler.map((s) => ({ id: s.id, ad: s.ad }))}
         masrafTurleri={masrafTurleri.map((t) => ({ id: t.id, ad: t.ad, aktif: t.aktif }))}
         roller={roller}
+        hizmetTipleri={hizmetTipleri.map((h) => ({
+          id: h.id,
+          ad: h.ad,
+          kirma: h.kirma,
+          kavurma: h.kavurma,
+          paketleme: h.paketleme,
+          varsayilanBirimFiyat: Number(h.varsayilanBirimFiyat),
+          sira: h.sira,
+          aktif: h.aktif,
+        }))}
+        smsAyarlari={
+          smsAyari ?? {
+            aktif: false,
+            saglayici: "TEST",
+            apiUrl: "",
+            kullaniciAdi: "",
+            sifre: "",
+            baslik: "",
+            kayitSablonu: "",
+            tamamlandiSablonu: "",
+            otomatikGirisSms: true,
+          }
+        }
       />
     </div>
   );

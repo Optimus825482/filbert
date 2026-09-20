@@ -7,7 +7,8 @@ import { sunucuIslemi } from "@/lib/istemci-guvenli";
 import { sayiCevir, puan as fmtPuan } from "@/lib/format";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Calculator, Save, X } from "lucide-react";
+import { QuickNumberStepper } from "@/components/ui/quick-number-stepper";
+import { Calculator, Save, X, RotateCcw } from "lucide-react";
 
 interface RandimanFormProps {
   fisId: string;
@@ -33,7 +34,7 @@ export function RandimanForm({ fisId, fisNo, onClose, onComplete }: RandimanForm
       if (!sonuc) return;
       if (sonuc.ok) {
         toast.success(`Randıman kaydedildi: ${fisNo}`, {
-          description: `Puan: ${sonuc.puan}`,
+          description: `Randıman: ${sonuc.puan} Puan`,
         });
         onComplete?.();
       } else {
@@ -43,34 +44,60 @@ export function RandimanForm({ fisId, fisNo, onClose, onComplete }: RandimanForm
   }
 
   return (
-    <div className="ozet-kart space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-bold text-sky-100">
-          <Calculator className="h-4 w-4" /> RANDIMAN GİRİŞİ
+    <div className="ozet-kart space-y-4">
+      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2.5">
+        <div className="flex items-center gap-2 text-sm font-bold text-[var(--app-fg)]">
+          <Calculator className="h-4 w-4 text-amber-500" /> RANDIMAN GİRİŞİ — <span className="text-[var(--primary)]">{fisNo}</span>
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-sky-500 hover:bg-slate-800 hover:text-sky-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted-foreground hover:bg-[var(--surface-secondary)] hover:text-[var(--app-fg)]"
+          >
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor={`randiman-${fisId}`}>Randıman puanı (0-100)</Label>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`randiman-${fisId}`} className="text-sm font-bold text-[var(--app-fg)]">
+            Randıman Puanı (0 - 100) <span className="text-red-400">*</span>
+          </Label>
+          {puanGirdi && (
+            <button
+              type="button"
+              onClick={() => setPuanGirdi("")}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+            >
+              <RotateCcw className="h-3 w-3" /> Temizle
+            </button>
+          )}
+        </div>
         <Input
           id={`randiman-${fisId}`}
           inputMode="decimal"
           value={puanGirdi}
           onChange={(e) => setPuanGirdi(e.target.value)}
           placeholder="Örn. 52"
-          className="saha-input"
+          className="saha-input text-2xl font-extrabold text-center tracking-tight"
+          autoFocus
+        />
+
+        {/* Hızlı Randıman Puanları */}
+        <QuickNumberStepper
+          label="Standart Randıman Değerleri:"
+          values={[48, 49, 50, 51, 52, 53, 54, 55]}
+          mode="set"
+          onSelect={(p) => setPuanGirdi(String(p))}
         />
       </div>
 
-      {/* Canlı puan önizleme */}
-      <div className="flex items-center justify-between rounded-xl bg-orange-900/30 px-4 py-3">
-        <span className="text-sm font-bold text-orange-200">Randıman Puanı</span>
-        <span className="text-2xl font-extrabold tabular-nums text-orange-400">
+      {/* Canlı Puan Önizleme */}
+      <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+        <span className="text-sm font-bold text-amber-300">Hesaplanan Randıman</span>
+        <span className="text-2xl font-black tabular-nums text-amber-400">
           {puanGecerli ? fmtPuan(puan) : "—"}
         </span>
       </div>
@@ -79,10 +106,10 @@ export function RandimanForm({ fisId, fisNo, onClose, onComplete }: RandimanForm
         type="button"
         disabled={pending || !puanGecerli}
         onClick={gonder}
-        className="saha-btn w-full bg-filbert-600 text-white shadow-lg shadow-filbert-600/30"
+        className="saha-btn w-full bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/30 hover:opacity-95"
       >
-        <Save className="h-5 w-5" />
-        {pending ? "Kaydediliyor..." : "Randımanı Tamamla"}
+        <Save className="h-4 w-4" />
+        {pending ? "Kaydediliyor..." : "Randımanı Onayla & Kaydet"}
       </button>
     </div>
   );

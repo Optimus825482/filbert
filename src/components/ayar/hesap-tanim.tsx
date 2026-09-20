@@ -152,7 +152,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
               <div className="space-y-1.5">
                 <Label>Tip</Label>
                 <Select value={tip} onValueChange={setTip}>
-                  <SelectTrigger className="saha-input w-full bg-slate-800">
+                  <SelectTrigger className="saha-input w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -167,7 +167,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
               <div className="space-y-1.5">
                 <Label>Bakiye türü</Label>
                 <Select value={bakiyeTuru} onValueChange={setBakiyeTuru}>
-                  <SelectTrigger className="saha-input w-full bg-slate-800">
+                  <SelectTrigger className="saha-input w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

@@ -1,5 +1,5 @@
 import { ModulListe } from "@/components/modul-liste";
-import { ShoppingBasket, ClipboardList, Calculator, ArrowLeftRight, Truck } from "lucide-react";
+import { ShoppingBasket, ClipboardList, Calculator, ArrowLeftRight, Truck, PackageCheck } from "lucide-react";
 import { izinVar, requirePagePermission } from "@/lib/rbac/guard";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export default async function FindikIslemleriPage() {
   return (
     <ModulListe
       baslik="Fındık İşlemleri"
-      alt="Alım yönetimi, randıman takibi, virman ve sevk planlama"
+      alt="Alım yönetimi, randıman takibi, kırma-paketleme, virman ve sevk planlama"
       geri="/"
       maddeler={[
         {
@@ -18,6 +18,13 @@ export default async function FindikIslemleriPage() {
           alt: "Müşteri, miktar, fiyat ve kalite bilgilerini tek işlemde kaydedin.",
           ikon: ShoppingBasket,
           renk: "bg-filbert-600",
+        },
+        {
+          href: "/hizmet",
+          baslik: "Kırma & Paketleme",
+          alt: "Ev kullanımı için fındık kırma, kavurma, vakumlu paketleme ve sıra takibi.",
+          ikon: PackageCheck,
+          renk: "bg-emerald-600",
         },
         {
           href: "/randiman",
@@ -48,7 +55,14 @@ export default async function FindikIslemleriPage() {
           renk: "bg-violet-600",
         },
       ].filter((madde) => {
-        const izinler: Record<string, Parameters<typeof izinVar>[1]> = { "/alim": "ALIM", "/randiman": "RANDIMAN", "/virman": "FINANS", "/sevkiyat": "SEVKIYAT", "/emanet": "EMANET" };
+        const izinler: Record<string, Parameters<typeof izinVar>[1]> = {
+          "/alim": "ALIM",
+          "/hizmet": "HIZMET",
+          "/randiman": "RANDIMAN",
+          "/virman": "FINANS",
+          "/sevkiyat": "SEVKIYAT",
+          "/emanet": "EMANET",
+        };
         return izinVar(actor, izinler[madde.href], "GORUNTULE");
       })}
     />

@@ -443,9 +443,9 @@ html.light textarea::placeholder {
 .font-xl { --font-scale: 1.25; }
 
 @layer components {
-  /* Büyük dokunma hedefi — saha modu (min 56px) */
+  /* Büyük dokunma hedefi — saha modu (min 52-56px mobilde, 44-48px masaüstünde) */
   .saha-btn {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 px-4 text-base font-semibold
+    @apply inline-flex min-h-12 md:min-h-11 items-center justify-center gap-2 px-4 text-sm md:text-base font-semibold
       transition-transform duration-150 ease-out select-none
       active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
     border-radius: var(--win-radius);
@@ -455,13 +455,13 @@ html.light textarea::placeholder {
   }
 
   .saha-input {
-    @apply flex min-h-14 w-full px-4 text-lg text-[var(--app-fg)]
+    @apply flex min-h-12 md:min-h-11 w-full items-center px-4 text-base md:text-sm text-[var(--app-fg)]
       placeholder:text-slate-400
       focus-visible:outline-2 focus-visible:outline-offset-2
-      disabled:opacity-50;
+      disabled:opacity-50 transition-all;
     border-radius: var(--win-radius);
     border: var(--win-border);
-    background: var(--win-card-bg);
+    background: var(--surface);
     &:focus-visible { outline-color: var(--primary); }
   }
 

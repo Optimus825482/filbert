@@ -11,6 +11,9 @@ import { RenkSecici } from "@/components/ayar/renk-secici";
 import { StilSecici } from "@/components/ayar/stil-secici";
 import { FontAyar } from "@/components/ayar/font-ayar";
 import { TanimlarSekme } from "@/components/ayar/tanimlar-sekme";
+import { HizmetTipiTanim, type HizmetTipiSatir } from "@/components/ayar/hizmet-tipi-tanim";
+import { SmsAyarTanim } from "@/components/ayar/sms-ayar-tanim";
+import { PackageCheck, MessageSquare } from "lucide-react";
 import type { DepoSatir, SubeSecenek } from "@/components/ayar/depo-tanim";
 import type { HesapSatir } from "@/components/ayar/hesap-tanim";
 import type { AracSatir } from "@/components/ayar/arac-tanim";
@@ -57,14 +60,28 @@ interface Props {
   subeler: SubeSecenek[];
   masrafTurleri: MasrafTuruSatir[];
   roller: { id: string; ad: string }[];
+  hizmetTipleri: HizmetTipiSatir[];
+  smsAyarlari: {
+    aktif: boolean;
+    saglayici: string;
+    apiUrl?: string;
+    kullaniciAdi?: string;
+    sifre?: string;
+    baslik?: string;
+    kayitSablonu: string;
+    tamamlandiSablonu: string;
+    otomatikGirisSms: boolean;
+  };
 }
 
-type Sekme = "gorunum" | "firma" | "tanimlar" | "kullanicilar" | "sistem";
+type Sekme = "gorunum" | "firma" | "tanimlar" | "hizmetler" | "sms" | "kullanicilar" | "sistem";
 
 const SEKME_BILGI: { key: Sekme; etiket: string; ikon: LucideIcon }[] = [
   { key: "gorunum", etiket: "Görünüm", ikon: Palette },
   { key: "firma", etiket: "Firma", ikon: Building2 },
   { key: "tanimlar", etiket: "Tanımlar", ikon: FolderCog },
+  { key: "hizmetler", etiket: "Hizmet Tipleri", ikon: PackageCheck },
+  { key: "sms", etiket: "SMS Ayarları", ikon: MessageSquare },
   { key: "kullanicilar", etiket: "Kullanıcılar", ikon: Users },
   { key: "sistem", etiket: "Sistem", ikon: Database },
 ];
@@ -74,7 +91,9 @@ const SEKME_BILGI: { key: Sekme; etiket: string; ikon: LucideIcon }[] = [
 export function AyarIcerik(props: Props) {
   const gorunenSekmeler = SEKME_BILGI.filter((sekme) =>
     ((sekme.key !== "gorunum" && sekme.key !== "firma") || props.ayarGoruntuleYetkisi)
+    && (sekme.key !== "sms" || props.ayarGoruntuleYetkisi)
     && (sekme.key !== "tanimlar" || props.tanimGoruntuleYetkisi)
+    && (sekme.key !== "hizmetler" || props.tanimGoruntuleYetkisi)
     && (sekme.key !== "kullanicilar" || props.kullaniciYonetYetkisi)
     && (sekme.key !== "sistem" || props.sistemGoruntuleYetkisi),
   );
@@ -124,6 +143,19 @@ export function AyarIcerik(props: Props) {
               masrafTurleri: props.masrafTurleri,
               roller: props.roller,
             }}
+          />
+        )}
+        {secilen === "hizmetler" && props.tanimGoruntuleYetkisi && (
+          <HizmetTipiTanim
+            hizmetTipleri={props.hizmetTipleri}
+            olusturYetkisi={props.tanimOlusturYetkisi}
+            guncelleYetkisi={props.tanimGuncelleYetkisi}
+          />
+        )}
+        {secilen === "sms" && props.ayarGoruntuleYetkisi && (
+          <SmsAyarTanim
+            ayarlar={props.smsAyarlari}
+            guncelleYetkisi={props.firmaGuncelleYetkisi}
           />
         )}
         {secilen === "kullanicilar" && props.kullaniciYonetYetkisi && (

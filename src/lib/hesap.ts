@@ -13,3 +13,9 @@ export function fisNoUret(onEk: string, yil: number, sira: number): string {
 export function satinAlmaKoduUret(sira: number): string {
   return String(sira).padStart(3, "0");
 }
+
+/** 4 basamaklı sıralı hizmet takip numarası: 0001, 0002, ... */
+export function hizmetSiraNoUret(sira: number): string {
+  return String(sira).padStart(4, "0");
+}
+

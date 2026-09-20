@@ -139,7 +139,7 @@ export function AracTanim({ araclar, olusturYetkisi, guncelleYetkisi }: { aracla
               <div className="space-y-1.5">
                 <Label>Tip</Label>
                 <Select value={tip} onValueChange={setTip}>
-                  <SelectTrigger className="saha-input w-full bg-slate-800">
+                  <SelectTrigger className="saha-input w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

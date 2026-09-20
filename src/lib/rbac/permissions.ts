@@ -20,6 +20,7 @@ export const UYGULAMA_MODULLERI = [
   "AYARLAR",
   "KULLANICI_YONETIMI",
   "SESLI_NOT",
+  "HIZMET",
 ] as const;
 
 export const IZIN_EYLEMLERI = [
@@ -66,6 +67,7 @@ export const MODUL_ADLARI: Readonly<Record<UygulamaModuluKodu, string>> = {
   AYARLAR: "Ayarlar",
   KULLANICI_YONETIMI: "Kullanıcı ve rol yönetimi",
   SESLI_NOT: "Sesli notlar",
+  HIZMET: "Fındık Kırma & Paketleme Hizmeti",
 };
 
 export const EYLEM_ADLARI: Readonly<Record<IzinEylemiKodu, string>> = {

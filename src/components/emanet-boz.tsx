@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PackageOpen } from "lucide-react";
+import { QuickNumberStepper } from "@/components/ui/quick-number-stepper";
+import { PackageOpen, RotateCcw } from "lucide-react";
 
 export function EmanetBozButon({
   emanetId,
@@ -34,14 +35,20 @@ export function EmanetBozButon({
   const [kgGirdi, setKgGirdi] = useState(String(kalanKg));
   const [fiyat, setFiyat] = useState("");
 
-  const tutar = tutarHesapla(sayiCevir(kgGirdi), sayiCevir(fiyat));
+  const sayisalKg = sayiCevir(kgGirdi);
+  const sayisalFiyat = sayiCevir(fiyat);
+  const tutar = tutarHesapla(sayisalKg, sayisalFiyat);
 
   function gonder() {
     startTransition(async () => {
-      const sonuc = await sunucuIslemi(() => muhasebelestirEmanet({ emanetId, kg: sayiCevir(kgGirdi), birimFiyat: sayiCevir(fiyat) }));
+      const sonuc = await sunucuIslemi(() =>
+        muhasebelestirEmanet({ emanetId, kg: sayisalKg, birimFiyat: sayisalFiyat })
+      );
       if (!sonuc) return;
       if (sonuc.ok) {
-        toast.success("Emanet muhasebeleştirildi", { description: `${kgGirdi} kg × ${paraTL(sayiCevir(fiyat))} → ${paraTL(sonuc.tutar)} TL borç` });
+        toast.success("Emanet başarıyla muhasebeleştirildi", {
+          description: `${kg(sayisalKg)} × ${paraTL(sayisalFiyat)} = ${paraTL(sonuc.tutar)} TL borç yazıldı`,
+        });
         setAcik(false);
         router.refresh();
       } else {
@@ -53,37 +60,93 @@ export function EmanetBozButon({
   return (
     <Dialog open={acik} onOpenChange={setAcik}>
       <DialogTrigger asChild>
-        <button type="button" className="saha-btn bg-orange-800 px-4 text-sm text-white">
+        <button
+          type="button"
+          className="saha-btn bg-amber-600 hover:bg-amber-500 text-white px-4 text-sm font-bold shadow-xs"
+        >
           <PackageOpen className="h-4 w-4" /> Muhasebeleştir (Hesap Gör)
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Emaneti Muhasebeleştir — {cariAd}</DialogTitle>
+          <DialogTitle>Emaneti Muhasebeleştir</DialogTitle>
           <DialogDescription>
-            Emanetteki {kg(kalanKg)} fındığın tamamını veya bir kısmını manuel fiyatla satın alınır; kg borcu düşer, TL borç yazılır.
+            {cariAd} emanetindeki toplam {kg(kalanKg)} fındıktan istenen miktar bozdurularak TL borca dönüştürülür.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>Miktar (kg) — kalan: {kalanKg.toLocaleString("tr-TR")}</Label>
-            <Input inputMode="decimal" value={kgGirdi} onChange={(e) => setKgGirdi(e.target.value)} className="saha-input" />
+        <div className="space-y-4 pt-1">
+          {/* Miktar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold text-[var(--app-fg)]">
+                Bozdurulacak Miktar (Kg) <span className="text-red-400">*</span>
+              </Label>
+              <button
+                type="button"
+                onClick={() => setKgGirdi(String(kalanKg))}
+                className="text-xs font-bold text-[var(--primary)] hover:underline"
+              >
+                Tümünü Seç ({kalanKg.toLocaleString("tr-TR")} kg)
+              </button>
+            </div>
+            <Input
+              inputMode="decimal"
+              value={kgGirdi}
+              onChange={(e) => setKgGirdi(e.target.value)}
+              className="saha-input text-xl font-bold"
+            />
           </div>
-          <div className="space-y-1.5">
-            <Label>Birim fiyat (TL/kg)</Label>
-            <Input inputMode="decimal" value={fiyat} onChange={(e) => setFiyat(e.target.value)} className="saha-input" />
+
+          {/* Fiyat */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold text-[var(--app-fg)]">
+                Birim Fiyat (TL/kg) <span className="text-red-400">*</span>
+              </Label>
+              {fiyat && (
+                <button
+                  type="button"
+                  onClick={() => setFiyat("")}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  <RotateCcw className="h-3 w-3" /> Temizle
+                </button>
+              )}
+            </div>
+            <Input
+              inputMode="decimal"
+              value={fiyat}
+              onChange={(e) => setFiyat(e.target.value)}
+              placeholder="0,00 TL"
+              className="saha-input text-xl font-bold"
+            />
+            <QuickNumberStepper
+              label="Hızlı Fiyat Seçimi:"
+              values={[125, 130, 135, 140, 145, 150]}
+              unit="TL"
+              mode="set"
+              onSelect={(p) => setFiyat(String(p))}
+            />
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-orange-900/30 px-4 py-3">
-            <span className="text-sm font-bold text-orange-200">Oluşacak TL borç</span>
-            <span className="text-2xl font-extrabold tabular-nums text-orange-700">{paraTL(tutar)}</span>
+
+          {/* Canlı Tutar Önizleme */}
+          <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <span className="text-sm font-bold text-amber-300">Oluşacak TL Borç:</span>
+            <span className="text-2xl font-black tabular-nums text-amber-400">{paraTL(tutar)}</span>
           </div>
+
           <button
             type="button"
-            disabled={pending || sayiCevir(kgGirdi) <= 0 || sayiCevir(kgGirdi) > kalanKg || sayiCevir(fiyat) <= 0}
+            disabled={
+              pending ||
+              sayisalKg <= 0 ||
+              sayisalKg > kalanKg ||
+              sayisalFiyat <= 0
+            }
             onClick={gonder}
-            className="saha-btn w-full bg-orange-800 text-white"
+            className="saha-btn w-full bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/30"
           >
-            {pending ? "İşleniyor..." : "Satın Almayı Tamamla"}
+            {pending ? "İşleniyor..." : "Satın Almayı Onayla & Tamamla"}
           </button>
         </div>
       </DialogContent>

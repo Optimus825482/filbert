@@ -34,20 +34,34 @@ export default async function CariHesaplarPage({ searchParams }: { searchParams:
       </div>
 
       <div className="mb-3 flex gap-2">
-        <form className="flex min-w-0 flex-1 gap-2">
-        <input name="q" defaultValue={q} placeholder="İsim ara..." className="saha-input flex-1" />
-        {tur && <input type="hidden" name="tur" value={tur} />}
-        <button type="submit" className="saha-btn bg-[#f5c518] px-6 font-extrabold text-[#0b1b3a]">Ara</button>
+        <form className="relative flex min-w-0 flex-1 items-center gap-2">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="İsim veya bölge ara..."
+            className="saha-input flex-1"
+          />
+          {tur && <input type="hidden" name="tur" value={tur} />}
+          <button
+            type="submit"
+            className="saha-btn shrink-0 bg-[var(--primary)] px-5 font-bold text-white shadow-xs"
+          >
+            Ara
+          </button>
         </form>
         <YeniCariButonu yetkili={cariOlusturYetkisi} />
       </div>
 
-      <div className="mb-3 flex gap-2 text-sm font-semibold">
+      <div className="mb-3 flex gap-2 text-sm font-semibold overflow-x-auto pb-1">
         {[undefined, "URETICI", "TUCCAR", "FABRIKA"].map((t) => (
           <Link
             key={t ?? "hepsi"}
             href={{ query: { q, tur: t } }}
-            className={`rounded-full px-3 py-1.5 ${tur === t || (!tur && !t) ? "bg-[#f5c518] font-extrabold text-[#0b1b3a]" : "border border-slate-700 bg-slate-800 text-sky-100"}`}
+            className={`rounded-full px-3.5 py-1.5 transition-colors shrink-0 ${
+              tur === t || (!tur && !t)
+                ? "bg-[var(--primary)] font-bold text-white shadow-xs"
+                : "border border-[var(--surface-border)] bg-[var(--surface)] text-[var(--app-fg)] hover:border-[var(--primary)]"
+            }`}
           >
             {t ? TUR_ETIKET[t] : "Tümü"}
           </Link>

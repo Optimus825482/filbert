@@ -154,7 +154,7 @@ export function PersonelTanim({ personel, olusturYetkisi, guncelleYetkisi }: { p
               <div className="space-y-1.5">
                 <Label>Görev</Label>
                 <Select value={gorev} onValueChange={setGorev}>
-                  <SelectTrigger className="saha-input w-full bg-slate-800">
+                  <SelectTrigger className="saha-input w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
