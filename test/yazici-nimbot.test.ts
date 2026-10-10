@@ -48,6 +48,8 @@ import {
   NIMBOT_SERI_PAKET_ARALIGI,
   NIMBOT_SERI_PAKET_ZAMAN_ASIMI,
   NimbotUsbIstemcisi,
+  nimbotAdiMi,
+  nimbotHatirlananCihaz,
 } from "../src/lib/yazici/nimbot";
 import type { EtiketVerisi } from "../src/lib/yazici/escpos";
 
@@ -474,4 +476,31 @@ test("USB seri istemcisi kütüphanenin 1 sn varsayılanı yerine geniş zaman a
   assert.equal(istemci.protocol.getPacketTimeout(), NIMBOT_SERI_PAKET_ZAMAN_ASIMI);
   assert.ok(NIMBOT_SERI_PAKET_ZAMAN_ASIMI >= 5000);
   assert.ok(NIMBOT_SERI_BAGLANTI_DENEMESI >= 2);
+});
+
+test("hatırlanan yazıcı: ad önekiyle eşleşen cihaz seçilir", () => {
+  const cihazlar = [
+    { name: "Kulaklik" },
+    { name: "b1-1a2b3c" },
+    { name: "H506075543" },
+  ] as unknown as BluetoothDevice[];
+  assert.equal(nimbotHatirlananCihaz(cihazlar)?.name, "b1-1a2b3c");
+  assert.ok(nimbotAdiMi("B21-PRO"));
+  assert.ok(nimbotAdiMi(" d110-1 "));
+  assert.ok(!nimbotAdiMi("H506075543"));
+  assert.ok(!nimbotAdiMi(null));
+});
+
+test("hatırlanan yazıcı: ad eşleşmese de tek izinli cihaz yazıcı sayılır", () => {
+  const tek = [{ name: "H506075543" }] as unknown as BluetoothDevice[];
+  assert.equal(nimbotHatirlananCihaz(tek)?.name, "H506075543");
+
+  const adsiz = [{ name: null }] as unknown as BluetoothDevice[];
+  assert.equal(nimbotHatirlananCihaz(adsiz), adsiz[0]);
+});
+
+test("hatırlanan yazıcı: birden fazla adsız cihazda seçim penceresine düşülür", () => {
+  const cihazlar = [{ name: null }, { name: "Kulaklik" }] as unknown as BluetoothDevice[];
+  assert.equal(nimbotHatirlananCihaz(cihazlar), null);
+  assert.equal(nimbotHatirlananCihaz([]), null);
 });

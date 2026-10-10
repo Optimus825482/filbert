@@ -98,6 +98,27 @@ export function nimbotBaglantiyiSifirla(): void {
   basilanCihaz = null;
 }
 
+/** Adı Nimbot model öneklerinden biriyle başlıyor mu? */
+export function nimbotAdiMi(ad: string | null | undefined): boolean {
+  if (!ad) return false;
+  const buyukAd = ad.trim().toUpperCase();
+  return NIMBOT_AD_ONEKLERI.some((onek) => buyukAd.startsWith(onek.toUpperCase()));
+}
+
+/**
+ * Daha önce izin verilmiş cihazlar arasından yazıcıyı seçer.
+ *
+ * Yazıcının reklam adı her modelde "B1…" biçiminde olmuyor; bazı Nimbot
+ * cihazları seri numarasıyla (ör. "H5…") yayın yapıyor. Ad öneklerden
+ * biriyle eşleşmezse bu kaynakta izin verilmiş tek cihaz yazıcı kabul edilir:
+ * cihazı zaten kullanıcı bu sitede kendisi seçmiştir.
+ */
+export function nimbotHatirlananCihaz(cihazlar: BluetoothDevice[]): BluetoothDevice | null {
+  const adli = cihazlar.find((cihaz) => nimbotAdiMi(cihaz.name));
+  if (adli) return adli;
+  return cihazlar.length === 1 ? cihazlar[0] : null;
+}
+
 async function cihaziAl(): Promise<BluetoothDevice> {
   if (basilanCihaz) return basilanCihaz;
 
@@ -109,7 +130,7 @@ async function cihaziAl(): Promise<BluetoothDevice> {
   if (typeof getDevices === "function") {
     try {
       const izinliler = await getDevices.call(tarayici);
-      const nimbot = izinliler.find((cihaz) => cihaz.name && /^(B1|B21|D1|M2|N1)/i.test(cihaz.name));
+      const nimbot = nimbotHatirlananCihaz(izinliler);
       if (nimbot) {
         basilanCihaz = nimbot;
         return nimbot;
