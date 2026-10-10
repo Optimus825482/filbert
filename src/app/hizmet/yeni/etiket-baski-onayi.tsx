@@ -23,10 +23,12 @@ import type { EtiketVerisi } from "@/lib/yazici/escpos";
 import {
   NIMBOT_DESTEK_HATASI,
   NIMBOT_MAKS_KOPYA,
+  NIMBOT_SERI_DESTEK_HATASI,
   nimbotEtiketOnizleme,
   nimbotEtiketiYazdir,
+  nimbotSeriEtiketiYazdir,
 } from "@/lib/yazici/nimbot";
-import { useBluetoothDestekli } from "@/lib/yazici/nimbot-durum";
+import { useBluetoothDestekli, useSerialDestekli } from "@/lib/yazici/nimbot-durum";
 
 /** Dış sistem aboneliği yok; tarayıcı ölçümü her render'da okunur. */
 const aboneOl = () => () => {};
@@ -44,8 +46,9 @@ const BIRINCIL_DUGME =
  * Talep kaydedildikten hemen sonra açılan etiket baskı onayı.
  *
  * Etiket ekranına gitmeye gerek kalmadan, oluşturulan QR kodlu etiketin
- * yazıcıya gidecek görüntüsü gösterilir; tek onayla Nimbot B1'e (Bluetooth)
- * veya ayarlarda seçili doğrudan ESC/POS yazıcıya gönderilir.
+ * yazıcıya gidecek görüntüsü gösterilir; tek onayla Nimbot B1'e (ayarlarda
+ * USB seri seçiliyse kabloyla, değilse Bluetooth ile) veya ayarlarda seçili
+ * doğrudan ESC/POS yazıcıya gönderilir.
  */
 interface Props {
   acik: boolean;
@@ -83,8 +86,9 @@ export function EtiketBaskiOnayi({
   const [ilerleme, setIlerleme] = useState(0);
   const [hata, setHata] = useState<string | null>(null);
   const [cihaz, setCihaz] = useState<string | null>(null);
-  // Web Bluetooth desteği yalnızca tarayıcıda ölçülebilir.
+  // Tarayıcı desteği (Web Bluetooth / Web Serial) yalnızca istemcide ölçülebilir.
   const btDestekli = useBluetoothDestekli();
+  const seriDestekli = useSerialDestekli();
   // Sunucu render'ında tuval bulunmaz; önizleme yalnızca tarayıcıda çizilir.
   const tarayicida = useSyncExternalStore(aboneOl, istemciMi, sunucudaMi);
   const profil = etiketProfiliGetir(etiketProfili);
@@ -112,29 +116,33 @@ export function EtiketBaskiOnayi({
     .filter((satir): satir is string => Boolean(satir))
     .join(" + ");
 
-  // Bluetooth baskı tarayıcıda yapılır; ayarlarda hedef seçilmese de çalışır.
-  const nimbotKullanilabilir = btDestekli && yazdirmaYetkisi;
+  // Nimbot baskı tarayıcıda yapılır: ayarlarda USB seri seçiliyse kabloyla,
+  // aksi hâlde Bluetooth ile gönderilir; hedef seçilmese de Bluetooth çalışır.
+  const nimbotSeriMi = yaziciHedefi === "SERIAL_USB";
+  const nimbotDestekli = nimbotSeriMi ? seriDestekli : btDestekli;
+  const nimbotDestekHatasi = nimbotSeriMi ? NIMBOT_SERI_DESTEK_HATASI : NIMBOT_DESTEK_HATASI;
+  const nimbotKullanilabilir = nimbotDestekli && yazdirmaYetkisi;
   // Doğrudan ESC/POS baskı yalnızca hedef tanımlıysa mümkündür.
-  const dogrudanVar = yaziciHazir && yaziciHedefi !== "BLUETOOTH_BLE";
+  const dogrudanVar =
+    yaziciHazir && yaziciHedefi !== "BLUETOOTH_BLE" && yaziciHedefi !== "SERIAL_USB";
   const dogrudanKullanilabilir = dogrudanVar && yazdirmaYetkisi;
-  // Ayarlarda Bluetooth seçiliyse ya da doğrudan yazıcı yoksa Nimbot önerilir.
-  const nimbotTercih = yaziciHedefi === "BLUETOOTH_BLE" || !dogrudanKullanilabilir;
+  // Ayarlarda Nimbot hedefi seçiliyse ya da doğrudan yazıcı yoksa Nimbot önerilir.
+  const nimbotTercih = nimbotSeriMi || yaziciHedefi === "BLUETOOTH_BLE" || !dogrudanKullanilabilir;
 
-  /** Etiketi Bluetooth (Nimbot B1) üzerinden yazıcıya gönderir. */
+  /** Etiketi Nimbot B1'e gönderir (USB seri veya Bluetooth). */
   async function nimbotIleYazdir() {
     setHata(null);
     setIlerleme(0);
     setYaziyor(true);
     try {
-      const sonuc = await nimbotEtiketiYazdir(
-        { ...etiket, kopyaNo: 1, kopyaSayisi },
-        {
-          etiketProfili: profil.kod,
-          yogunluk: bluetoothYogunluk,
-          kopya: kopyaSayisi,
-          ilerleme: setIlerleme,
-        }
-      );
+      const secenekler = {
+        etiketProfili: profil.kod,
+        yogunluk: bluetoothYogunluk,
+        kopya: kopyaSayisi,
+        ilerleme: setIlerleme,
+      };
+      const gonder = nimbotSeriMi ? nimbotSeriEtiketiYazdir : nimbotEtiketiYazdir;
+      const sonuc = await gonder({ ...etiket, kopyaNo: 1, kopyaSayisi }, secenekler);
       setCihaz(sonuc.cihazAdi);
       // Baskı istemcide yapıldı; etiket sayacı sunucuda güncellenir.
       const kayit = await etiketBaskisiKaydet(hizmetId, sonuc.kopya);
@@ -146,7 +154,8 @@ export function EtiketBaskiOnayi({
       );
       onKapat(true);
     } catch (e) {
-      const mesaj = (e as Error).message || "Bluetooth baskı başarısız";
+      const mesaj =
+        (e as Error).message || (nimbotSeriMi ? "USB baskı başarısız" : "Bluetooth baskı başarısız");
       setHata(mesaj);
       toast.error(mesaj);
     } finally {
@@ -221,9 +230,9 @@ export function EtiketBaskiOnayi({
                 Etiket baskısı için HİZMET güncelleme yetkisi gerekir.
               </div>
             )}
-            {!btDestekli && (
+            {!nimbotDestekli && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-2.5 text-[11px] font-semibold text-amber-300">
-                {NIMBOT_DESTEK_HATASI}
+                {nimbotDestekHatasi}
               </div>
             )}
             {!dogrudanVar && (
@@ -239,7 +248,9 @@ export function EtiketBaskiOnayi({
             )}
             {yaziyor && (
               <div className="text-[11px] font-bold text-sky-200">
-                {nimbotTercih ? "Bluetooth ile gönderiliyor %" + ilerleme : "Yazıcıya gönderiliyor"}
+                {nimbotTercih
+                  ? (nimbotSeriMi ? "USB ile gönderiliyor %" : "Bluetooth ile gönderiliyor %") + ilerleme
+                  : "Yazıcıya gönderiliyor"}
                 {cihaz ? " · " + cihaz : ""}
               </div>
             )}
@@ -284,9 +295,11 @@ export function EtiketBaskiOnayi({
               onClick={() => void nimbotIleYazdir()}
               disabled={yaziyor || !nimbotKullanilabilir}
               title={
-                btDestekli
-                  ? "Nimbot B1 yazıcıya Bluetooth ile gönder (ilk baskıda yazıcı seçilir)"
-                  : NIMBOT_DESTEK_HATASI
+                !nimbotDestekli
+                  ? nimbotDestekHatasi
+                  : nimbotSeriMi
+                    ? "Nimbot B1 yazıcıya USB kablo ile gönder (ilk baskıda port seçilir)"
+                    : "Nimbot B1 yazıcıya Bluetooth ile gönder (ilk baskıda yazıcı seçilir)"
               }
               className={nimbotTercih ? BIRINCIL_DUGME : IKINCIL_DUGME}
             >
@@ -295,7 +308,7 @@ export function EtiketBaskiOnayi({
               ) : (
                 <Bluetooth className="h-4 w-4" />
               )}
-              Nimbot B1&apos;e Yazdır
+              Nimbot B1&apos;e Yazdır{nimbotSeriMi ? " (USB)" : ""}
               {kopyaSayisi > 1 ? " (" + kopyaSayisi + ")" : ""}
             </button>
             {dogrudanVar && (

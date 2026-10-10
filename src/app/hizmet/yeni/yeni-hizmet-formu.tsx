@@ -27,7 +27,7 @@ import {
   type YaziciHedefTipi,
 } from "@/lib/findik-isleme";
 import type { EtiketVerisi } from "@/lib/yazici/escpos";
-import { nimbotEtiketiYazdir } from "@/lib/yazici/nimbot";
+import { nimbotEtiketiYazdir, nimbotSeriEtiketiYazdir } from "@/lib/yazici/nimbot";
 import { EtiketBaskiOnayi } from "./etiket-baski-onayi";
 
 /** Müşteri önerisi: adın ilk 4 harfi girildiğinde en yakın 5 kayıt önerilir. */
@@ -257,8 +257,11 @@ export function YeniHizmetFormu({
   /** "Otomatik" davranış: etiket bekletilmeden yazıcıya gönderilir. */
   async function otomatikEtiketiGonder(hizmetId: string, etiket: EtiketVerisi) {
     try {
-      if (yaziciHedefi === "BLUETOOTH_BLE") {
-        const sonuc = await nimbotEtiketiYazdir(etiket, {
+      // Nimbot hedeflerinde baskı tarayıcıda yapılır: USB seri seçiliyse
+      // kabloyla, aksi hâlde Bluetooth ile gönderilir.
+      if (yaziciHedefi === "BLUETOOTH_BLE" || yaziciHedefi === "SERIAL_USB") {
+        const gonder = yaziciHedefi === "SERIAL_USB" ? nimbotSeriEtiketiYazdir : nimbotEtiketiYazdir;
+        const sonuc = await gonder(etiket, {
           etiketProfili,
           yogunluk: bluetoothYogunluk,
           kopya: 1,

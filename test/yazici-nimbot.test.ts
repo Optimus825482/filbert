@@ -21,6 +21,7 @@ import {
   etiketBaskiDavranisiGetir,
   findikIslemeAyarBlogunuBirlestir,
   findikIslemeAyarlariniCoz,
+  yaziciHedefGecerliMi,
   yaziciHedefTanimi,
   yaziciYapilandirildiMi,
   type FindikIslemeAyarlari,
@@ -259,4 +260,30 @@ test("Bluetooth hedefi seçili değilken doğrudan baskı yapılandırılmamış
   assert.equal(cozulen.yazici.hedef, "YOK");
   assert.equal(yaziciYapilandirildiMi(cozulen.yazici), false);
   assert.equal(cozulen.yazici.bluetoothYogunluk, VARSAYILAN_BLUETOOTH_YOGUNLUGU);
+});
+test("USB seri hedefi ayarlara yazılıp geri okunur ve sunucu ayarı gerektirmez", () => {
+  const ayarlar: FindikIslemeAyarlari = {
+    kasaHesapId: null,
+    etiketProfili: "NIMBOT_B1_50x50",
+    etiketBaskiDavranisi: "SOR",
+    yazici: {
+      hedef: "SERIAL_USB",
+      kuyrukAdi: null,
+      ip: null,
+      port: 9100,
+      kodSayfasi: "CP857",
+      bluetoothYogunluk: 5,
+    },
+  };
+  const cozulen = findikIslemeAyarlariniCoz(findikIslemeAyarBlogunuBirlestir({ tema: "koyu" }, ayarlar));
+  assert.equal(cozulen.yazici.hedef, "SERIAL_USB");
+  assert.equal(cozulen.yazici.bluetoothYogunluk, 5);
+  // USB seri baskı tarayıcıda yapılır; sunucu tarafı doğrudan hedef gerekmez.
+  assert.equal(yaziciYapilandirildiMi(cozulen.yazici), true);
+  assert.match(yaziciHedefTanimi(cozulen.yazici), /USB seri/);
+  assert.match(yaziciHedefTanimi(cozulen.yazici), /5/);
+  assert.equal(yaziciHedefGecerliMi("SERIAL_USB"), true);
+  // Bilinmeyen hedef sessizce kapalıya düşer.
+  const bozuk = findikIslemeAyarlariniCoz({ findikIsleme: { yazici: { hedef: "USB_SERI" } } });
+  assert.equal(bozuk.yazici.hedef, "YOK");
 });

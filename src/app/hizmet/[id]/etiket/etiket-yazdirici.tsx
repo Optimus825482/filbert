@@ -11,6 +11,7 @@ import {
   Settings2,
   AlertTriangle,
   Bluetooth,
+  Cable,
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
@@ -28,11 +29,14 @@ import {
 import type { EtiketVerisi } from "@/lib/yazici/escpos";
 import {
   NIMBOT_DESTEK_HATASI,
+  NIMBOT_SERI_DESTEK_HATASI,
   nimbotCihazAdi,
   nimbotEtiketOnizleme,
   nimbotEtiketiYazdir,
+  nimbotSeriEtiketiYazdir,
+  nimbotSeriPortAdi,
 } from "@/lib/yazici/nimbot";
-import { useBluetoothDestekli } from "@/lib/yazici/nimbot-durum";
+import { useBluetoothDestekli, useSerialDestekli } from "@/lib/yazici/nimbot-durum";
 
 interface Props {
   hizmetId: string;
@@ -92,8 +96,14 @@ export function HizmetEtiketYazdirici({
   const [btHata, setBtHata] = useState<string | null>(null);
   const [btCihaz, setBtCihaz] = useState<string | null>(null);
   const [btOnizleme, setBtOnizleme] = useState<string | null>(null);
-  // Web Bluetooth desteği yalnızca tarayıcıda ölçülebilir.
+  const [seriPort, setSeriPort] = useState<string | null>(null);
+  // Tarayıcı desteği (Web Bluetooth / Web Serial) yalnızca istemcide ölçülebilir.
   const btDestekli = useBluetoothDestekli();
+  const seriDestekli = useSerialDestekli();
+  // Ayarlarda USB seri hedefi seçiliyse kabloyla, aksi hâlde Bluetooth ile.
+  const nimbotSeriMi = yaziciHedefi === "SERIAL_USB";
+  const nimbotDestekli = nimbotSeriMi ? seriDestekli : btDestekli;
+  const nimbotDestekHatasi = nimbotSeriMi ? NIMBOT_SERI_DESTEK_HATASI : NIMBOT_DESTEK_HATASI;
 
   const profilBilgi = etiketProfiliGetir(profil);
   const kucuk = profil === "NIMBOT_B1_50x50";
@@ -175,14 +185,15 @@ export function HizmetEtiketYazdirici({
     }
   }
 
-  /** Etiketi Bluetooth (Nimbot B1) üzerinden doğrudan yazıcıya gönderir. */
+  /** Etiketi Nimbot B1'e gönderir (ayarlara göre USB seri veya Bluetooth). */
   async function handleBluetoothYazdir() {
     setBtHata(null);
     setBtIlerleme(0);
     setBtYaziyor(true);
     const veri = etiketVerisiniOlustur();
     try {
-      const sonuc = await nimbotEtiketiYazdir(veri, {
+      const gonder = nimbotSeriMi ? nimbotSeriEtiketiYazdir : nimbotEtiketiYazdir;
+      const sonuc = await gonder(veri, {
         etiketProfili: profil,
         yogunluk: bluetoothYogunluk,
         kopya: kopyaSayisi,
@@ -194,14 +205,19 @@ export function HizmetEtiketYazdirici({
       if (!kayit.ok) {
         toast.warning("Etiket basıldı ancak sayaç güncellenemedi: " + kayit.hata);
       }
-      toast.success(`Bluetooth ile yazdırıldı: ${sonuc.model} (${sonuc.cihazAdi})`);
+      toast.success(
+        (nimbotSeriMi ? "USB ile yazdırıldı: " : "Bluetooth ile yazdırıldı: ") +
+          sonuc.model + " (" + sonuc.cihazAdi + ")"
+      );
     } catch (e) {
-      const mesaj = (e as Error).message || "Bluetooth baskı başarısız";
+      const mesaj =
+        (e as Error).message || (nimbotSeriMi ? "USB baskı başarısız" : "Bluetooth baskı başarısız");
       setBtHata(mesaj);
       toast.error(mesaj);
     } finally {
       setBtYaziyor(false);
-      setBtCihaz(nimbotCihazAdi());
+      setBtCihaz(nimbotSeriMi ? nimbotSeriPortAdi() : nimbotCihazAdi());
+      setSeriPort(nimbotSeriPortAdi());
     }
   }
 
@@ -294,7 +310,7 @@ export function HizmetEtiketYazdirici({
             <button
               type="button"
               onClick={handleOnizle}
-              disabled={!btDestekli}
+              disabled={!nimbotDestekli}
               className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-sky-100 transition-colors hover:bg-slate-700 disabled:opacity-40"
               title="Bluetooth etiketinin ekrandaki önizlemesi (kâğıt harcamaz)"
             >
@@ -305,22 +321,30 @@ export function HizmetEtiketYazdirici({
             <button
               type="button"
               onClick={() => void handleBluetoothYazdir()}
-              disabled={!yazdirmaYetkisi || btYaziyor || !btDestekli}
+              disabled={!yazdirmaYetkisi || btYaziyor || !nimbotDestekli}
               className="flex items-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 transition-colors hover:bg-sky-500/25 disabled:opacity-40"
               title={
-                !btDestekli
-                  ? NIMBOT_DESTEK_HATASI
+                !nimbotDestekli
+                  ? nimbotDestekHatasi
                   : !yazdirmaYetkisi
-                    ? "Bluetooth baskı için HİZMET güncelleme yetkisi gerekir"
-                    : `Nimbot B1'e Bluetooth ile yazdır (${btCihaz ?? "ilk baskıda yazıcı seçilir"})`
+                    ? "Nimbot baskı için HİZMET güncelleme yetkisi gerekir"
+                    : nimbotSeriMi
+                      ? `Nimbot B1'e USB kablo ile yazdır (${seriPort ?? "ilk baskıda port seçilir"})`
+                      : `Nimbot B1'e Bluetooth ile yazdır (${btCihaz ?? "ilk baskıda yazıcı seçilir"})`
               }
             >
               {btYaziyor ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : nimbotSeriMi ? (
+                <Cable className="h-4 w-4" />
               ) : (
                 <Bluetooth className="h-4 w-4" />
               )}
-              {btYaziyor ? `Yazdırılıyor %${btIlerleme}` : "Bluetooth ile Yazdır"}
+              {btYaziyor
+                ? `Yazdırılıyor %${btIlerleme}`
+                : nimbotSeriMi
+                  ? "USB ile Yazdır"
+                  : "Bluetooth ile Yazdır"}
             </button>
 
             <button
@@ -384,11 +408,20 @@ export function HizmetEtiketYazdirici({
           )}
         </div>
 
-        {/* ─── Bluetooth (Nimbot B1) durumu ─── */}
+        {/* ─── Nimbot B1 (Bluetooth / USB seri) durumu ─── */}
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3 text-[11px]">
-          <Bluetooth className="h-3.5 w-3.5 text-[#f5c518]" />
-          {!btDestekli ? (
-            <span className="text-amber-300">{NIMBOT_DESTEK_HATASI}</span>
+          {nimbotSeriMi ? (
+            <Cable className="h-3.5 w-3.5 text-[#f5c518]" />
+          ) : (
+            <Bluetooth className="h-3.5 w-3.5 text-[#f5c518]" />
+          )}
+          {!nimbotDestekli ? (
+            <span className="text-amber-300">{nimbotDestekHatasi}</span>
+          ) : nimbotSeriMi ? (
+            <span className="text-emerald-300">
+              USB seri: <b>{seriPort ?? "port seçilmedi"}</b> · yoğunluk {bluetoothYogunluk} · etiket
+              tarayıcıda çizilip kabloyla gönderilir.
+            </span>
           ) : yaziciHedefi === "BLUETOOTH_BLE" ? (
             <span className="text-emerald-300">
               Bluetooth: <b>{btCihaz ?? "yazıcı seçilmedi"}</b> · yoğunluk {bluetoothYogunluk} ·

@@ -14,6 +14,7 @@ import {
   Network,
   PowerOff,
   Bluetooth,
+  Cable,
   Loader2,
   QrCode,
 } from "lucide-react";
@@ -37,11 +38,16 @@ import {
 import { testEtiketiVerisi } from "@/lib/yazici/escpos";
 import {
   NIMBOT_DESTEK_HATASI,
+  NIMBOT_SERI_DESTEK_HATASI,
   nimbotBaglantiyiSifirla,
   nimbotCihazAdi,
   nimbotEtiketiYazdir,
+  nimbotSeriBaglantiyiSifirla,
+  nimbotSeriEtiketiYazdir,
+  nimbotSeriPortAdi,
+  nimbotSeriPortuSec,
 } from "@/lib/yazici/nimbot";
-import { useBluetoothDestekli } from "@/lib/yazici/nimbot-durum";
+import { useBluetoothDestekli, useSerialDestekli } from "@/lib/yazici/nimbot-durum";
 
 interface Props {
   kasalar: Array<{ id: string; ad: string; tip: string; modul?: string }>;
@@ -63,6 +69,7 @@ interface Props {
 const HEDEF_IKONLARI: Record<YaziciHedefTipi, typeof Usb> = {
   YOK: PowerOff,
   BLUETOOTH_BLE: Bluetooth,
+  SERIAL_USB: Cable,
   WINDOWS_KUYRUK: Usb,
   AG_9100: Network,
 };
@@ -109,8 +116,13 @@ export function IslemeAyarFormu({
   const [btIlerleme, setBtIlerleme] = useState(0);
   const [btHata, setBtHata] = useState<string | null>(null);
   const [btCihaz, setBtCihaz] = useState<string | null>(null);
-  // Web Bluetooth yalnızca tarayıcıda sorgulanabilir; sunucu render'ında kapalı.
+  const [seriYaziyor, setSeriYaziyor] = useState(false);
+  const [seriIlerleme, setSeriIlerleme] = useState(0);
+  const [seriHata, setSeriHata] = useState<string | null>(null);
+  const [seriPort, setSeriPort] = useState<string | null>(null);
+  // Tarayıcı yetenekleri yalnızca istemcide sorgulanabilir; sunucu render'ında kapalı.
   const btDestekli = useBluetoothDestekli();
+  const seriDestekli = useSerialDestekli();
 
   async function yaziciListesiniYukle() {
     setYazicilarYukleniyor(true);
@@ -187,6 +199,49 @@ export function IslemeAyarFormu({
     nimbotBaglantiyiSifirla();
     setBtCihaz(null);
     toast.success("Bluetooth yazıcı seçimi sıfırlandı.");
+  }
+
+  /** USB portunu seçer; ilk seçimde tarayıcının port penceresi açılır. */
+  async function seriPortSec() {
+    setSeriHata(null);
+    try {
+      setSeriPort(await nimbotSeriPortuSec());
+      toast.success("USB yazıcı portu seçildi.");
+    } catch (e) {
+      const mesaj = (e as Error).message || "USB portu seçilemedi";
+      setSeriHata(mesaj);
+      toast.error(mesaj);
+    }
+  }
+
+  function seriBaglantiyiUnut() {
+    nimbotSeriBaglantiyiSifirla();
+    setSeriPort(null);
+    toast.success("USB yazıcı seçimi sıfırlandı.");
+  }
+
+  /** USB seri hedefi için test etiketi: tarayıcıda çizilir, kabloyla basılır. */
+  async function seriTestEtiketiYazdir() {
+    setSeriHata(null);
+    setSeriIlerleme(0);
+    setSeriYaziyor(true);
+    try {
+      const sonuc = await nimbotSeriEtiketiYazdir(testEtiketiVerisi(firmaAdi), {
+        etiketProfili,
+        yogunluk: Number(bluetoothYogunluk) || VARSAYILAN_BLUETOOTH_YOGUNLUGU,
+        kopya: 1,
+        ilerleme: setSeriIlerleme,
+      });
+      setSeriPort(sonuc.cihazAdi);
+      toast.success("USB test etiketi gönderildi: " + sonuc.model + " (" + sonuc.cihazAdi + ")");
+    } catch (e) {
+      const mesaj = (e as Error).message || "USB baskı başarısız";
+      setSeriHata(mesaj);
+      toast.error(mesaj);
+    } finally {
+      setSeriYaziyor(false);
+      setSeriPort(nimbotSeriPortAdi());
+    }
   }
 
   const profil = etiketProfiliGetir(etiketProfili);
@@ -508,7 +563,121 @@ export function IslemeAyarFormu({
           </div>
         )}
 
-        {yaziciHedefi !== "YOK" && yaziciHedefi !== "BLUETOOTH_BLE" && (
+        {yaziciHedefi === "SERIAL_USB" && (
+          <div className="mt-3 space-y-3">
+            <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-3 text-[11px] text-sky-100">
+              Nimbot B1 USB kabloyla bağlıyken etiket, tarayıcıdan{" "}
+              <b className="text-white">Web Serial</b> ile doğrudan yazıcıya gönderilir.
+              Windows&apos;a sürücü kurmak gerekmez. Sayfa <b className="text-white">Chrome</b> veya{" "}
+              <b className="text-white">Edge</b> ile, <b className="text-white">localhost</b> ya da{" "}
+              <b className="text-white">https</b> üzerinden açık olmalıdır. Farklı bir USB porta
+              geçmek için önce &quot;Unut&quot; düğmesini kullanın.
+            </div>
+
+            {!seriDestekli && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+                {NIMBOT_SERI_DESTEK_HATASI}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wide text-sky-200">
+                  Baskı yoğunluğu
+                </label>
+                <select
+                  value={bluetoothYogunluk}
+                  onChange={(e) => setBluetoothYogunluk(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#081226] px-3.5 py-2.5 text-sm font-semibold text-white focus:border-[#f5c518] focus:outline-none"
+                >
+                  {BLUETOOTH_YOGUNLUKLARI.map((deger) => (
+                    <option key={deger} value={deger}>
+                      {deger}
+                      {deger === VARSAYILAN_BLUETOOTH_YOGUNLUGU ? " (önerilen)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-sky-300">
+                  Etiket soluk çıkarsa yoğunluğu artırın (yazıcı 1-5 destekler).
+                </p>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wide text-sky-200">
+                  Seçili USB portu
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className={
+                      "flex-1 truncate rounded-xl border px-3.5 py-2.5 text-sm font-semibold " +
+                      (seriPort
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                        : "border-white/10 bg-black/20 text-sky-300")
+                    }
+                  >
+                    {seriPort ?? "Henüz seçilmedi (ilk baskıda seçilir)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={seriBaglantiyiUnut}
+                    disabled={!seriPort}
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                    title="USB port seçimini sıfırla"
+                  >
+                    Unut
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void seriPortSec()}
+                disabled={seriYaziyor || !seriDestekli}
+                className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white disabled:opacity-40"
+              >
+                <Cable className="h-3.5 w-3.5" /> USB Portunu Seç
+              </button>
+              <button
+                type="button"
+                onClick={() => void seriTestEtiketiYazdir()}
+                disabled={seriYaziyor || !seriDestekli}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40"
+              >
+                {seriYaziyor ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Printer className="h-3.5 w-3.5" />
+                )}
+                {seriYaziyor ? "Gönderiliyor..." : "USB ile Test Etiketi Yazdır"}
+              </button>
+              {yaziciKaydedilmemis && (
+                <span className="text-[11px] font-semibold text-amber-300">
+                  Yoğunluk değişikliği için önce kaydedin.
+                </span>
+              )}
+            </div>
+
+            {seriYaziyor && (
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-emerald-400 transition-all"
+                  style={{ width: seriIlerleme + "%" }}
+                />
+              </div>
+            )}
+
+            {seriHata && (
+              <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-[11px] text-rose-200">
+                {seriHata}
+              </div>
+            )}
+          </div>
+        )}
+
+        {yaziciHedefi !== "YOK" &&
+          yaziciHedefi !== "BLUETOOTH_BLE" &&
+          yaziciHedefi !== "SERIAL_USB" && (
           <div className="mt-3">
             <label className="text-[11px] font-bold uppercase tracking-wide text-sky-200">
               Karakter kod sayfası
@@ -534,18 +703,27 @@ export function IslemeAyarFormu({
           <button
             type="button"
             onClick={testEtiketiYazdir}
-            disabled={testBekliyor || yaziciHedefi === "YOK" || yaziciHedefi === "BLUETOOTH_BLE"}
+            disabled={
+              testBekliyor ||
+              yaziciHedefi === "YOK" ||
+              yaziciHedefi === "BLUETOOTH_BLE" ||
+              yaziciHedefi === "SERIAL_USB"
+            }
             title={
               yaziciHedefi === "BLUETOOTH_BLE"
                 ? "Bluetooth hedefinde test baskısı yukarıdaki Bluetooth bölümünden yapılır"
-                : undefined
+                : yaziciHedefi === "SERIAL_USB"
+                  ? "USB seri hedefinde test baskısı yukarıdaki USB bölümünden yapılır"
+                  : undefined
             }
             className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white disabled:opacity-40"
           >
             <Printer className="h-3.5 w-3.5" />
             {testBekliyor ? "Gönderiliyor..." : "Test Etiketi Yazdır"}
           </button>
-          {yaziciKaydedilmemis && yaziciHedefi !== "BLUETOOTH_BLE" && (
+          {yaziciKaydedilmemis &&
+            yaziciHedefi !== "BLUETOOTH_BLE" &&
+            yaziciHedefi !== "SERIAL_USB" && (
             <span className="text-[11px] font-semibold text-amber-300">
               Test baskısı kaydedilmiş ayarlarla yapılır — önce kaydedin.
             </span>

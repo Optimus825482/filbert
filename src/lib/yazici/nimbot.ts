@@ -1,13 +1,17 @@
 /**
- * Nimbot B1 (Bluetooth LE) doğrudan baskı — tarayıcı katmanı.
+ * Nimbot B1 doğrudan baskı — tarayıcı katmanı (Bluetooth LE ve USB seri).
  *
  * NIIMBOT yazıcılar ESC/POS konuşmadığı için etiket burada tarayıcıda bir
- * tuvale çizilir, 1 bit raster'a çevrilir ve `@mmote/niimbluelib` ile Web
- * Bluetooth üzerinden yazıcıya gönderilir. Böylece Windows'a sürücü kurmak
- * veya ek bir servis çalıştırmak gerekmez.
+ * tuvale çizilir, 1 bit raster'a çevrilir ve `@mmote/niimbluelib` ile
+ * yazıcıya gönderilir. İki taşıma yolu desteklenir:
  *
- * Gereksinimler: Chrome/Edge (Web Bluetooth), güvenli bağlam (https veya
- * localhost) ve yazıcının bilgisayara Bluetooth ile tanıtılmış olması.
+ *   - Web Bluetooth (BLE): kablosuz, cihaz seçme penceresiyle eşleşir.
+ *   - Web Serial (USB): kablo takılıyken daha kararlıdır; baud 115200.
+ *
+ * Böylece Windows'a sürücü kurmak veya ek bir servis çalıştırmak gerekmez.
+ *
+ * Gereksinimler: Chrome/Edge, güvenli bağlam (https veya localhost) ve
+ * yazıcının bilgisayara Bluetooth ya da USB ile bağlı olması.
  *
  * Bu modül yalnızca istemci bileşenlerinden çağrılır; sunucu tarafında
  * kullanılamaz.
@@ -17,7 +21,9 @@ import {
   ImageEncoder,
   LabelType,
   NiimbotBluetoothClient,
+  NiimbotSerialClient,
   PageColorType,
+  type NiimbotAbstractClient,
 } from "@mmote/niimbluelib";
 import type { EtiketVerisi } from "@/lib/yazici/escpos";
 import {
@@ -304,7 +310,80 @@ export function nimbotEtiketOnizleme(veri: EtiketVerisi, etiketProfili: EtiketPr
   return tuval.toDataURL("image/png");
 }
 
-// ─── Bluetooth baskı ────────────────────────────────────────
+// ─── Ortak Nimbot baskı çekirdeği ───────────────────────────
+
+/** Kopya sayısını ve yoğunluğu yazıcının desteklediği aralığa çeker. */
+function baskiDegerleriniNormalizeEt(secenekler: NimbotBaskiSecenekleri): {
+  kopya: number;
+  yogunluk: number;
+} {
+  const kopya = Math.min(NIMBOT_MAKS_KOPYA, Math.max(1, Math.trunc(secenekler.kopya ?? 1) || 1));
+  const yogunlukHam = Math.trunc(secenekler.yogunluk);
+  const yogunluk =
+    Number.isFinite(yogunlukHam) && yogunlukHam > 0
+      ? Math.min(BLUETOOTH_YOGUNLUK_MAX, Math.max(BLUETOOTH_YOGUNLUK_MIN, yogunlukHam))
+      : VARSAYILAN_BLUETOOTH_YOGUNLUGU;
+  return { kopya, yogunluk };
+}
+
+/**
+ * Bağlı istemci üzerinden etiketi yazıcıya gönderir. Bluetooth ve USB seri
+ * yolları aynı Nimbot protokolünü konuştuğu için baskı akışı tek yerde tutulur.
+ */
+async function nimbotGoreviniYazdir(
+  aktifIstemci: NiimbotAbstractClient,
+  veri: EtiketVerisi,
+  secenekler: NimbotBaskiSecenekleri,
+  kopya: number,
+  yogunluk: number,
+  cihazAdi: string
+): Promise<NimbotBaskiSonucu> {
+  const meta = aktifIstemci.getModelMetadata();
+  const gorevAdi = aktifIstemci.getPrintTaskType();
+  if (!gorevAdi) {
+    throw new Error(
+      "Yazıcı modeli tanınamadı" + (meta ? " (" + meta.model + ")" : "") +
+        ". Nimbot B1 veya uyumlu bir model bağlandığından emin olun."
+    );
+  }
+
+  const sayfaKodla = (sayfaVerisi: EtiketVerisi) => {
+    const tuval = nimbotTuvale(sayfaVerisi, secenekler.etiketProfili);
+    const tuvalCtx = tuval.getContext("2d");
+    if (!tuvalCtx) throw new Error("Etiket tuvali okunamadı");
+    const pikseller = tuvalCtx.getImageData(0, 0, tuval.width, tuval.height).data;
+    const kaynak = esikliNoktaKaynagi(pikseller, tuval.width, tuval.height);
+    return ImageEncoder.encode(kaynak, PageColorType.SingleColor, meta?.printDirection ?? "top");
+  };
+
+  const gorev = aktifIstemci.protocol.newPrintTask(gorevAdi, {
+    totalPages: kopya,
+    density: yogunluk,
+    labelType: LabelType.WithGaps,
+    pageColor: PageColorType.SingleColor,
+    statusPollIntervalMs: 300,
+    statusTimeoutMs: 20_000,
+    pageTimeoutMs: 30_000,
+  });
+
+  const ilerleme = (olay: { progress: number }) => secenekler.ilerleme?.(olay.progress);
+  aktifIstemci.on("printpacketprogress", ilerleme);
+  try {
+    await gorev.printInit();
+    // Her kopya ayrı sayfa olarak gönderilir; böylece "Kopya n/N" doğru basılır.
+    for (let sira = 1; sira <= kopya; sira++) {
+      await gorev.printPage(sayfaKodla({ ...veri, kopyaNo: sira, kopyaSayisi: kopya }), 1);
+    }
+    await gorev.waitForFinished();
+  } finally {
+    aktifIstemci.off("printpacketprogress", ilerleme);
+    await gorev.printEnd().catch(() => false);
+  }
+
+  return { model: meta?.model ?? "BILINMEYEN", cihazAdi, kopya };
+}
+
+// ─── Bluetooth (BLE) baskı ──────────────────────────────────
 
 /**
  * Etiketi Bluetooth üzerinden Nimbot yazıcıya gönderir. İlk çağrıda tarayıcı
@@ -317,13 +396,7 @@ export async function nimbotEtiketiYazdir(
 ): Promise<NimbotBaskiSonucu> {
   if (!nimbotBluetoothDestekleniyorMu()) throw new Error(NIMBOT_DESTEK_HATASI);
 
-  const kopya = Math.min(NIMBOT_MAKS_KOPYA, Math.max(1, Math.trunc(secenekler.kopya ?? 1) || 1));
-  const yogunlukHam = Math.trunc(secenekler.yogunluk);
-  const yogunluk =
-    Number.isFinite(yogunlukHam) && yogunlukHam > 0
-      ? Math.min(BLUETOOTH_YOGUNLUK_MAX, Math.max(BLUETOOTH_YOGUNLUK_MIN, yogunlukHam))
-      : VARSAYILAN_BLUETOOTH_YOGUNLUGU;
-
+  const { kopya, yogunluk } = baskiDegerleriniNormalizeEt(secenekler);
   const hedefCihaz = await cihaziAl();
   const aktifIstemci = istemci ?? (istemci = new NiimbotBluetoothClient());
 
@@ -331,57 +404,115 @@ export async function nimbotEtiketiYazdir(
     if (!aktifIstemci.isConnected()) {
       await aktifIstemci.connect({ authorizedDevice: hedefCihaz });
     }
-
-    const meta = aktifIstemci.getModelMetadata();
-    const gorevAdi = aktifIstemci.getPrintTaskType();
-    if (!gorevAdi) {
-      throw new Error(
-        "Yazıcı modeli tanınamadı" + (meta ? " (" + meta.model + ")" : "") +
-          ". Nimbot B1 veya uyumlu bir model bağlandığından emin olun."
-      );
-    }
-
-    const sayfaKodla = (sayfaVerisi: EtiketVerisi) => {
-      const tuval = nimbotTuvale(sayfaVerisi, secenekler.etiketProfili);
-      const tuvalCtx = tuval.getContext("2d");
-      if (!tuvalCtx) throw new Error("Etiket tuvali okunamadı");
-      const pikseller = tuvalCtx.getImageData(0, 0, tuval.width, tuval.height).data;
-      const kaynak = esikliNoktaKaynagi(pikseller, tuval.width, tuval.height);
-      return ImageEncoder.encode(kaynak, PageColorType.SingleColor, meta?.printDirection ?? "top");
-    };
-
-    const gorev = aktifIstemci.protocol.newPrintTask(gorevAdi, {
-      totalPages: kopya,
-      density: yogunluk,
-      labelType: LabelType.WithGaps,
-      pageColor: PageColorType.SingleColor,
-      statusPollIntervalMs: 300,
-      statusTimeoutMs: 20_000,
-      pageTimeoutMs: 30_000,
-    });
-
-    const ilerleme = (olay: { progress: number }) => secenekler.ilerleme?.(olay.progress);
-    aktifIstemci.on("printpacketprogress", ilerleme);
-    try {
-      await gorev.printInit();
-      // Her kopya ayrı sayfa olarak gönderilir; böylece "Kopya n/N" doğru basılır.
-      for (let sira = 1; sira <= kopya; sira++) {
-        await gorev.printPage(sayfaKodla({ ...veri, kopyaNo: sira, kopyaSayisi: kopya }), 1);
-      }
-      await gorev.waitForFinished();
-    } finally {
-      aktifIstemci.off("printpacketprogress", ilerleme);
-      await gorev.printEnd().catch(() => false);
-    }
-
-    return {
-      model: meta?.model ?? "BILINMEYEN",
-      cihazAdi: hedefCihaz.name ?? "Nimbot",
+    return await nimbotGoreviniYazdir(
+      aktifIstemci,
+      veri,
+      secenekler,
       kopya,
-    };
+      yogunluk,
+      hedefCihaz.name ?? "Nimbot"
+    );
   } catch (hata) {
     // Bağlantı koptuysa bir sonraki denemede yeniden bağlanılsın.
     if (istemci && !istemci.isConnected()) void istemci.disconnect().catch(() => undefined);
+    throw hata;
+  }
+}
+
+// ─── USB seri baskı (Web Serial) ────────────────────────────
+
+/** NIIMBOT USB satıcı kimliği; port seçme penceresi bu kimlikle süzülür. */
+const NIMBOT_USB_VID = 0x3513;
+
+export const NIMBOT_SERI_DESTEK_HATASI =
+  "Bu tarayıcı USB seri (Web Serial) desteklemiyor. Chrome veya Edge kullanın; " +
+  "sayfa https veya localhost üzerinden açılmalıdır.";
+
+// Sayfa oturumu boyunca USB portu ve istemcisi hatırlanır; böylece sonraki
+// baskılarda port seçme penceresi yeniden açılmaz.
+let seriIstemci: NiimbotSerialClient | null = null;
+let seriPort: SerialPort | null = null;
+
+/** Web Serial API bu tarayıcıda kullanılabilir mi? */
+export function nimbotSerialDestekleniyorMu(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.serial !== "undefined";
+}
+
+function seriPortEtiketi(port: SerialPort): string {
+  const bilgi = port.getInfo();
+  const vid = bilgi.usbVendorId !== undefined ? bilgi.usbVendorId.toString(16).toUpperCase() : "?";
+  const pid = bilgi.usbProductId !== undefined ? bilgi.usbProductId.toString(16).toUpperCase() : "?";
+  return "USB VID:" + vid + " PID:" + pid;
+}
+
+/** Seçili USB portunun okunur etiketi (henüz seçilmediyse null). */
+export function nimbotSeriPortAdi(): string | null {
+  return seriPort ? seriPortEtiketi(seriPort) : null;
+}
+
+/**
+ * USB portunu hazırlar. Daha önce izin verilmiş bir NIIMBOT portu varsa seçim
+ * penceresi açılmadan kullanılır; yoksa tarayıcının port seçme penceresi açılır.
+ */
+async function seriPortuAl(): Promise<SerialPort> {
+  if (seriPort) return seriPort;
+  if (!nimbotSerialDestekleniyorMu()) throw new Error(NIMBOT_SERI_DESTEK_HATASI);
+
+  const izinliPortlar = await navigator.serial.getPorts();
+  const kayitli = izinliPortlar.find((port) => port.getInfo().usbVendorId === NIMBOT_USB_VID);
+  seriPort =
+    kayitli ??
+    (await navigator.serial.requestPort({ filters: [{ usbVendorId: NIMBOT_USB_VID }] }));
+  return seriPort;
+}
+
+/**
+ * Ayarlar ekranından USB portunu seçer ve okunur etiketini döndürür. İlk
+ * çağrıda tarayıcının port seçme penceresi açılır.
+ */
+export async function nimbotSeriPortuSec(): Promise<string> {
+  return seriPortEtiketi(await seriPortuAl());
+}
+
+/** USB bağlantısını ve seçili portu unutur (başka porta geçmek için). */
+export function nimbotSeriBaglantiyiSifirla(): void {
+  void seriIstemci?.disconnect().catch(() => undefined);
+  seriIstemci = null;
+  seriPort = null;
+}
+
+/**
+ * Etiketi USB kablo üzerinden Nimbot yazıcıya gönderir. İlk çağrıda tarayıcı
+ * port seçme penceresi açılır; aynı sayfa oturumundaki sonraki baskılar
+ * hatırlanan porta gider.
+ */
+export async function nimbotSeriEtiketiYazdir(
+  veri: EtiketVerisi,
+  secenekler: NimbotBaskiSecenekleri
+): Promise<NimbotBaskiSonucu> {
+  if (!nimbotSerialDestekleniyorMu()) throw new Error(NIMBOT_SERI_DESTEK_HATASI);
+
+  const { kopya, yogunluk } = baskiDegerleriniNormalizeEt(secenekler);
+  const port = await seriPortuAl();
+  const aktifIstemci = seriIstemci ?? (seriIstemci = new NiimbotSerialClient());
+
+  try {
+    if (!aktifIstemci.isConnected()) {
+      await aktifIstemci.connect({ authorizedPort: port });
+    }
+    return await nimbotGoreviniYazdir(
+      aktifIstemci,
+      veri,
+      secenekler,
+      kopya,
+      yogunluk,
+      seriPortEtiketi(port)
+    );
+  } catch (hata) {
+    // Bağlantı koptuysa bir sonraki denemede yeniden bağlanılsın.
+    if (seriIstemci && !seriIstemci.isConnected()) {
+      void seriIstemci.disconnect().catch(() => undefined);
+    }
     throw hata;
   }
 }

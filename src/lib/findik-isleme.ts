@@ -140,6 +140,7 @@ export const VARSAYILAN_BLUETOOTH_YOGUNLUGU = 3;
 export const YAZICI_HEDEFLERI = [
   { kod: "YOK", ad: "Kapalı · yalnızca tarayıcıdan yazdır" },
   { kod: "BLUETOOTH_BLE", ad: "Bluetooth · Nimbot B1 (tarayıcıdan)" },
+  { kod: "SERIAL_USB", ad: "USB kablo · Nimbot B1 (tarayıcıdan)" },
   { kod: "WINDOWS_KUYRUK", ad: "Windows yazıcı kuyruğu (USB / Nimbot B1)" },
   { kod: "AG_9100", ad: "Ağ yazıcısı (IP:9100 ESC/POS)" },
 ] as const;
@@ -160,7 +161,7 @@ export interface YaziciAyarlari {
   port: number;
   kodSayfasi: KodSayfasi;
   /**
-   * Nimbot Bluetooth baskı yoğunluğu (hedef: BLUETOOTH_BLE). Yazıcı 1-5
+   * Nimbot baskı yoğunluğu (hedef: BLUETOOTH_BLE ve SERIAL_USB). Yazıcı 1-5
    * aralığını destekler; etiket soluk çıkarsa artırın.
    */
   bluetoothYogunluk: number;
@@ -177,8 +178,10 @@ export const VARSAYILAN_YAZICI_AYARLARI: YaziciAyarlari = {
 
 /** ESC/POS doğrudan baskı için hedef yapılandırılmış mı? */
 export function yaziciYapilandirildiMi(yazici: YaziciAyarlari): boolean {
-  // Bluetooth baskı tarayıcıda yapılır; sunucu tarafında ek ayar gerekmez.
+  // Bluetooth ve USB seri baskı tarayıcıda yapılır; sunucu tarafında ek ayar
+  // gerekmez. Yanıt, tarayıcının Web Bluetooth / Web Serial desteğine bağlıdır.
   if (yazici.hedef === "BLUETOOTH_BLE") return true;
+  if (yazici.hedef === "SERIAL_USB") return true;
   if (yazici.hedef === "WINDOWS_KUYRUK") return Boolean(yazici.kuyrukAdi?.trim());
   if (yazici.hedef === "AG_9100") return Boolean(yazici.ip?.trim());
   return false;
@@ -192,6 +195,9 @@ export function yaziciHedefTanimi(yazici: YaziciAyarlari): string {
   }
   if (yazici.hedef === "BLUETOOTH_BLE") {
     return `Nimbot B1 · Bluetooth · yoğunluk ${yazici.bluetoothYogunluk}`;
+  }
+  if (yazici.hedef === "SERIAL_USB") {
+    return `Nimbot B1 · USB seri · yoğunluk ${yazici.bluetoothYogunluk}`;
   }
   return "kapalı";
 }

@@ -241,7 +241,8 @@ sürecinin çalıştığı bilgisayara bağlı (ya da ağdan erişilebilir) olma
 | --- | --- | --- |
 | Kapalı | Doğrudan baskı istenmiyorsa (yalnızca tarayıcıdan yazdırma) | — |
 | Bluetooth · Nimbot B1 (tarayıcıdan) | Yazıcı BLE ile bağlanacaksa, sürücü kurmadan | Baskı yoğunluğu (1-5) |
-| Windows yazıcı kuyruğu | Nimbot B1 USB ile bağlıysa | Yazıcı kuyruğu adı |
+| USB kablo · Nimbot B1 (tarayıcıdan) | Yazıcı USB kabloyla bağlıysa; Bluetooth'a göre daha kararlıdır, şarj sorunu yoktur | Baskı yoğunluğu (1-5) |
+| Windows yazıcı kuyruğu | ESC/POS konuşan USB/ağ yazıcısı (Nimbot B1 bu hedefte çalışmaz) | Yazıcı kuyruğu adı |
 | Ağ yazıcısı (IP:9100) | Yazıcı ağda ve ESC/POS soketi açıksa | IP adresi + port (varsayılan 9100) |
 
 - **Karakter kod sayfası:** `PC857 · Türkçe` (varsayılan, `ESC t 13`) veya `ASCII`
@@ -312,9 +313,13 @@ gönderilir. Yazıcı sürücüsü ya da ek bir yerel servis gerekmez.
    niimbluelib `ImageEncoder` ile uyumlu 1 bit raster.
 2. `src/lib/yazici/nimbot.ts` — istemci katmanı: cihaz seçimi (`getDevices` →
    `requestDevice`), tuval çizimi, `newPrintTask`/`printPage` baskı işi ve ilerleme
-   olayları. Kopya başına ayrı sayfa basılır (en fazla 10 kopya).
-3. `src/lib/yazici/nimbot-durum.ts` — `useBluetoothDestekli()`: Web Bluetooth desteği
-   `useSyncExternalStore` ile istemcide ölçülür (sunucu render'ında kapalı).
+   olayları. Kopya başına ayrı sayfa basılır (en fazla 10 kopya). USB seri yolu da
+   buradadır: `nimbotSeriPortuSec`/`nimbotSeriEtiketiYazdir` (`NiimbotSerialClient`,
+   Web Serial, 115200 baud, VID `0x3513` süzgeci) aynı baskı çekirdeğini kullanır.
+3. `src/lib/yazici/nimbot-durum.ts` — `useBluetoothDestekli()` ve
+   `useSerialDestekli()`: tarayıcı desteği `useSyncExternalStore` ile istemcide ölçülür
+   (sunucu render'ında kapalı). Web Serial tipleri `src/types/web-serial.d.ts` içinde
+   tanımlıdır (TypeScript'in `lib.dom` çıktısında henüz yok).
 4. `src/lib/actions/yazici.ts` → `etiketBaskisiKaydet` — baskı istemcide yapıldığı için
    sunucu yalnızca `etiketBasildiSayisi` sayacını artırır.
 
@@ -327,6 +332,25 @@ gönderilir. Yazıcı sürücüsü ya da ek bir yerel servis gerekmez.
 | Etiket çok soluk | Baskı yoğunluğunu artırın (1-5) |
 | Eşleşmiş yazıcı değişmiyor | **Unut** düğmesiyle seçimi sıfırlayıp yeniden seçin |
 
+### USB seri ile doğrudan baskı (Nimbot B1 · Web Serial)
+
+Kablo takılıyken Bluetooth yerine USB seri kullanılabilir; Nimbot B1 USB'de hem seri
+(COM) hem yazıcı arayüzü sunar, ancak yalnızca seri arayüzü Nimbot protokolünü taşır
+(Windows yazıcı kuyruğu bu yazıcı için çalışmaz). Baskı yine **tarayıcıda** yapılır:
+
+- Tarayıcı: **Chrome** veya **Edge** (Web Serial destekleyen masaüstü sürüm);
+  sayfa **`localhost`** ya da **`https`** üzerinden açılmalıdır.
+- Yazıcı USB kablo ile bağlı ve açık olmalıdır; başka bir uygulama portu tutmamalıdır.
+- **Ayarlar → Fındık İşleme → Doğrudan Yazıcı → USB kablo · Nimbot B1** seçilip
+  kaydedilir.
+- **USB Portunu Seç** ile port bir kez seçilir (NIIMBOT VID `0x3513` süzülür);
+  sonraki baskılarda seçim hatırlanır. Başka porta geçmek için **Unut** kullanılır.
+- **USB ile Test Etiketi Yazdır** örnek etiket basar; talep penceresindeki düğme
+  **Nimbot B1'e Yazdır (USB)** olarak görünür ve kabloyla gönderir.
+- Baskı yoğunluğu ayarı (1-5) Bluetooth ile ortaktır (`bluetoothYogunluk`).
+- Tarayıcı port izni origin bazlıdır; farklı bir adres/port ile açılan sayfa izni
+  yeniden ister.
+
 ### Talep kaydı sonrası etiket baskısı
 
 Yeni talep formundaki **Kaydet ve Etiket Yazdır** düğmesi, kaydı oluşturduktan sonra
@@ -334,9 +358,10 @@ etiket ekranına yönlendirmek yerine doğrudan **baskı onayı penceresini** a�
 
 - Pencerede etiketin yazıcıya gidecek 1 bit görüntüsü (önizleme), müşteri/miktar/işlem
   özeti ve **kopya sayısı** (1-10) bulunur.
-- **Nimbot B1'e Yazdır** düğmesi etiketi Web Bluetooth ile gönderir; ayarlarda yazıcı
-  hedefi seçilmemiş olsa da çalışır. Hedef tanımlıysa ek olarak **Yazıcıya Gönder**
-  (ESC/POS) düğmesi görünür.
+- **Nimbot B1'e Yazdır** düğmesi etiketi Nimbot protokolüyle gönderir: ayarlarda
+  **USB kablo** hedefi seçiliyse kabloyla (düğme **Nimbot B1'e Yazdır (USB)** olur),
+  aksi hâlde Web Bluetooth ile. Yazıcı hedefi seçilmemiş olsa da Bluetooth çalışır.
+  Hedef ESC/POS ise ek olarak **Yazıcıya Gönder** düğmesi görünür.
 - **Yazdırmadan Bitir** talep listesine döner; **Etiket Ekranını Aç** bilinen etiket
   ekranını açar (tarayıcıdan yazdırma ve QR PNG indirme).
 
@@ -346,7 +371,7 @@ Davranış **Ayarlar → Fındık İşleme → Talep Sonrası Etiket** bölümü
 | Seçim | Davranış |
 | --- | --- |
 | **Onaylı yazdır** (varsayılan) | Kayıt sonrası baskı penceresi açılır; baskıyı kullanıcı onaylar |
-| **Otomatik yazdır** | Kayıt tamamlanır tamamlanmaz etiket yazıcıya gönderilir |
+| **Otomatik yazdır** | Kayıt tamamlanır tamamlanmaz etiket yazıcıya gönderilir (Nimbot hedeflerinde Bluetooth/USB; tarayıcı izni alınamazsa pencere nedeniyle açılır) |
 | **Kapalı** | Etiket baskısı sorulmaz; yalnızca talep oluşturulur |
 
 - **Otomatik yazdır** seçiliyken tarayıcı, yazıcı seçimi için kullanıcı onayı isteyebilir.
@@ -487,10 +512,12 @@ göre ayrıldığı (alım: Ana Sayfa / Ara / Sesli modu aç / Ayarlar; işleme:
 Talep Kuyruğu / Yeni Talep / Kasa / Ayarlar) ve **işleme modülünde eller
 serbest (sesli not) ögesinin bulunmadığı** da doğrulanır.
 
-Web Bluetooth'un kendisi (yazıcı eşleştirme ve fiziksel baskı) tarayıcı izni ve donanım
-gerektirdiğinden e2e'de taklit edilir. Gerçek baskı **yazıcının bağlı olduğu makinede**
-elle doğrulanmalıdır: hedefi Bluetooth yapın, **Bluetooth ile Test Etiketi Yazdır** ile
-yazıcıyı seçin ve çıktıyı kontrol edin.
+Web Bluetooth ve Web Serial'in kendisi (yazıcı/port eşleştirme ve fiziksel baskı) tarayıcı
+izni ve donanım gerektirdiğinden e2e'de taklit edilir. Gerçek baskı **yazıcının bağlı
+olduğu makinede** elle doğrulanmalıdır: hedefi Bluetooth yapıp **Bluetooth ile Test
+Etiketi Yazdır** ile yazıcıyı seçin; USB için hedefi **USB kablo · Nimbot B1** yapıp
+**USB Portunu Seç** ve **USB ile Test Etiketi Yazdır** ile portu seçip çıktıyı kontrol
+edin.
 
 ## 9. Şema ve migration
 
