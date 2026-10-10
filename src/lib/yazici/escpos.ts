@@ -130,6 +130,8 @@ export interface EtiketOlcusu {
 export const ETIKET_OLCULERI: Readonly<Record<EtiketProfili, EtiketOlcusu>> = {
   // 50 mm etiket ≈ 384 nokta baskı genişliği / 12 nokta karakter = 32 karakter.
   NIMBOT_B1_50x50: { satirGenisligi: 32, qrModulBoyutu: 4, baslikBuyuk: false },
+  // 50×30 mm: genişlik aynı, yükseklik kısa; satır düzeni 50 mm ile aynıdır.
+  NIMBOT_B1_50x30: { satirGenisligi: 32, qrModulBoyutu: 4, baslikBuyuk: false },
   // 80 mm rulo ≈ 576 nokta baskı genişliği = 48 karakter.
   TERMAL_80x70: { satirGenisligi: 48, qrModulBoyutu: 6, baslikBuyuk: true },
 };

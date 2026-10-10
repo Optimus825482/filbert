@@ -44,6 +44,7 @@ import {
   esikUygula,
   esikliNoktaKaynagi,
   nimbotEtiketIcerigi,
+  NIMBOT_UST_BOSLUGU,
   nimbotOlcusu,
   nimbotPunto,
   type NimbotSatiri,
@@ -219,7 +220,9 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
 
   const kenar = NIMBOT_KENAR_BOSLUGU;
   const icGenislik = tuval.width - kenar * 2;
-  const govdeAlani = tuval.height - kenar * 2;
+  // Üstte yazıcının basmadığı bölge kadar boşluk bırakılır.
+  const ustBosluk = NIMBOT_UST_BOSLUGU;
+  const govdeAlani = tuval.height - ustBosluk - kenar;
 
   const planla = (katSayi: number): CizimParcasi[] =>
     icerik.map((satir) => {
@@ -273,9 +276,8 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const katSayi = alt;
   const plan = planla(katSayi);
 
-  // İçerik etiketin ÜSTÜNDEN başlar. Dikey ortalama, yazıcı etiketin tepesine
-  // hizalanmadığı için içeriği aşağı kaydırıp alttaki etikete taşırıyordu.
-  let y = kenar;
+  // İçerik, yazıcının basmaya başladığı satırdan itibaren üstten hizalı çizilir.
+  let y = ustBosluk;
   for (const parca of plan) {
     ctx.font = yaziTipi(parca.punto);
     ctx.fillStyle = "#000000";

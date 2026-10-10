@@ -154,12 +154,21 @@ export interface NimbotOlcusu {
 }
 
 /**
+ * Görüntünün ilk satırlarının basılmadığı bölge (nokta).
+ *
+ * Ölçüldü (Nimbot B1, 50×30 rulo): boşluk algılayıcı baskı kafasının ilerisinde
+ * olduğu için görüntünün ilk ~4 mm'si etiketin üstüne değil boşluğa denk geliyor.
+ * Bu yüzden içerik görüntüde bu kadar aşağıdan başlatılır.
+ */
+export const NIMBOT_UST_BOSLUGU = 32;
+
+/**
  * Baskı yüksekliğinden güvenlik için düşülen pay (nokta).
  *
- * Ölçüldü: içerik etiketin alt kenarına kadar uzatıldığında son satırlar
- * alttaki etikete taşıyor. Görüntü bu yüzden etiketten kısa tutulur.
+ * Ölçüldü: görüntü etiket boyundan uzun olursa son satırlar alttaki etikete
+ * taşıyor. Görüntü bu yüzden etiketten kısa tutulur.
  */
-export const NIMBOT_ALT_EMNIYETI = 28;
+export const NIMBOT_ALT_EMNIYETI = 16;
 
 /** Güvenlik payı düşüldükten sonra kalabilecek en küçük baskı yüksekliği. */
 export const NIMBOT_ASGARI_YUKSEKLIK = 120;

@@ -13,6 +13,7 @@ import {
 import {
   NIMBOT_ALT_EMNIYETI,
   NIMBOT_BASLIK_NOKTASI,
+  NIMBOT_UST_BOSLUGU,
   esikliNoktaKaynagi,
   nimbotEtiketIcerigi,
   nimbotOlcusu,
@@ -145,10 +146,21 @@ test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {
   assert.equal(b1.yukseklik, 384 - NIMBOT_ALT_EMNIYETI);
   assert.equal(b1.olcek, 1);
 
+  // 50×30 mm rulo için baskı yüksekliği 30 mm'ye göre hesaplanır.
+  const kisa = nimbotOlcusu("NIMBOT_B1_50x30");
+  assert.equal(kisa.genislik, NIMBOT_BASLIK_NOKTASI);
+  assert.equal(kisa.yukseklik, 240 - NIMBOT_ALT_EMNIYETI);
+
   // 80×70 mm profil B1'e sığacak biçimde küçültülür.
   const termal = nimbotOlcusu("TERMAL_80x70");
   assert.equal(termal.genislik, NIMBOT_BASLIK_NOKTASI);
   assert.equal(termal.yukseklik, 384 - NIMBOT_ALT_EMNIYETI);
+});
+
+test("Üst boşluk yazıcının basmadığı bölgeyi kapsar", () => {
+  // Yazıcı görüntünün ilk satırlarını basmıyor; içerik bu bölgenin altından başlar.
+  assert.ok(NIMBOT_UST_BOSLUGU >= 24);
+  assert.ok(NIMBOT_UST_BOSLUGU < nimbotOlcusu("NIMBOT_B1_50x30").yukseklik);
 });
 
 test("Punto rol başına ölçeklenir ve okunabilir alt sınırın altına inmez", () => {

@@ -93,6 +93,7 @@ export function durumDagilimiDilimleri(sayilar: Readonly<Record<string, number>>
 /** Etiket yazıcı profilleri. Nimbot B1 50×50 mm varsayılandır. */
 export const ETIKET_PROFILLERI = [
   { kod: "NIMBOT_B1_50x50", ad: "Nimbot B1 · 50×50 mm", genislikMm: 50, yukseklikMm: 50 },
+  { kod: "NIMBOT_B1_50x30", ad: "Nimbot B1 · 50×30 mm", genislikMm: 50, yukseklikMm: 30 },
   { kod: "TERMAL_80x70", ad: "Termal rulo · 80×70 mm", genislikMm: 80, yukseklikMm: 70 },
 ] as const;
 
