@@ -29,6 +29,67 @@ export const TALEP_DURUM_ADLARI: Readonly<Record<string, string>> = {
 /** Üretimde sayılan (henüz teslim edilmemiş) durumlar. */
 export const URETIM_DURUMLARI = ["SIRAYA_ALINDI", "KIRIM", "KAVURMA", "PAKETLEME"] as const;
 
+// ─── Pano durum dağılımı (grafik) ───────────────────────────
+
+/** Pano durum dağılımı grafiğinde her durumun rengi. */
+export const DURUM_RENKLERI: Readonly<Record<string, string>> = {
+  SIRAYA_ALINDI: "#38bdf8",
+  KIRIM: "#f5c518",
+  KAVURMA: "#fb923c",
+  PAKETLEME: "#a78bfa",
+  TAMAMLANDI: "#34d399",
+  TESLIM_EDILDI: "#64748b",
+  IPTAL: "#f87171",
+};
+
+/** Durum dağılımı sırası: üretim hattı → teslim → iptal. */
+export const DURUM_DAGILIM_SIRASI = [
+  "SIRAYA_ALINDI",
+  "KIRIM",
+  "KAVURMA",
+  "PAKETLEME",
+  "TAMAMLANDI",
+  "TESLIM_EDILDI",
+  "IPTAL",
+] as const;
+
+export type DurumDilimi = {
+  kod: string;
+  ad: string;
+  adet: number;
+  /** Toplama oranı (0-100). */
+  yuzde: number;
+  /** Donut yayının başladığı nokta (0-100, saat yönü). */
+  baslangicYuzde: number;
+  renk: string;
+};
+
+/**
+ * Durum sayaçlarını donut grafiği ve göstergesi için sıralı dilimlere çevirir.
+ * Sıfır adetli durumlar atlanır; `baslangicYuzde` dilimlerin boşluksuz
+ * dizilmesini sağlar, böylece yay toplamı %100'e tamamlanır.
+ */
+export function durumDagilimiDilimleri(sayilar: Readonly<Record<string, number>>) {
+  const toplam = DURUM_DAGILIM_SIRASI.reduce((t, kod) => t + (sayilar[kod] ?? 0), 0);
+  const dilimler: DurumDilimi[] = [];
+  let birikim = 0;
+  for (const kod of DURUM_DAGILIM_SIRASI) {
+    const adet = sayilar[kod] ?? 0;
+    if (adet <= 0) continue;
+    const yuzde = toplam > 0 ? (adet / toplam) * 100 : 0;
+    dilimler.push({
+      kod,
+      ad: TALEP_DURUM_ADLARI[kod] ?? kod,
+      adet,
+      yuzde,
+      baslangicYuzde: birikim,
+      renk: DURUM_RENKLERI[kod] ?? "#38bdf8",
+    });
+    birikim += yuzde;
+  }
+  return { toplam, dilimler };
+}
+
 /** Etiket yazıcı profilleri. Nimbot B1 50×50 mm varsayılandır. */
 export const ETIKET_PROFILLERI = [
   { kod: "NIMBOT_B1_50x50", ad: "Nimbot B1 · 50×50 mm", genislikMm: 50, yukseklikMm: 50 },

@@ -1,14 +1,20 @@
 import Link from "next/link";
 import {
   ArrowRight, BellRing, Boxes, CheckCircle2, ChevronRight, ClipboardList, Flame,
-  PackageOpen, PackageSearch, Plus, Scissors, Timer, type LucideIcon,
+  HandCoins, MessageSquareWarning, PackageOpen, PackageSearch, Plus, Scissors,
+  Timer, type LucideIcon,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getSonGunlerHizmet, islemeSayaclari, n } from "@/lib/queries";
 import { izinVar, requirePagePermission } from "@/lib/rbac/guard";
 import { kg, tarihSaat } from "@/lib/format";
 import { istanbulGunAraligi } from "@/lib/zaman";
-import { TALEP_DURUM_ADLARI, URETIM_DURUMLARI } from "@/lib/findik-isleme";
+import {
+  TALEP_DURUM_ADLARI,
+  URETIM_DURUMLARI,
+  durumDagilimiDilimleri,
+  type DurumDilimi,
+} from "@/lib/findik-isleme";
 
 type Aktor = Awaited<ReturnType<typeof requirePagePermission>>;
 
@@ -53,7 +59,7 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
   }
 
   // Pano parasal veri çekmez: tutar yalnızca rapor ve kasa ekranlarında okunur.
-  const [sayaclar, trend, acikTalepler, hazirListesi, tahsilatBekleyen, sonTalepler] = await Promise.all([
+  const [sayaclar, trend, acikTalepler, hazirListesi, sonTalepler] = await Promise.all([
     islemeSayaclari(actor.firmaId),
     getSonGunlerHizmet(7),
     prisma.hizmetIslemi.findMany({
@@ -65,9 +71,6 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
       orderBy: { tamamlandiAt: "asc" },
       take: 5,
       select: { id: true, siraNo: true, musteriAdi: true, kilo: true, tamamlandiAt: true },
-    }),
-    prisma.hizmetIslemi.count({
-      where: { firmaId: actor.firmaId, durum: "TESLIM_EDILDI", odemeDurumu: { not: "ODENDI" } },
     }),
     prisma.hizmetIslemi.findMany({
       where: { firmaId: actor.firmaId },
@@ -87,9 +90,10 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
   const enYuksekAsamaAdet = asamaSayilari.reduce((enBuyuk, asama) => Math.max(enBuyuk, asama.adet), 0);
   const uretimdeToplam = sayaclar.bekleyenTalep + sayaclar.uretimdeTalep;
 
+  const dagilim = durumDagilimiDilimleri(sayaclar.durumDagilimi);
   const trendToplamKg = trend.reduce((toplam, gun) => toplam + gun.kg, 0);
-  const enYuksekGunKg = trend.reduce((enBuyuk, gun) => Math.max(enBuyuk, gun.kg), 0);
-  const bugun = trend[trend.length - 1] ?? { kg: 0, adet: 0 };
+  const trendTamamlananAdet = trend.reduce((toplam, gun) => toplam + gun.tamamlananAdet, 0);
+  const bugun = trend[trend.length - 1] ?? { kg: 0, adet: 0, tamamlananAdet: 0 };
 
   const yapilacaklar: { href: string; ikon: LucideIcon; etiket: string; rozet: string }[] = [];
   if (sayaclar.hazirBekleyen > 0) {
@@ -98,8 +102,8 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
   if (sayaclar.smsBekleyen > 0) {
     yapilacaklar.push({ href: "/hizmet?liste=sms", ikon: BellRing, etiket: "Tamamlandı bildirimi gönderilmedi", rozet: `${sayaclar.smsBekleyen} talep` });
   }
-  if (tahsilatBekleyen > 0) {
-    yapilacaklar.push({ href: "/hizmet/raporlar", ikon: Timer, etiket: "Teslim edildi, tahsilat bekliyor", rozet: `${tahsilatBekleyen} talep` });
+  if (sayaclar.tahsilatBekleyen > 0) {
+    yapilacaklar.push({ href: "/hizmet/raporlar", ikon: Timer, etiket: "Teslim edildi, tahsilat bekliyor", rozet: `${sayaclar.tahsilatBekleyen} talep` });
   }
 
   return (
@@ -112,13 +116,27 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
           <MobilKutu href="/hizmet/kasa" etiket={"İşleme\nKasası"} ikon={PackageOpen} />
           <MobilKutu href="/hizmet/raporlar" etiket={"Durum\nRaporları"} ikon={Boxes} />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <MobilKpi etiket="Bekleyen" deger={sayaclar.bekleyenTalep} renk="#38bdf8" />
+          <MobilKpi etiket="Bugün tamamlanan" deger={sayaclar.bugunTamamlanan} renk="#34d399" />
+          <MobilKpi etiket="Teslim bekleyen" deger={sayaclar.teslimBekleyen} renk="#a78bfa" />
+          <MobilKpi etiket="Mesaj gönderilmedi" deger={sayaclar.smsBekleyen} renk="#fb923c" />
+        </div>
         <div className="rounded-2xl border border-[var(--surface-border)] bg-white/5 px-4 py-3">
           <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-sky-100">BUGÜN</div>
           <div className="mt-1.5 flex items-center justify-between text-sm">
-            <span className="text-sky-100"><b className="tabular-nums text-white">{bugun.adet}</b> talep</span>
-            <span className="text-sky-100">İşleme <b className="tabular-nums text-[#f5c518]">{kg(bugun.kg)}</b></span>
+            <span className="text-sky-100"><b className="tabular-nums text-white">{bugun.adet}</b> gelen</span>
+            <span className="text-sky-100"><b className="tabular-nums text-emerald-400">{bugun.tamamlananAdet}</b> tamamlanan</span>
           </div>
+          <div className="mt-1 text-xs font-semibold text-sky-100">İşleme alınan <b className="tabular-nums text-[#f5c518]">{kg(bugun.kg)}</b></div>
         </div>
+        <section className={PANEL}>
+          <div className={PANEL_BASLIK}>
+            <h2 className="text-sm font-extrabold tracking-tight text-white">Talep durum dağılımı</h2>
+            <span className="text-xs font-bold tabular-nums text-sky-500">{dagilim.toplam}</span>
+          </div>
+          <Donut toplam={dagilim.toplam} dilimler={dagilim.dilimler} />
+        </section>
       </div>
 
       {/* ═══════════ MASAÜSTÜ GÖRÜNÜM (md+) ═══════════ */}
@@ -139,14 +157,29 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-border)] sm:grid-cols-4 md:col-span-12">
-          <Metrik baslik="İŞLEME BEKLEYEN" deger={String(uretimdeToplam)} alt={`${sayaclar.bekleyenTalep} bekliyor · ${sayaclar.uretimdeTalep} üretimde`} vurgu={uretimdeToplam > 0} href="/hizmet" />
-          <Metrik baslik="TESLİME HAZIR" deger={String(sayaclar.hazirBekleyen)} alt={sayaclar.hazirBekleyen > 0 ? "teslim alınmayı bekliyor" : "bekleyen yok"} vurgu={sayaclar.hazirBekleyen > 0} href="/hizmet?liste=hazir" />
-          <Metrik baslik="TAHSİLAT BEKLEYEN" deger={String(tahsilatBekleyen)} alt="teslim edildi, ödeme alınmadı" vurgu={tahsilatBekleyen > 0} href="/hizmet/raporlar" />
-          <Metrik baslik="BUGÜN GELEN" deger={kg(bugun.kg)} alt={`${bugun.adet} talep`} href="/hizmet" />
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 md:col-span-12">
+          <Kpi baslik="Bekleyen talep" deger={sayaclar.bekleyenTalep} toplam={dagilim.toplam} alt="işleme alınmayı bekliyor" ikon={ClipboardList} renk="#38bdf8" href="/hizmet" />
+          <Kpi baslik="Üretimde" deger={sayaclar.uretimdeTalep} toplam={dagilim.toplam} alt="kırım · kavurma · paketleme" ikon={Boxes} renk="#f5c518" href="/hizmet" />
+          <Kpi baslik="Bugün tamamlanan" deger={sayaclar.bugunTamamlanan} toplam={dagilim.toplam} alt="bugün tamamlandı işaretlendi" ikon={CheckCircle2} renk="#34d399" href="/hizmet/raporlar" />
+          <Kpi baslik="Teslim edilmeyi bekleyen" deger={sayaclar.teslimBekleyen} toplam={dagilim.toplam} alt="hazır, müşteri almadı" ikon={PackageOpen} renk="#a78bfa" href="/hizmet?liste=hazir" />
+          <Kpi baslik="Mesaj gönderilmeyen" deger={sayaclar.smsBekleyen} toplam={sayaclar.teslimBekleyen} alt="tamamlandı bildirimi bekliyor" ikon={MessageSquareWarning} renk="#fb923c" href="/hizmet?liste=sms" />
+          <Kpi baslik="Tahsilat bekleyen" deger={sayaclar.tahsilatBekleyen} toplam={sayaclar.teslimEdilen} alt="teslim edildi, ödeme yok" ikon={HandCoins} renk="#f87171" href="/hizmet/raporlar" />
         </section>
 
-        <section className={`md:col-span-12 lg:col-span-7 ${PANEL}`}>
+        <section className={`md:col-span-12 lg:col-span-4 ${PANEL}`}>
+          <div className={PANEL_BASLIK}>
+            <div>
+              <h2 className="text-sm font-extrabold tracking-tight text-white">Talep durum dağılımı</h2>
+              <p className="mt-0.5 text-xs font-semibold text-sky-100">Toplam {dagilim.toplam} talep</p>
+            </div>
+            <Link href="/hizmet" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
+              Talepler <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <Donut toplam={dagilim.toplam} dilimler={dagilim.dilimler} />
+        </section>
+
+        <section className={`md:col-span-12 lg:col-span-4 ${PANEL}`}>
           <div className={PANEL_BASLIK}>
             <div>
               <h2 className="text-sm font-extrabold tracking-tight text-white">Fındık işleme kuyruğu</h2>
@@ -183,7 +216,7 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
           )}
         </section>
 
-        <section className={`md:col-span-12 lg:col-span-5 ${PANEL}`}>
+        <section className={`md:col-span-12 lg:col-span-4 ${PANEL}`}>
           <div className={PANEL_BASLIK}>
             <h2 className="text-sm font-extrabold tracking-tight text-white">Yapılacaklar</h2>
             <span className="text-xs font-bold tabular-nums text-sky-500">{yapilacaklar.length}</span>
@@ -212,38 +245,38 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
         <section className={`md:col-span-12 lg:col-span-7 ${PANEL}`}>
           <div className={PANEL_BASLIK}>
             <div>
-              <h2 className="text-sm font-extrabold tracking-tight text-white">Son 7 gün · işleme talepleri</h2>
-              <p className="mt-0.5 text-xs font-semibold text-sky-100">Toplam {kg(trendToplamKg)}</p>
+              <h2 className="text-sm font-extrabold tracking-tight text-white">Son 7 gün · işleme hareketi</h2>
+              <p className="mt-0.5 text-xs font-semibold text-sky-100">
+                Gelen {kg(trendToplamKg)} · Tamamlanan {trendTamamlananAdet} talep
+              </p>
             </div>
             <Link href="/hizmet/raporlar" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
               Durum raporları <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
-          <div className="px-4 py-4">
-            <div
-              role="img"
-              aria-label={`Son 7 günün fındık işleme talepleri. ${trend.map((gun) => `${GUN_UZUN.format(gun.anahtar)} ${kg(gun.kg)}`).join(", ")}`}
-              className="flex h-32 items-end gap-1.5 sm:gap-2"
-            >
-              {trend.map((gun, i) => {
-                const dunBugun = i === trend.length - 1;
-                const yuzde = enYuksekGunKg > 0 ? Math.round((gun.kg / enYuksekGunKg) * 100) : 0;
-                return (
-                  <div key={gun.anahtar.toISOString()} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5">
-                    <div
-                      title={`${GUN_UZUN.format(gun.anahtar)} · ${kg(gun.kg)} · ${gun.adet} talep`}
-                      className={`w-full rounded-t ${dunBugun ? "bg-[#f5c518]" : "bg-sky-400/40"} ${gun.kg > 0 ? "" : "h-1"}`}
-                      style={gun.kg > 0 ? { height: `${Math.max(yuzde, 4)}%` } : undefined}
-                    />
-                    <span className={`text-center text-[10px] font-extrabold uppercase ${dunBugun ? "text-[#f5c518]" : "text-sky-500"}`}>
-                      {GUN_KISA.format(gun.anahtar)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {trendToplamKg === 0 && (
-              <p className="mt-3 text-center text-xs font-semibold text-sky-100">Son 7 günde işleme talebi yok. Yeni bir talep kaydıyla başlayın.</p>
+          <div className="space-y-5 px-4 py-4">
+            <MiniGrafik
+              baslik="Gelen talep · kg"
+              renk="#f5c518"
+              ozet={`Toplam ${kg(trendToplamKg)}`}
+              gunler={trend.map((gun) => ({
+                anahtar: gun.anahtar,
+                deger: gun.kg,
+                ipucu: `${GUN_UZUN.format(gun.anahtar)} · ${kg(gun.kg)} · ${gun.adet} talep`,
+              }))}
+            />
+            <MiniGrafik
+              baslik="Tamamlanan talep · adet"
+              renk="#34d399"
+              ozet={`Toplam ${trendTamamlananAdet}`}
+              gunler={trend.map((gun) => ({
+                anahtar: gun.anahtar,
+                deger: gun.tamamlananAdet,
+                ipucu: `${GUN_UZUN.format(gun.anahtar)} · ${gun.tamamlananAdet} tamamlanan talep`,
+              }))}
+            />
+            {trendToplamKg === 0 && trendTamamlananAdet === 0 && (
+              <p className="text-center text-xs font-semibold text-sky-100">Son 7 günde işleme hareketi yok. Yeni bir talep kaydıyla başlayın.</p>
             )}
           </div>
         </section>
@@ -352,17 +385,162 @@ function MobilKutu({ href, etiket, ikon: Ikon, badge }: { href: string; etiket: 
   );
 }
 
-function Metrik({ baslik, deger, alt, vurgu, href }: { baslik: string; deger: string; alt?: string; vurgu?: boolean; href?: string }) {
-  const icerik = (
-    <div className="flex h-full flex-col justify-between gap-2 bg-[var(--surface)] px-4 py-3">
-      <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-sky-500">{baslik}</div>
-      <div>
-        <div className={`text-2xl font-extrabold tabular-nums tracking-tight ${vurgu ? "text-[#f5c518]" : "text-white"}`}>{deger}</div>
-        {alt && <div className="mt-0.5 truncate text-xs font-semibold text-sky-100">{alt}</div>}
+// ─── Pano KPI kartı (masaüstü) ─────────────────────────────
+function Kpi({
+  baslik, deger, toplam, alt, ikon: Ikon, renk, href,
+}: {
+  baslik: string;
+  deger: number;
+  toplam: number;
+  alt: string;
+  ikon: LucideIcon;
+  renk: string;
+  href: string;
+}) {
+  const yuzde = toplam > 0 ? Math.min(100, Math.round((deger / toplam) * 100)) : 0;
+  return (
+    <Link
+      href={href}
+      className={`flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] px-4 py-3 ${SATIR_HOVER}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-[10px] font-extrabold uppercase leading-tight tracking-[0.1em] text-sky-500">{baslik}</span>
+        <Ikon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: renk }} />
+      </div>
+      <div className="text-3xl font-extrabold leading-none tabular-nums tracking-tight text-white">{deger}</div>
+      <div className="mt-auto space-y-1.5">
+        <div
+          className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-border)]"
+          title={`${baslik}: ${yuzde}%`}
+        >
+          <div className="h-full rounded-full" style={{ width: `${yuzde}%`, backgroundColor: renk }} />
+        </div>
+        <div className="truncate text-[11px] font-semibold text-sky-100">{alt}</div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Mobil KPI hücresi ─────────────────────────────────────
+function MobilKpi({ etiket, deger, renk }: { etiket: string; deger: number; renk: string }) {
+  return (
+    <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: renk }} />
+        <span className="min-w-0 truncate text-[10px] font-extrabold uppercase tracking-wider text-sky-100">{etiket}</span>
+      </div>
+      <div className="mt-1 text-2xl font-extrabold leading-none tabular-nums text-white">{deger}</div>
+    </div>
+  );
+}
+
+// ─── Durum dağılımı (donut) ────────────────────────────────
+const DONUT_YARICAP = 15.91549430918954;
+
+function Donut({ toplam, dilimler }: { toplam: number; dilimler: readonly DurumDilimi[] }) {
+  if (toplam <= 0) {
+    return (
+      <p className="px-4 py-6 text-sm text-sky-100">
+        Henüz işleme talebi yok. İlk talebi oluşturduğunuzda dağılım burada görünür.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center gap-4 px-4 py-4 sm:flex-row sm:gap-6">
+      <div className="relative h-40 w-40 shrink-0">
+        <svg
+          viewBox="0 0 42 42"
+          role="img"
+          aria-label={`Talep durum dağılımı: ${dilimler.map((d) => `${d.ad} ${d.adet}`).join(", ")}`}
+          className="h-40 w-40 -rotate-90"
+        >
+          <circle cx="21" cy="21" r={DONUT_YARICAP} fill="none" stroke="var(--surface-border)" strokeWidth="5" />
+          {dilimler.map((d) => {
+            const uzunluk = Math.max(d.yuzde - 1, 0.8);
+            return (
+              <circle
+                key={d.kod}
+                cx="21"
+                cy="21"
+                r={DONUT_YARICAP}
+                fill="none"
+                stroke={d.renk}
+                strokeWidth="5"
+                strokeDasharray={`${uzunluk} ${100 - uzunluk}`}
+                strokeDashoffset={-d.baslangicYuzde}
+              />
+            );
+          })}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-extrabold leading-none tabular-nums text-white">{toplam}</span>
+          <span className="mt-0.5 text-[10px] font-extrabold uppercase tracking-widest text-sky-500">talep</span>
+        </div>
+      </div>
+      <ul className="w-full min-w-0 space-y-2">
+        {dilimler.map((d) => (
+          <li key={d.kod} className="flex items-center gap-2 text-sm">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: d.renk }} />
+            <span className="min-w-0 flex-1 truncate font-semibold text-white">{d.ad}</span>
+            <span className="shrink-0 font-bold tabular-nums text-white">{d.adet}</span>
+            <span className="w-10 shrink-0 text-right text-xs font-semibold tabular-nums text-sky-100">
+              {Math.round(d.yuzde)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ─── Günlük seri için mini çubuk grafik ────────────────────
+type GrafikGunu = { anahtar: Date; deger: number; ipucu: string };
+
+function MiniGrafik({ baslik, renk, ozet, gunler }: { baslik: string; renk: string; ozet: string; gunler: GrafikGunu[] }) {
+  const enYuksek = gunler.reduce((enBuyuk, gun) => Math.max(enBuyuk, gun.deger), 0);
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-sky-500">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: renk }} />
+          {baslik}
+        </span>
+        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-sky-100">{ozet}</span>
+      </div>
+      <div
+        role="img"
+        aria-label={`${baslik}. ${gunler.map((gun) => gun.ipucu).join(", ")}`}
+        className="flex h-24 items-end gap-1.5 sm:gap-2"
+      >
+        {gunler.map((gun, i) => {
+          const dunBugun = i === gunler.length - 1;
+          const yuzde = enYuksek > 0 ? Math.round((gun.deger / enYuksek) * 100) : 0;
+          return (
+            <div
+              key={gun.anahtar.toISOString()}
+              title={gun.ipucu}
+              className={`w-full min-w-0 flex-1 rounded-t ${gun.deger > 0 ? "" : "h-1"}`}
+              style={
+                gun.deger > 0
+                  ? { height: `${Math.max(yuzde, 4)}%`, backgroundColor: renk, opacity: dunBugun ? 1 : 0.5 }
+                  : { backgroundColor: "var(--surface-border)" }
+              }
+            />
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex gap-1.5 sm:gap-2">
+        {gunler.map((gun, i) => (
+          <span
+            key={gun.anahtar.toISOString()}
+            className={`min-w-0 flex-1 text-center text-[10px] font-extrabold uppercase ${i === gunler.length - 1 ? "text-[#f5c518]" : "text-sky-500"}`}
+          >
+            {GUN_KISA.format(gun.anahtar)}
+          </span>
+        ))}
       </div>
     </div>
   );
-  return href ? <Link href={href} className={`block h-full ${SATIR_HOVER}`}>{icerik}</Link> : icerik;
 }
 
 function HizliButon({ href, ikon: Ikon, etiket, birincil }: { href: string; ikon: LucideIcon; etiket: string; birincil?: boolean }) {

@@ -26,9 +26,14 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 `aktifModuluOku()` (`src/lib/aktif-modul.ts`) ile çözer; işleme modülünde
 `PanoIsleme` (`src/app/pano-isleme.tsx`) render edilir.
 
-- **İşleme panosu:** yalnızca kırma/kavurma/paketleme talepleri — İŞLEME BEKLEYEN,
-  TESLİME HAZIR, TAHSİLAT BEKLEYEN ve BUGÜN GELEN metrikleri, kuyruk aşama dağılımı,
-  7 günlük talep trendi, teslim alınmayan hazır talepler ve son talepler.
+- **İşleme panosu:** yalnızca kırma/kavurma/paketleme talepleri. Üstte altı KPI kartı
+  (Bekleyen talep, Üretimde, Bugün tamamlanan, Teslim edilmeyi bekleyen, Mesaj
+  gönderilmeyen, Tahsilat bekleyen) her biri ikon, renk ve orana göre dolan ilerleme
+  çubuğuyla gösterilir. Bunun yanında **talep durum dağılımı** halka (donut) grafiği,
+  kuyruk aşama dağılımı, **son 7 gün · işleme hareketi** için iki mini çubuk grafik
+  (gelen talep · kg ve tamamlanan talep · adet), teslim alınmayan hazır talepler ve son
+  talepler yer alır. Mobilde aynı KPI'lar dört hücreli ızgaraya sığdırılır ve durum
+  dağılımı donut'u "BUGÜN" kutusunun altında gösterilir.
 - **Alım panosu:** yalnızca alım akışıdır (alım fişi, randıman, emanet, depo, sevkiyat).
   İşleme metrikleri, "Fındık İşleme Talebi" kısayolu ve işleme bekleyen satırı burada
   **yer almaz**.
@@ -314,6 +319,7 @@ pnpm test                 # birim testleri (tsx --test)
                           #   Bluetooth/BLE raster: test/yazici-nimbot.test.ts
                           #   Modül ayrımı/menü daraltma: test/modul.test.ts
                           #   Müşteri/müstahsil ayrımı: test/musteri-ayrim.test.ts
+                          #   Pano KPI + durum dağılımı grafiği: test/pano-isleme-kpi.test.ts
 pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
 pnpm build
 ```

@@ -687,12 +687,14 @@ export async function getGunlukRapor(tarih: Date) {
 }
 
 /**
- * Fındık İşleme Modülü menü sayaçları.
- * Aşama durumları tek `groupBy` ile sayılır; bildirim bekleyenler için ikinci
- * hafif bir sayım yapılır (tamamlandı + bildirimi gönderilmemiş).
+ * Fındık İşleme Modülü menü ve pano sayaçları.
+ * Aşama durumları tek `groupBy` ile sayılır; pano KPI'ları için bugün
+ * tamamlanan, teslim bekleyen, tahsilat bekleyen ve bildirim bekleyen
+ * sayımları da aynı turda döner.
  */
 export const islemeSayaclari = cache(async (fid: string) => {
-  const [gruplar, smsBekleyen] = await Promise.all([
+  const { baslangic: bugunBaslangic } = istanbulGunAraligi();
+  const [gruplar, smsBekleyen, bugunTamamlanan, tahsilatBekleyen] = await Promise.all([
     prisma.hizmetIslemi.groupBy({
       by: ["durum"],
       where: { firmaId: fid },
@@ -700,6 +702,12 @@ export const islemeSayaclari = cache(async (fid: string) => {
     }),
     prisma.hizmetIslemi.count({
       where: { firmaId: fid, durum: "TAMAMLANDI", tamamlandiSmsGonderildi: false },
+    }),
+    prisma.hizmetIslemi.count({
+      where: { firmaId: fid, tamamlandiAt: { gte: bugunBaslangic } },
+    }),
+    prisma.hizmetIslemi.count({
+      where: { firmaId: fid, durum: "TESLIM_EDILDI", odemeDurumu: { not: "ODENDI" } },
     }),
   ]);
 
@@ -712,18 +720,34 @@ export const islemeSayaclari = cache(async (fid: string) => {
     bekleyenTalep: say(["SIRAYA_ALINDI"]),
     uretimdeTalep: say(["KIRIM", "KAVURMA", "PAKETLEME"]),
     hazirBekleyen: say(["TAMAMLANDI"]),
+    teslimBekleyen: say(["TAMAMLANDI"]),
+    teslimEdilen: say(["TESLIM_EDILDI"]),
+    iptalTalep: say(["IPTAL"]),
     smsBekleyen,
+    bugunTamamlanan,
+    tahsilatBekleyen,
+    /** Donut grafiği için durum → adet eşlemesi. */
+    durumDagilimi: Object.fromEntries(gruplar.map((grup) => [grup.durum, grup._count._all])),
   };
 });
 
 // ─── Fındık işleme (hizmet) ─────────────────────────────────
 
-export type GunlukHizmet = { anahtar: Date; baslangic: Date; bitis: Date; kg: number; adet: number };
+export type GunlukHizmet = {
+  anahtar: Date;
+  baslangic: Date;
+  bitis: Date;
+  kg: number;
+  adet: number;
+  /** O gün tamamlandı işaretlenen talep adedi. */
+  tamamlananAdet: number;
+};
 
 /**
- * Son N günün fındık işleme talebi toplamları. Aralıklar İstanbul iş günü
- * sınırlarıdır; sonuç en eski günden bugüne sıralıdır ve boş günler 0 ile yer
- * alır. Pano parasal veri göstermez; yalnızca kg ve talep adedi döner.
+ * Son N günün fındık işleme hareketi. Aralıklar İstanbul iş günü sınırlarıdır;
+ * sonuç en eski günden bugüne sıralıdır ve boş günler 0 ile yer alır. Gelen
+ * talep `createdAt`, tamamlanan talep `tamamlandiAt` üzerinden güne yazılır.
+ * Pano parasal veri göstermez; yalnızca kg ve talep adedi döner.
  */
 export async function getSonGunlerHizmet(gunSayisi = 7): Promise<GunlukHizmet[]> {
   const fid = await firmaId();
@@ -731,21 +755,40 @@ export async function getSonGunlerHizmet(gunSayisi = 7): Promise<GunlukHizmet[]>
   const gunler: GunlukHizmet[] = [];
   for (let geri = gunSayisi - 1; geri >= 0; geri -= 1) {
     const { baslangic, bitis } = istanbulGunAraligi(new Date(bugun - geri * 86_400_000));
-    gunler.push({ anahtar: istanbulTarihAnahtari(baslangic), baslangic, bitis, kg: 0, adet: 0 });
+    gunler.push({
+      anahtar: istanbulTarihAnahtari(baslangic),
+      baslangic,
+      bitis,
+      kg: 0,
+      adet: 0,
+      tamamlananAdet: 0,
+    });
   }
   if (gunler.length === 0) return gunler;
 
+  const ilkBaslangic = gunler[0].baslangic;
+  const sonBitis = gunler[gunler.length - 1].bitis;
   const talepler = await prisma.hizmetIslemi.findMany({
-    where: { firmaId: fid, createdAt: { gte: gunler[0].baslangic, lt: gunler[gunler.length - 1].bitis } },
-    select: { createdAt: true, kilo: true },
+    where: {
+      firmaId: fid,
+      OR: [
+        { createdAt: { gte: ilkBaslangic, lt: sonBitis } },
+        { tamamlandiAt: { gte: ilkBaslangic, lt: sonBitis } },
+      ],
+    },
+    select: { createdAt: true, tamamlandiAt: true, kilo: true },
   });
 
   const indeks = new Map(gunler.map((gun, i) => [gun.anahtar.getTime(), i]));
   for (const talep of talepler) {
-    const i = indeks.get(istanbulTarihAnahtari(talep.createdAt).getTime());
-    if (i === undefined) continue;
-    gunler[i].kg += n(talep.kilo);
-    gunler[i].adet += 1;
+    const gelen = indeks.get(istanbulTarihAnahtari(talep.createdAt).getTime());
+    if (gelen !== undefined) {
+      gunler[gelen].kg += n(talep.kilo);
+      gunler[gelen].adet += 1;
+    }
+    if (!talep.tamamlandiAt) continue;
+    const tamamlanan = indeks.get(istanbulTarihAnahtari(talep.tamamlandiAt).getTime());
+    if (tamamlanan !== undefined) gunler[tamamlanan].tamamlananAdet += 1;
   }
   return gunler;
 }
