@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ImageEncoder,
   NiimbotPacket,
+  PacketReceivedEvent,
   PageColorType,
   RequestCommandId,
   ResponseCommandId,
@@ -34,6 +35,8 @@ import {
 } from "../src/lib/findik-isleme";
 import {
   NIMBOT_SERI_BAGLANTI_DENEMESI,
+  NIMBOT_SERI_BILGI_ZAMAN_ASIMI,
+  NIMBOT_SERI_PAKET_ARALIGI,
   NIMBOT_SERI_PAKET_ZAMAN_ASIMI,
   NimbotUsbIstemcisi,
 } from "../src/lib/yazici/nimbot";
@@ -299,26 +302,50 @@ test("USB seri hedefi ayarlara yazılıp geri okunur ve sunucu ayarı gerektirme
   assert.equal(bozuk.yazici.hedef, "YOK");
 });
 
-test("USB seri istemcisi yanıt dinleyicisini paketi yazmadan önce bağlar", async () => {
-  // Kütüphane yanıt dinleyicisini yazdıktan sonra bağlıyor; USB seri çok hızlı
-  // yanıt verdiği için yanıt kaybolabiliyordu. Bu istemci sırayı çevirir.
+test("USB seri istemcisi yanıt bekleyicisini paketi yazmadan önce kurar", async () => {
+  // USB seri yanıtı çok hızlı gelebildiği için bekleyici yazmadan önce kurulmalı.
   const istemci = new NimbotUsbIstemcisi();
-  const sira: string[] = [];
-  const yanit = new NiimbotPacket(ResponseCommandId.In_Connect, [1]);
+  let yazarkenDinleyici = -1;
+  let yazmaSayisi = 0;
+  const bekleyenBaslangic = istemci.listenerCount("packetreceived");
 
-  (istemci as unknown as { waitForPacket: () => Promise<NiimbotPacket> }).waitForPacket = () => {
-    sira.push("dinle");
-    return Promise.resolve(yanit);
-  };
   (istemci as unknown as { sendPacket: () => Promise<void> }).sendPacket = async () => {
-    sira.push("yaz");
+    yazmaSayisi += 1;
+    yazarkenDinleyici = istemci.listenerCount("packetreceived");
   };
 
   const paket = new NiimbotPacket(RequestCommandId.Connect, [1], [ResponseCommandId.In_Connect]);
-  const sonuc = await istemci.sendPacketWaitResponse(paket);
+  const bekleme = istemci.sendPacketWaitResponse(paket, 2_000);
+  // Paket yazıldıktan sonra yanıt gelir; bekleyici yazma anında hazır olmalı.
+  await new Promise((coz) => setTimeout(coz, 5));
+  istemci.emit("packetreceived", new PacketReceivedEvent(new NiimbotPacket(ResponseCommandId.In_Connect, [3])));
+  const sonuc = await bekleme;
 
-  assert.deepEqual(sira, ["dinle", "yaz"]);
-  assert.equal(sonuc, yanit);
+  assert.equal(yazmaSayisi, 1);
+  assert.equal(yazarkenDinleyici, bekleyenBaslangic + 1);
+  assert.equal(sonuc.command, ResponseCommandId.In_Connect);
+});
+
+test("USB seri istemcisi istekten önce gelen paketi hazır yanıt olarak kullanır", async () => {
+  // Yazıcı port açıldıktan hemen sonra kendiliğinden connect/durum paketi gönderiyor.
+  const istemci = new NimbotUsbIstemcisi();
+  (istemci as unknown as { sendPacket: () => Promise<void> }).sendPacket = async () => undefined;
+
+  const erken = new NiimbotPacket(ResponseCommandId.In_Connect, [3]);
+  istemci.emit("packetreceived", new PacketReceivedEvent(erken));
+
+  const paket = new NiimbotPacket(RequestCommandId.Connect, [1], [ResponseCommandId.In_Connect]);
+  const sonuc = await istemci.sendPacketWaitResponse(paket, 500);
+  assert.equal(sonuc, erken);
+
+  // Hazır paket bir kez kullanılır; ikinci istek yanıt bekler ve zaman aşımına düşer.
+  await assert.rejects(() => istemci.sendPacketWaitResponse(paket, 300), /Yanıt gelmedi/);
+});
+
+test("USB seri bilgi sorguları paket zaman aşımından kısa süre bekler", () => {
+  assert.ok(NIMBOT_SERI_BILGI_ZAMAN_ASIMI < NIMBOT_SERI_PAKET_ZAMAN_ASIMI);
+  assert.ok(NIMBOT_SERI_PAKET_ZAMAN_ASIMI >= 10_000);
+  assert.ok(NIMBOT_SERI_PAKET_ARALIGI >= 100);
 });
 
 test("USB seri istemcisi kütüphanenin 1 sn varsayılanı yerine geniş zaman aşımı kullanır", () => {

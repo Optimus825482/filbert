@@ -354,21 +354,32 @@ Kablo takılıyken Bluetooth yerine USB seri kullanılabilir; Nimbot B1 USB'de h
 #### USB seri dayanıklılık ayarları (ölçülmüş davranış)
 
 USB kablosu takılı Nimbot B1, Nimbot el sıkışmasına doğru yanıt verir: `Connect`
-(`0xC1`) paketine `0xC2 / ConnectResult=3 (ConnectedV3)` döner. Ölçümler (Windows,
-COM5, 115200 baud):
+(`0xC1`) paketine `0xC2 / ConnectResult=3 (ConnectedV3)` döner. Yazıcı kendi
+protokolünü konuşur; uygulamaya kilitli değildir (Python araçları da aynı protokolü
+kullanır). Ölçümler (Windows, COM5, 115200 baud, `NimbotUsbIstemcisi`):
 
-- Port açıldıktan sonra **ilk** paketin yanıtı 1 ms ile 5 sn arasında değişebiliyor
-  (yazıcı uyanma gecikmesi); sonraki paketler 1-2 ms.
-- Yanıt, Bluetooth'a göre çok hızlı geldiği için `niimbluelib`'in "önce yaz, sonra
-  dinle" sırası yanıtı kaçırabiliyor.
+- Port açıldıktan hemen sonra yazıcı **kendiliğinden** `Connect` (`0xC2`) ve durum
+  (`0xB5`) paketi gönderiyor; istek daha yazılmadığı için bu paketler kayboluyordu.
+- Yanıt gecikmesi uyanıkken 1-3 sn; yazıcı uzun süre boşta kaldıysa 10-30 sn.
+- Art arda gönderilen sorgularda yazıcı bir noktadan sonra yanıt vermeyi bırakıyor
+  ve seri **yazma** çağrısı hiç tamamlanmıyor (ölçüldü: `0x0A` batarya sorgusundan
+  sonra yazma geri dönmedi). Batarya seviyesi %4 okundu; yazıcı bu durumda uykuya
+  geçiyor olabilir — baskı denemesi öncesi yazıcının şarjlı ve açık olması gerekir.
 
 Bu yüzden `src/lib/yazici/nimbot.ts` USB için özel bir istemci kullanır
 (`NimbotUsbIstemcisi`):
 
-- Paket zaman aşımı `NIMBOT_SERI_PAKET_ZAMAN_ASIMI` (10 sn) — kütüphanenin 1 sn
+- Paket zaman aşımı `NIMBOT_SERI_PAKET_ZAMAN_ASIMI` (20 sn) — kütüphanenin 1 sn
   varsayılanı USB'de yetersiz.
-- `sendPacketWaitResponse` yanıt dinleyicisini paketi yazmadan **önce** bağlar.
-- Bağlantı `NIMBOT_SERI_BAGLANTI_DENEMESI` (3) kez denenir; turlar arasında 400 ms
+- `sendPacketWaitResponse` bekleyiciyi paketi yazmadan **önce** kurar ve yanıtı
+  kendi dinleyicisi + paket önbelleği ile bekler (`yanitBekle`); istekten önce gelen
+  paketler `NIMBOT_SERI_ERKEN_PAKET_OMRU` (3 sn) boyunca hazır yanıt sayılır.
+- Paketler arası bekleme `NIMBOT_SERI_PAKET_ARALIGI` (250 ms); kütüphanenin 10 ms
+  değeri USB'de yazıcıyı tıkıyor.
+- Bilgi sorguları (`seri no`, `bluetooth adresi`, `batarya`, `kapanma süresi`, ses)
+  `NIMBOT_SERI_BILGI_ZAMAN_ASIMI` (4 sn) ile okunur ve yanıtsız kalırlarsa bağlantı
+  düşürülmez; yalnızca baskı görevi seçimini belirleyen **model kimliği** zorunludur.
+- Bağlantı `NIMBOT_SERI_BAGLANTI_DENEMESI` (3) kez denenir; turlar arasında 800 ms
   beklenir (yazıcı uyanmadıysa ilk tur düşebilir).
 
 ### Talep kaydı sonrası etiket baskısı

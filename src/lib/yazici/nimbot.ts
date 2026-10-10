@@ -24,8 +24,12 @@ import {
   NiimbotPacket,
   NiimbotSerialClient,
   PageColorType,
+  PacketReceivedEvent,
+  PrinterInfoFetchedEvent,
   ResponseCommandId,
+  SoundSettingsItemType,
   type NiimbotAbstractClient,
+  type PrinterInfo,
 } from "@mmote/niimbluelib";
 import type { EtiketVerisi } from "@/lib/yazici/escpos";
 import {
@@ -433,27 +437,65 @@ export const NIMBOT_SERI_DESTEK_HATASI =
 /**
  * USB seri taşımasında paket başına yanıt bekleme süresi.
  *
- * Nimbot B1 uzun süre boşta kaldığında ilk paketlere geç yanıt verebiliyor
- * (ölçülen: 1-5 sn). Kütüphanenin varsayılanı 1 sn kaldığı için USB
- * bağlantısı bu değerle kurulur.
+ * Nimbot B1 yanıt gecikmesi uyanıkken 1-3 sn, uzun boşluktan sonra 10-30 sn
+ * (ölçüldü). Kütüphanenin 1 sn varsayılanı USB'de kesin yetersiz.
  */
-export const NIMBOT_SERI_PAKET_ZAMAN_ASIMI = 10_000;
+export const NIMBOT_SERI_PAKET_ZAMAN_ASIMI = 20_000;
+
+/**
+ * Zorunlu olmayan yazıcı bilgisi sorguları için kısa zaman aşımı. Yazıcı uykuda
+ * olduğunda bu sorgular yanıtsız kalabiliyor; bağlantı bunları beklemeden sürer.
+ */
+export const NIMBOT_SERI_BILGI_ZAMAN_ASIMI = 4_000;
 
 /** Bağlantı kurulurken denenecek en fazla tur (ilk tur uyanma yüzünden düşebilir). */
 export const NIMBOT_SERI_BAGLANTI_DENEMESI = 3;
 
+/** Paketler arası bekleme: kütüphane BLE için 10 ms kullanıyor, USB'de yazıcı tıkanıyor. */
+export const NIMBOT_SERI_PAKET_ARALIGI = 250;
+
+/**
+ * Kendiliğinden gelen paketlerin önbellekte kalma süresi. Yazıcı port açıldıktan
+ * hemen sonra istek beklemeden `connect`/durum paketi gönderiyor; bunlar kısa süre
+ * yeniden kullanılır, eskisi istek yanıtı sayılmasın diye süre kısa tutulur.
+ */
+export const NIMBOT_SERI_ERKEN_PAKET_OMRU = 3_000;
+
 /**
  * USB seri için Nimbot istemcisi.
  *
- * Kütüphane yanıt dinleyicisini paketi yazdıktan SONRA bağlıyor. USB seri,
- * Bluetooth'a göre çok daha hızlı yanıt verdiği için yanıt dinleyici
- * bağlanmadan önce gelip kaybolabiliyor. Bu sınıf dinleyiciyi yazmadan önce
- * bağlar ve USB için daha geniş paket zaman aşımı kullanır.
+ * Ölçülen davranış (Nimbot B1, Windows, 115200 baud):
+ * - Yazıcı port açıldıktan hemen sonra kendiliğinden `connect` (c2) ve durum (b5)
+ *   paketi gönderiyor; istek henüz yazılmadığı için bu paketler kayboluyordu.
+ * - Art arda gönderilen sorgularda yazıcı bir noktadan sonra yanıt vermeyi
+ *   bırakıyor; kütüphanenin 10 ms paket aralığı USB'de çok hızlı.
+ * - Tek bir bilgi sorgusu yanıtsız kalınca kütüphane bağlantının tamamını düşürüyor.
+ *
+ * Bu sınıf erken gelen paketleri bağlantı sırasında yeniden kullanır, paket
+ * aralığını yavaşlatır ve bilgi turunu hata toleranslı okur.
  */
 export class NimbotUsbIstemcisi extends NiimbotSerialClient {
+  private erkenPaketler = new Map<number, { paket: NiimbotPacket; zaman: number }>();
+
   constructor() {
     super();
     this.protocol.setPacketTimeout(NIMBOT_SERI_PAKET_ZAMAN_ASIMI);
+    this.packetIntervalMs = NIMBOT_SERI_PAKET_ARALIGI;
+    this.on("packetreceived", (olay) => {
+      this.erkenPaketler.set(olay.packet.command, { paket: olay.packet, zaman: Date.now() });
+    });
+  }
+
+  /** Kısa süre önce gelen paketi hazır yanıt olarak verir (kullanılınca önbellekten silinir). */
+  private erkenPaketiAl(ids: number[]): NiimbotPacket | null {
+    for (const id of ids) {
+      const kayit = this.erkenPaketler.get(id);
+      if (kayit && Date.now() - kayit.zaman <= NIMBOT_SERI_ERKEN_PAKET_OMRU) {
+        this.erkenPaketler.delete(id);
+        return kayit.paket;
+      }
+    }
+    return null;
   }
 
   override async sendPacketWaitResponse(
@@ -465,8 +507,15 @@ export class NimbotUsbIstemcisi extends NiimbotSerialClient {
         await this.sendPacket(packet, true);
         return new NiimbotPacket(ResponseCommandId.In_Invalid, []);
       }
-      // Dinleyici yazmadan ÖNCE bağlanır; aksi hâlde hızlı yanıt kaybolur.
-      const bekleme = this.waitForPacket(packet.validResponseIds, true, timeoutMs);
+      // Yazıcı istek yazılmadan önce de paket gönderiyor (ölçüldü); hazır paket
+      // varsa yanıt beklenmeden kullanılır.
+      const hazir = this.erkenPaketiAl(packet.validResponseIds);
+      if (hazir) {
+        await this.sendPacket(packet, true);
+        return hazir;
+      }
+      // Bekleyici yazmadan ÖNCE kurulur; USB seri hızlı yanıt veriyor.
+      const bekleme = this.yanitBekle(packet.validResponseIds, timeoutMs, packet.command);
       try {
         await this.sendPacket(packet, true);
       } catch (yazmaHatasi) {
@@ -475,6 +524,139 @@ export class NimbotUsbIstemcisi extends NiimbotSerialClient {
       }
       return bekleme;
     });
+  }
+
+  /**
+   * Yanıtı kendi dinleyicimiz ve paket önbelleğiyle bekler.
+   *
+   * Kütüphanenin `waitForPacket` akışı USB seride yanıtı kaçırabiliyor; burada
+   * paket olayı ile önbellek birlikte izlenir, yanıt iki yoldan da yakalanır.
+   * Yazıcının hata paketleri (0xdb / 0x02) isteği reddeder.
+   */
+  private yanitBekle(ids: number[], timeoutMs: number, istekKomutu: number): Promise<NiimbotPacket> {
+    return new Promise((cozul, reddet) => {
+      let bitti = false;
+      let zamanlayici: ReturnType<typeof setTimeout> | null = null;
+      let denetleyici: ReturnType<typeof setInterval> | null = null;
+      const temizle = () => {
+        bitti = true;
+        if (zamanlayici) clearTimeout(zamanlayici);
+        if (denetleyici) clearInterval(denetleyici);
+        this.off("packetreceived", dinleyici);
+      };
+      const kabul = (paket: NiimbotPacket) => {
+        if (bitti) return;
+        temizle();
+        cozul(paket);
+      };
+      const dinleyici = (olay: PacketReceivedEvent) => {
+        const komut = olay.packet.command;
+        if (ids.length === 0 || ids.includes(komut)) {
+          kabul(olay.packet);
+        } else if (
+          komut === ResponseCommandId.In_PrintError ||
+          komut === ResponseCommandId.In_NotSupported
+        ) {
+          if (bitti) return;
+          temizle();
+          reddet(new Error("Yazıcı isteği reddetti (0x" + komut.toString(16) + ")"));
+        }
+      };
+      this.on("packetreceived", dinleyici);
+      denetleyici = setInterval(() => {
+        const paket = this.erkenPaketiAl(ids);
+        if (paket) kabul(paket);
+      }, 40);
+      zamanlayici = setTimeout(() => {
+        if (bitti) return;
+        temizle();
+        reddet(
+          new Error("Yanıt gelmedi (istek 0x" + istekKomutu.toString(16) + ", beklenen 0x" + ids.map((id) => id.toString(16)).join(",")) + ")"
+        );
+      }, timeoutMs);
+      const elde = this.erkenPaketiAl(ids);
+      if (elde) kabul(elde);
+    });
+  }
+
+  /**
+   * Bağlantı kurulduktan sonraki bilgi turu.
+   *
+   * Kütüphane tek bir sorgu yanıtsız kalınca bağlantıyı düşürüyor. USB'de bu
+   * sık yaşandığı için bilgiler tek tek ve hata toleranslı okunur; yalnızca
+   * baskı görevi seçimini belirleyen model kimliği zorunludur.
+   */
+  protected override async negotiateAndGetPrinterInfo(temizle?: () => void): Promise<void> {
+    try {
+      try {
+        await this.connectNegotiate();
+      } catch (hata) {
+        temizle?.();
+        throw new Error(`Unable to perform initial negotiate: ${hata}`);
+      }
+      try {
+        await this.fetchPrinterInfo();
+      } catch (hata) {
+        console.warn("[nimbot-usb] Yazıcı bilgileri tam okunamadı, baskı yine denenecek:", hata);
+      }
+      await this.fetchRfidInfo().catch(() => undefined);
+    } finally {
+      // Bağlantı turu bitince erken paketler temizlenir; baskıda karışmasınlar.
+      this.erkenPaketler.clear();
+    }
+  }
+
+  override async fetchPrinterInfo(): Promise<PrinterInfo> {
+    const dene = async <T>(
+      ad: string,
+      islem: () => Promise<T>,
+      zamanAsimi = NIMBOT_SERI_BILGI_ZAMAN_ASIMI
+    ): Promise<T | undefined> => {
+      const oncekiZamanAsimi = this.protocol.getPacketTimeout();
+      this.protocol.setPacketTimeout(zamanAsimi);
+      try {
+        return await islem();
+      } catch (hata) {
+        console.warn(`[nimbot-usb] ${ad} okunamadı: ${(hata as Error).message}`);
+        return undefined;
+      } finally {
+        this.protocol.setPacketTimeout(oncekiZamanAsimi);
+      }
+    };
+
+    // Model kimliği baskı görevinin seçiminde zorunlu; okunamazsa bağlantı kurulamaz.
+    this.printerInfo.modelId = await this.protocol.getPrinterModel();
+    this.printerInfo.serial = await dene("seri numarası", () => this.protocol.getPrinterSerialNumber());
+    this.printerInfo.mac = await dene("bluetooth adresi", () =>
+      this.protocol.getPrinterBluetoothMacAddress()
+    );
+    this.printerInfo.batteryPercents = await dene("batarya", () => this.protocol.getBatteryChargeLevel());
+    this.printerInfo.autoShutdownTime = await dene("kapanma süresi", () =>
+      this.protocol.getAutoShutDownTime()
+    );
+    this.printerInfo.settings.connectionSound =
+      (await dene("bluetooth bağlantı sesi", () =>
+        this.protocol.isSoundEnabled(SoundSettingsItemType.BluetoothConnectionSound)
+      )) ?? false;
+    this.printerInfo.settings.powerSound =
+      (await dene("açılış sesi", () => this.protocol.isSoundEnabled(SoundSettingsItemType.PowerSound))) ??
+      false;
+    try {
+      const bilgi = await this.protocol.heartbeatPrinterInfo();
+      this.printerInfo.printheadWidth = bilgi.printheadWidth;
+      this.printerInfo.hardwareVersion = bilgi.hardwareVersion;
+      this.printerInfo.softwareVersion = bilgi.softwareVersion;
+      this.printerInfo.resolutionClass = bilgi.resolutionClass;
+    } catch {
+      this.printerInfo.hardwareVersion = await dene("donanım sürümü", () =>
+        this.protocol.getHardwareVersion()
+      );
+      this.printerInfo.softwareVersion = await dene("yazılım sürümü", () =>
+        this.protocol.getSoftwareVersion()
+      );
+    }
+    this.emit("printerinfofetched", new PrinterInfoFetchedEvent(this.printerInfo));
+    return this.printerInfo;
   }
 }
 
@@ -529,7 +711,7 @@ async function seriBaglan(istemci: NimbotUsbIstemcisi, port: SerialPort): Promis
     } catch (hata) {
       sonHata = hata;
       if (deneme < NIMBOT_SERI_BAGLANTI_DENEMESI) {
-        await new Promise((coz) => setTimeout(coz, 400));
+        await new Promise((coz) => setTimeout(coz, 800));
       }
     }
   }
