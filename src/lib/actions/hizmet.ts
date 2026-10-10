@@ -10,11 +10,13 @@ import {
   BLUETOOTH_YOGUNLUK_MAX,
   BLUETOOTH_YOGUNLUK_MIN,
   VARSAYILAN_BLUETOOTH_YOGUNLUGU,
+  etiketBaskiDavranisiGecerliMi,
   etiketProfiliGecerliMi,
   findikIslemeAyarBlogunuBirlestir,
   findikIslemeAyarlariniCoz,
   kodSayfasiGecerliMi,
   yaziciHedefGecerliMi,
+  type EtiketBaskiDavranisi,
   type EtiketProfili,
   type FindikIslemeAyarlari,
   type KodSayfasi,
@@ -712,6 +714,7 @@ export interface YaziciAyarGirdisi {
 export async function findikIslemeAyarlariniKaydet(g: {
   kasaHesapId?: string | null;
   etiketProfili?: EtiketProfili;
+  etiketBaskiDavranisi?: EtiketBaskiDavranisi;
   yazici?: YaziciAyarGirdisi;
 }): Promise<Sonuc> {
   try {
@@ -733,6 +736,14 @@ export async function findikIslemeAyarlariniKaydet(g: {
       g.etiketProfili === undefined ? mevcut.etiketProfili : g.etiketProfili;
     if (!etiketProfiliGecerliMi(etiketProfili)) {
       return { ok: false, hata: "Geçersiz etiket profili" };
+    }
+
+    const etiketBaskiDavranisi =
+      g.etiketBaskiDavranisi === undefined
+        ? mevcut.etiketBaskiDavranisi
+        : g.etiketBaskiDavranisi;
+    if (!etiketBaskiDavranisiGecerliMi(etiketBaskiDavranisi)) {
+      return { ok: false, hata: "Geçersiz etiket baskı davranışı" };
     }
 
     // Yazıcı ayarları: gönderilmeyen alanlar mevcut değeri korur.
@@ -803,6 +814,7 @@ export async function findikIslemeAyarlariniKaydet(g: {
     const sonraki = findikIslemeAyarBlogunuBirlestir(firma.ayarlar, {
       kasaHesapId: kasaHesapId ?? null,
       etiketProfili,
+      etiketBaskiDavranisi,
       yazici,
     });
 

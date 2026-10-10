@@ -1,14 +1,22 @@
 import { prisma } from "@/lib/db";
 import { getCurrentFirma } from "@/lib/auth";
-import { requirePagePermission } from "@/lib/rbac/guard";
+import { izinVar, requirePagePermission } from "@/lib/rbac/guard";
 import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
+import {
+  findikIslemeAyarlariniCoz,
+  yaziciHedefTanimi,
+  yaziciYapilandirildiMi,
+} from "@/lib/findik-isleme";
 import { YeniHizmetFormu } from "./yeni-hizmet-formu";
 
 export const dynamic = "force-dynamic";
 
 export default async function YeniHizmetPage() {
-  await requirePagePermission("HIZMET", "OLUSTUR");
+  const kullanici = await requirePagePermission("HIZMET", "OLUSTUR");
   const firma = await getCurrentFirma();
+  // Etiket baskı ayarları: yeni talep kaydedildikten sonra etiketin nasıl
+  // yazdırılacağı bu ayarlara göre belirlenir.
+  const islemeAyarlari = findikIslemeAyarlariniCoz(firma.ayarlar);
 
   // Müşteri önerileri yalnızca Fındık İşleme müşteri rehberinden gelir.
   // Alım/tedarik carileri (müstahsil, tüccar, fabrika) bu modüle karışmaz.
@@ -43,6 +51,14 @@ export default async function YeniHizmetPage() {
       }))}
       smsAktif={smsAyari.aktif || smsAyari.saglayici === "TEST"}
       otomatikGirisSms={smsAyari.otomatikGirisSms}
+      firmaAdi={firma.unvan}
+      etiketProfili={islemeAyarlari.etiketProfili}
+      etiketBaskiDavranisi={islemeAyarlari.etiketBaskiDavranisi}
+      yaziciHedefi={islemeAyarlari.yazici.hedef}
+      yaziciAdi={yaziciHedefTanimi(islemeAyarlari.yazici)}
+      yaziciHazir={yaziciYapilandirildiMi(islemeAyarlari.yazici)}
+      bluetoothYogunluk={islemeAyarlari.yazici.bluetoothYogunluk}
+      etiketYazdirmaYetkisi={izinVar(kullanici, "HIZMET", "GUNCELLE")}
     />
   );
 }

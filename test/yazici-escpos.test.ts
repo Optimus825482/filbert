@@ -194,6 +194,7 @@ test("ayarlar bloğu yazıcı hedefini çözer, korur ve doğrular", () => {
   assert.deepEqual(birlesik.findikIsleme, {
     kasaHesapId: "kasa-1",
     etiketProfili: "TERMAL_80x70",
+    etiketBaskiDavranisi: "SOR",
     yazici: {
       hedef: "WINDOWS_KUYRUK",
       kuyrukAdi: "Nimbot B1",

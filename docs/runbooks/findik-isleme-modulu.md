@@ -327,6 +327,38 @@ gönderilir. Yazıcı sürücüsü ya da ek bir yerel servis gerekmez.
 | Etiket çok soluk | Baskı yoğunluğunu artırın (1-5) |
 | Eşleşmiş yazıcı değişmiyor | **Unut** düğmesiyle seçimi sıfırlayıp yeniden seçin |
 
+### Talep kaydı sonrası etiket baskısı
+
+Yeni talep formundaki **Kaydet ve Etiket Yazdır** düğmesi, kaydı oluşturduktan sonra
+etiket ekranına yönlendirmek yerine doğrudan **baskı onayı penceresini** açar:
+
+- Pencerede etiketin yazıcıya gidecek 1 bit görüntüsü (önizleme), müşteri/miktar/işlem
+  özeti ve **kopya sayısı** (1-10) bulunur.
+- **Nimbot B1'e Yazdır** düğmesi etiketi Web Bluetooth ile gönderir; ayarlarda yazıcı
+  hedefi seçilmemiş olsa da çalışır. Hedef tanımlıysa ek olarak **Yazıcıya Gönder**
+  (ESC/POS) düğmesi görünür.
+- **Yazdırmadan Bitir** talep listesine döner; **Etiket Ekranını Aç** bilinen etiket
+  ekranını açar (tarayıcıdan yazdırma ve QR PNG indirme).
+
+Davranış **Ayarlar → Fındık İşleme → Talep Sonrası Etiket** bölümünden seçilir
+(`Firma.ayarlar.findikIsleme.etiketBaskiDavranisi`):
+
+| Seçim | Davranış |
+| --- | --- |
+| **Onaylı yazdır** (varsayılan) | Kayıt sonrası baskı penceresi açılır; baskıyı kullanıcı onaylar |
+| **Otomatik yazdır** | Kayıt tamamlanır tamamlanmaz etiket yazıcıya gönderilir |
+| **Kapalı** | Etiket baskısı sorulmaz; yalnızca talep oluşturulur |
+
+- **Otomatik yazdır** seçiliyken tarayıcı, yazıcı seçimi için kullanıcı onayı isteyebilir.
+  Bu durumda baskı penceresi hata gerekçesiyle açılır ve tek tıkla baskı yapılabilir;
+  otomatik mod sessizce başarısız olmaz.
+- Baskı `HIZMET/GUNCELLE` izni gerektirir. Yetki yoksa talep yine kaydedilir ve etiket
+  ekranı açılır.
+- Etiket, sunucudan dönen sıra numarasıyla üretilir; QR içeriği
+  (`FILBERT-HIZMET:{siraNo}`) etiket ekranındakiyle aynıdır.
+- Bileşenler: `src/app/hizmet/yeni/etiket-baski-onayi.tsx` (pencere) ve
+  `src/app/hizmet/yeni/yeni-hizmet-formu.tsx` → `etiketAkisiniBaslat` (akış).
+
 ## 6. Teslim, tahsilat ve kasa
 
 Müşteri fındığını almaya geldiğinde talep satırındaki tutar hücresinden tahsilat açılır:
@@ -467,8 +499,9 @@ yazıcıyı seçin ve çıktıyı kontrol edin.
   (`prisma/migrations/20261010120000_findik_isleme_asamalari`).
 - `SmsAyari.teslimHatirlatmaSablonu` alanı teslim hatırlatma şablonunu tutar
   (`prisma/migrations/20261010140000_sms_teslim_hatirlatma`).
-- Firma bazlı işleme ayarları (`Firma.ayarlar.findikIsleme`) kasa ve etiket profilini
-  saklar; `src/lib/findik-isleme.ts` çözümleme/birleştirme yardımcılarını içerir.
+- Firma bazlı işleme ayarları (`Firma.ayarlar.findikIsleme`) kasa, etiket profilini ve
+  talep sonrası etiket baskı davranışını (`etiketBaskiDavranisi`: `SOR` | `OTOMATIK` |
+  `KAPALI`) saklar; `src/lib/findik-isleme.ts` çözümleme/birleştirme yardımcılarını içerir.
   ESC/POS yazıcı hedefi ve Bluetooth baskı yoğunluğu (`bluetoothYogunluk`) da aynı
   blokta (`yazici`) tutulur, ek migration gerekmez.
 - İşleme müşterileri `Musteri` tablosuna taşınmıştır; `HizmetIslemi.cariId` kaldırılıp

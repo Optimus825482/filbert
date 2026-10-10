@@ -15,17 +15,20 @@ import {
   PowerOff,
   Bluetooth,
   Loader2,
+  QrCode,
 } from "lucide-react";
 import { findikIslemeAyarlariniKaydet } from "@/lib/actions/hizmet";
 import { yaziciTestEtiketiYazdir, yazicilariListele } from "@/lib/actions/yazici";
 import {
   BLUETOOTH_YOGUNLUK_MAX,
   BLUETOOTH_YOGUNLUK_MIN,
+  ETIKET_BASKI_DAVRANISLARI,
   ETIKET_PROFILLERI,
   KOD_SAYFALARI,
   YAZICI_HEDEFLERI,
   VARSAYILAN_BLUETOOTH_YOGUNLUGU,
   etiketProfiliGetir,
+  type EtiketBaskiDavranisi,
   type EtiketProfili,
   type KodSayfasi,
   type YaziciAyarlari,
@@ -44,6 +47,7 @@ interface Props {
   kasalar: Array<{ id: string; ad: string; tip: string; modul?: string }>;
   mevcutKasaHesapId: string | null;
   mevcutEtiketProfili: EtiketProfili;
+  mevcutEtiketBaskiDavranisi: EtiketBaskiDavranisi;
   mevcutYazici: YaziciAyarlari;
   /** Sunucudan okunan kurulu Windows yazıcı kuyrukları. */
   yazicilar: string[];
@@ -73,6 +77,7 @@ export function IslemeAyarFormu({
   kasalar,
   mevcutKasaHesapId,
   mevcutEtiketProfili,
+  mevcutEtiketBaskiDavranisi,
   mevcutYazici,
   yazicilar: baslangicYazicilar,
   yaziciListesiHatasi: baslangicListeHatasi,
@@ -83,6 +88,8 @@ export function IslemeAyarFormu({
 }: Props) {
   const [kasaHesapId, setKasaHesapId] = useState<string>(mevcutKasaHesapId ?? "");
   const [etiketProfili, setEtiketProfili] = useState<EtiketProfili>(mevcutEtiketProfili);
+  const [etiketBaskiDavranisi, setEtiketBaskiDavranisi] =
+    useState<EtiketBaskiDavranisi>(mevcutEtiketBaskiDavranisi);
   const [yaziciHedefi, setYaziciHedefi] = useState<YaziciHedefTipi>(mevcutYazici.hedef);
   const [kuyrukAdi, setKuyrukAdi] = useState<string>(mevcutYazici.kuyrukAdi ?? "");
   const [yaziciIp, setYaziciIp] = useState<string>(mevcutYazici.ip ?? "");
@@ -123,6 +130,7 @@ export function IslemeAyarFormu({
       const res = await findikIslemeAyarlariniKaydet({
         kasaHesapId: kasaHesapId || null,
         etiketProfili,
+        etiketBaskiDavranisi,
         yazici: {
           hedef: yaziciHedefi,
           kuyrukAdi: kuyrukAdi || null,
@@ -543,6 +551,46 @@ export function IslemeAyarFormu({
             </span>
           )}
         </div>
+      </section>
+
+      {/* Talep Sonrası Etiket Baskısı */}
+      <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl">
+        <div className="flex items-center gap-2 text-sm font-extrabold text-white">
+          <QrCode className="h-4 w-4 text-[#f5c518]" /> Talep Sonrası Etiket
+        </div>
+        <p className="mt-1 text-xs text-sky-200">
+          Yeni talep kaydedildiğinde oluşturulan QR kodlu etiketin nasıl yazdırılacağını belirler.
+          Bluetooth hedefinde baskı, tarayıcıdan (Chrome/Edge) Nimbot B1 yazıcıya gönderilir.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {ETIKET_BASKI_DAVRANISLARI.map((secenek) => {
+            const aktif = etiketBaskiDavranisi === secenek.kod;
+            return (
+              <button
+                key={secenek.kod}
+                type="button"
+                onClick={() => setEtiketBaskiDavranisi(secenek.kod)}
+                className={`rounded-xl border p-3 text-left transition-all ${
+                  aktif
+                    ? "border-[#f5c518] bg-[#f5c518]/10"
+                    : "border-white/10 bg-white/5 hover:bg-white/10"
+                }`}
+              >
+                <div
+                  className={`text-xs font-extrabold ${aktif ? "text-[#f5c518]" : "text-white"}`}
+                >
+                  {secenek.ad}
+                </div>
+                <div className="mt-1 text-[11px] font-semibold text-sky-200">{secenek.aciklama}</div>
+              </button>
+            );
+          })}
+        </div>
+        {etiketBaskiDavranisi !== mevcutEtiketBaskiDavranisi && (
+          <div className="mt-2 text-[11px] font-bold text-amber-300">
+            Seçim henüz kaydedilmedi — Ayarları Kaydet düğmesini kullanın.
+          </div>
+        )}
       </section>
 
       {/* ─── SMS Bildirimleri ─── */}

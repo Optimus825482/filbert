@@ -17,7 +17,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createHizmetKaydi } from "@/lib/actions/hizmet";
+import { etiketBaskisiKaydet, hizmetEtiketiYazdir } from "@/lib/actions/yazici";
 import { tutarHesapla } from "@/lib/hesap";
+import { tarihSaat } from "@/lib/format";
+import {
+  etiketBaskiDavranisiGetir,
+  type EtiketBaskiDavranisi,
+  type EtiketProfili,
+  type YaziciHedefTipi,
+} from "@/lib/findik-isleme";
+import type { EtiketVerisi } from "@/lib/yazici/escpos";
+import { nimbotEtiketiYazdir } from "@/lib/yazici/nimbot";
+import { EtiketBaskiOnayi } from "./etiket-baski-onayi";
 
 /** Müşteri önerisi: adın ilk 4 harfi girildiğinde en yakın 5 kayıt önerilir. */
 const ONERI_MIN_HARF = 4;
@@ -43,6 +54,16 @@ interface Props {
   musteriler?: Array<{ id: string; ad: string; telefon: string }>;
   smsAktif: boolean;
   otomatikGirisSms: boolean;
+  /** Etiket baskı ayarları (Ayarlar → Fındık İşleme). */
+  firmaAdi: string;
+  etiketProfili: EtiketProfili;
+  etiketBaskiDavranisi: EtiketBaskiDavranisi;
+  yaziciHedefi: YaziciHedefTipi;
+  yaziciAdi: string;
+  yaziciHazir: boolean;
+  bluetoothYogunluk: number;
+  /** Etiket baskısı HİZMET güncelleme yetkisi gerektirir. */
+  etiketYazdirmaYetkisi: boolean;
 }
 
 export function YeniHizmetFormu({
@@ -50,6 +71,14 @@ export function YeniHizmetFormu({
   musteriler = [],
   smsAktif,
   otomatikGirisSms,
+  firmaAdi,
+  etiketProfili,
+  etiketBaskiDavranisi,
+  yaziciHedefi,
+  yaziciAdi,
+  yaziciHazir,
+  bluetoothYogunluk,
+  etiketYazdirmaYetkisi,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -128,6 +157,16 @@ export function YeniHizmetFormu({
   const [notlar, setNotlar] = useState("");
   const [smsGonderilsin, setSmsGonderilsin] = useState(otomatikGirisSms);
 
+  // Talep kaydedildikten sonra etiket baskısı: onay penceresi, otomatik
+  // gönderim veya kapalı davranışı Ayarlar → Fındık İşleme'den okunur.
+  const [olusanTalep, setOlusanTalep] = useState<{
+    id: string;
+    siraNo: string;
+    etiket: EtiketVerisi;
+  } | null>(null);
+  const [baskiOnayiAcik, setBaskiOnayiAcik] = useState(false);
+  const [otomatikHata, setOtomatikHata] = useState<string | null>(null);
+
   // Otomatik Tutar Güncelleme
   function tutariGuncelle(yeniKilo: number, yeniBirimFiyat: number) {
     if (!manuelTutar) {
@@ -195,6 +234,84 @@ export function YeniHizmetFormu({
     }
   }
 
+  /** Kaydedilen talep için yazıcıya gidecek etiket verisini üretir. */
+  function etiketVerisiniOlustur(siraNo: string): EtiketVerisi {
+    const k = parseFloat(kiloStr.replace(",", ".")) || 0;
+    const toplam = parseFloat(toplamTutarStr.replace(",", ".")) || 0;
+    return {
+      firmaAdi,
+      siraNo,
+      musteriAdi: musteriAdi.trim(),
+      telefon: telefon.trim(),
+      kilo: k.toFixed(2),
+      islemler: { kirma, kavurma, paketleme },
+      paketTipi: paketleme ? paketTipi : null,
+      paketAdedi: paketleme && paketAdedi ? parseInt(paketAdedi, 10) : null,
+      odemeDurumu: "BEKLIYOR",
+      toplamTutar: toplam.toFixed(2),
+      tarihSaatStr: tarihSaat(new Date()),
+      notlar: notlar.trim() || null,
+    };
+  }
+
+  /** "Otomatik" davranış: etiket bekletilmeden yazıcıya gönderilir. */
+  async function otomatikEtiketiGonder(hizmetId: string, etiket: EtiketVerisi) {
+    try {
+      if (yaziciHedefi === "BLUETOOTH_BLE") {
+        const sonuc = await nimbotEtiketiYazdir(etiket, {
+          etiketProfili,
+          yogunluk: bluetoothYogunluk,
+          kopya: 1,
+        });
+        await etiketBaskisiKaydet(hizmetId, sonuc.kopya);
+        toast.success("Etiket Nimbot yazıcıya gönderildi: " + sonuc.model);
+      } else if (yaziciHazir) {
+        const res = await hizmetEtiketiYazdir(hizmetId, 1);
+        if (!res.ok) throw new Error(res.hata);
+        toast.success("Etiket yazıcıya gönderildi: " + res.hedef);
+      } else {
+        throw new Error(
+          "Doğrudan yazıcı hedefi tanımlı değil. Ayarlar → Fındık İşleme bölümünden yazıcı seçin."
+        );
+      }
+      router.push("/hizmet");
+    } catch (e) {
+      // Tarayıcılar yazıcı seçimi için kullanıcı onayı ister; onay alınamazsa
+      // baskı penceresi gösterilir.
+      setOtomatikHata((e as Error).message || "Etiket otomatik gönderilemedi");
+      setOlusanTalep({ id: hizmetId, siraNo: etiket.siraNo, etiket });
+      setBaskiOnayiAcik(true);
+    }
+  }
+
+  /**
+   * Kayıt sonrası etiket akışı: ayarlardaki davranışa göre baskı onayı açılır,
+   * etiket doğrudan yazıcıya gönderilir veya baskı atlanır.
+   */
+  function etiketAkisiniBaslat(hizmetId: string, siraNo: string) {
+    const etiket = etiketVerisiniOlustur(siraNo);
+    setOtomatikHata(null);
+    setOlusanTalep({ id: hizmetId, siraNo, etiket });
+
+    const davranis = etiketBaskiDavranisiGetir(etiketBaskiDavranisi).kod;
+    if (davranis === "KAPALI") {
+      router.push("/hizmet");
+      return;
+    }
+    if (davranis === "OTOMATIK") {
+      void otomatikEtiketiGonder(hizmetId, etiket);
+      return;
+    }
+    setBaskiOnayiAcik(true);
+  }
+
+  /** Etiket penceresi kapandığında talep listesine dönülür. */
+  function baskiOnayiniKapat() {
+    setBaskiOnayiAcik(false);
+    setOlusanTalep(null);
+    router.push("/hizmet");
+  }
+
   // Kaydetme İşlemi
   function handleSubmit(etiketYazdir: boolean) {
     const k = parseFloat(kiloStr.replace(",", "."));
@@ -246,11 +363,24 @@ export function YeniHizmetFormu({
         toast.info(`Müşteriye (${telefon}) bilgilendirme SMS'i gönderildi.`);
       }
 
-      if (etiketYazdir && res.id) {
-        router.push(`/hizmet/${res.id}/etiket`);
-      } else {
+      if (!res.id) {
         router.push("/hizmet");
+        return;
       }
+
+      // Talep oluşturuldu: QR kodlu etiket, ayarlardaki davranışa göre
+      // yazdırılır (onay penceresi, otomatik gönderim veya kapalı).
+      if (!etiketYazdir) {
+        router.push("/hizmet");
+        return;
+      }
+      if (!etiketYazdirmaYetkisi) {
+        // Baskı HİZMET güncelleme yetkisi gerektirir; etiket ekranı açılır.
+        toast.warning("Etiket baskısı için yetkiniz yok; etiket ekranı açılıyor.");
+        router.push("/hizmet/" + res.id + "/etiket");
+        return;
+      }
+      etiketAkisiniBaslat(res.id, res.siraNo ?? "");
     });
   }
 
@@ -668,6 +798,23 @@ export function YeniHizmetFormu({
           </button>
         </div>
       </div>
+
+      {olusanTalep && (
+        <EtiketBaskiOnayi
+          acik={baskiOnayiAcik}
+          hizmetId={olusanTalep.id}
+          siraNo={olusanTalep.siraNo}
+          etiket={olusanTalep.etiket}
+          etiketProfili={etiketProfili}
+          yaziciHedefi={yaziciHedefi}
+          yaziciAdi={yaziciAdi}
+          yaziciHazir={yaziciHazir}
+          bluetoothYogunluk={bluetoothYogunluk}
+          yazdirmaYetkisi={etiketYazdirmaYetkisi}
+          otomatikHata={otomatikHata}
+          onKapat={baskiOnayiniKapat}
+        />
+      )}
     </div>
   );
 }

@@ -198,15 +198,57 @@ export function yaziciHedefTanimi(yazici: YaziciAyarlari): string {
 
 // ─── Firma ayarları ─────────────────────────────────────────
 
+// Talep sonrası etiket baskısı (davranış ayarı)
+
+/**
+ * Talep kaydedildikten sonra QR kodlu etiketin nasıl basılacağı:
+ *   SOR      — kayıt sonrası onay penceresi açılır, baskıyı kullanıcı onaylar.
+ *   OTOMATIK — kayıt tamamlanır tamamlanmaz etiket yazıcıya gönderilir.
+ *   KAPALI   — kayıt sonrası etiket baskısı istenmez.
+ */
+export const ETIKET_BASKI_DAVRANISLARI = [
+  {
+    kod: "SOR",
+    ad: "Onaylı yazdır",
+    aciklama: "Talep kaydedilince etiket penceresi açılır; baskıyı siz onaylarsınız.",
+  },
+  {
+    kod: "OTOMATIK",
+    ad: "Otomatik yazdır",
+    aciklama: "Talep kaydedilir kaydedilmez etiket yazıcıya gönderilir.",
+  },
+  {
+    kod: "KAPALI",
+    ad: "Kapalı",
+    aciklama: "Talep kaydedilir; etiket baskısı sorulmaz.",
+  },
+] as const;
+
+export type EtiketBaskiDavranisi = (typeof ETIKET_BASKI_DAVRANISLARI)[number]["kod"];
+
+export const VARSAYILAN_ETIKET_BASKI_DAVRANISI: EtiketBaskiDavranisi = "SOR";
+
+export function etiketBaskiDavranisiGecerliMi(deger: unknown): deger is EtiketBaskiDavranisi {
+  return ETIKET_BASKI_DAVRANISLARI.some((d) => d.kod === deger);
+}
+
+/** Kayıtlı kodun okunur tanımı; bilinmeyen değerde varsayılan seçenek döner. */
+export function etiketBaskiDavranisiGetir(kod?: string | null) {
+  return ETIKET_BASKI_DAVRANISLARI.find((d) => d.kod === kod) ?? ETIKET_BASKI_DAVRANISLARI[0];
+}
+
 export type FindikIslemeAyarlari = {
   kasaHesapId: string | null;
   etiketProfili: EtiketProfili;
+  /** Talep kaydedildikten sonra etiketin nasıl basılacağı. */
+  etiketBaskiDavranisi: EtiketBaskiDavranisi;
   yazici: YaziciAyarlari;
 };
 
 export const VARSAYILAN_FINDIK_ISLEME_AYARLARI: FindikIslemeAyarlari = {
   kasaHesapId: null,
   etiketProfili: VARSAYILAN_ETIKET_PROFILI,
+  etiketBaskiDavranisi: VARSAYILAN_ETIKET_BASKI_DAVRANISI,
   yazici: { ...VARSAYILAN_YAZICI_AYARLARI },
 };
 
@@ -251,7 +293,10 @@ export function findikIslemeAyarlariniCoz(ayarlar: unknown): FindikIslemeAyarlar
   const etiketProfili = etiketProfiliGecerliMi(kayit.etiketProfili)
     ? kayit.etiketProfili
     : VARSAYILAN_ETIKET_PROFILI;
-  return { kasaHesapId, etiketProfili, yazici: yaziciAyarlariniCoz(kayit) };
+  const etiketBaskiDavranisi = etiketBaskiDavranisiGecerliMi(kayit.etiketBaskiDavranisi)
+    ? kayit.etiketBaskiDavranisi
+    : VARSAYILAN_ETIKET_BASKI_DAVRANISI;
+  return { kasaHesapId, etiketProfili, etiketBaskiDavranisi, yazici: yaziciAyarlariniCoz(kayit) };
 }
 
 /** Firma.ayarlar içindeki diğer anahtarları koruyarak fındık işleme bloğunu yazar. */
@@ -266,6 +311,7 @@ export function findikIslemeAyarBlogunuBirlestir(
   kok.findikIsleme = {
     kasaHesapId: yeni.kasaHesapId,
     etiketProfili: yeni.etiketProfili,
+    etiketBaskiDavranisi: yeni.etiketBaskiDavranisi,
     yazici: {
       hedef: yeni.yazici.hedef,
       kuyrukAdi: yeni.yazici.kuyrukAdi,

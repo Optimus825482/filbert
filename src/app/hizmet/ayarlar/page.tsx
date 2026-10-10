@@ -55,6 +55,7 @@ export default async function HizmetAyarlarPage() {
         kasalar={kasalar.map((k) => ({ id: k.id, ad: k.ad, tip: k.tip, modul: k.modul }))}
         mevcutKasaHesapId={ayarlar.kasaHesapId}
         mevcutEtiketProfili={ayarlar.etiketProfili}
+        mevcutEtiketBaskiDavranisi={ayarlar.etiketBaskiDavranisi}
         mevcutYazici={ayarlar.yazici}
         yazicilar={yaziciListesi.ok ? yaziciListesi.adlar : []}
         yaziciListesiHatasi={yaziciListesi.ok ? null : yaziciListesi.hata}

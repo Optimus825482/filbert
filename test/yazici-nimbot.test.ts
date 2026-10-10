@@ -14,7 +14,11 @@ import {
   qrNoktaOlcusu,
 } from "../src/lib/yazici/nimbot-etiket";
 import {
+  ETIKET_BASKI_DAVRANISLARI,
   VARSAYILAN_BLUETOOTH_YOGUNLUGU,
+  VARSAYILAN_ETIKET_BASKI_DAVRANISI,
+  etiketBaskiDavranisiGecerliMi,
+  etiketBaskiDavranisiGetir,
   findikIslemeAyarBlogunuBirlestir,
   findikIslemeAyarlariniCoz,
   yaziciHedefTanimi,
@@ -203,6 +207,7 @@ test("Bluetooth hedefi ayarlara yazılıp geri okunur", () => {
   const ayarlar: FindikIslemeAyarlari = {
     kasaHesapId: null,
     etiketProfili: "NIMBOT_B1_50x50",
+    etiketBaskiDavranisi: "OTOMATIK",
     yazici: {
       hedef: "BLUETOOTH_BLE",
       kuyrukAdi: null,
@@ -221,6 +226,20 @@ test("Bluetooth hedefi ayarlara yazılıp geri okunur", () => {
   assert.equal(yaziciYapilandirildiMi(cozulen.yazici), true);
   assert.match(yaziciHedefTanimi(cozulen.yazici), /Bluetooth/);
   assert.match(yaziciHedefTanimi(cozulen.yazici), /4/);
+  assert.equal(cozulen.etiketBaskiDavranisi, "OTOMATIK", "etiket baskı davranışı korunur");
+});
+
+test("Talep sonrası etiket baskı davranışı varsayılanı onaylı yazdırmadır", () => {
+  const ayarlar = findikIslemeAyarlariniCoz(null);
+  assert.equal(VARSAYILAN_ETIKET_BASKI_DAVRANISI, "SOR");
+  assert.equal(ayarlar.etiketBaskiDavranisi, "SOR");
+  // Bilinmeyen kayıtlı değer sessizce varsayılana düşer.
+  const bozuk = findikIslemeAyarlariniCoz({ findikIsleme: { etiketBaskiDavranisi: "HER_ZAMAN" } });
+  assert.equal(bozuk.etiketBaskiDavranisi, "SOR");
+  assert.equal(etiketBaskiDavranisiGecerliMi("KAPALI"), true);
+  assert.equal(etiketBaskiDavranisiGecerliMi("HER_ZAMAN"), false);
+  assert.equal(etiketBaskiDavranisiGetir("OTOMATIK").ad, "Otomatik yazdır");
+  assert.equal(ETIKET_BASKI_DAVRANISLARI.length, 3);
 });
 
 test("Geçersiz Bluetooth yoğunluğu varsayılan değere düşer", () => {
