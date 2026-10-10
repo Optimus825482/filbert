@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Users, ShieldAlert, Database, Palette, Sun, Moon, FolderCog, LayoutGrid, Pencil, MapPin, Phone } from "lucide-react";
+import { Building2, Users, ShieldAlert, Database, Palette, Sun, Moon, FolderCog, LayoutGrid, Pencil, MapPin, Phone, Printer, Usb } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,8 @@ interface Props {
   tanimGoruntuleYetkisi: boolean;
   kullaniciYonetYetkisi: boolean;
   sistemGoruntuleYetkisi: boolean;
+  /** Fındık İşleme modülü ayarlarına kısayol gösterilsin mi. */
+  hizmetGoruntuleYetkisi: boolean;
   firma: FirmaBilgi | null;
   sezon: SezonBilgi | null;
   kullanicilar: KullaniciOzet[];
@@ -139,11 +142,14 @@ export function AyarIcerik(props: Props) {
       {/* İçerik alanı */}
       <div className="min-w-0 flex-1 space-y-6">
         {secilen === "modul" && (
-          <ModulSecim
-            aktifModul={props.aktifModul}
-            varsayilanModul={props.varsayilanModul}
-            yetkiliModuller={props.yetkiliModuller}
-          />
+          <>
+            <ModulSecim
+              aktifModul={props.aktifModul}
+              varsayilanModul={props.varsayilanModul}
+              yetkiliModuller={props.yetkiliModuller}
+            />
+            {props.hizmetGoruntuleYetkisi && <IslemeAyarlariKisayolu />}
+          </>
         )}
         {secilen === "gorunum" && props.ayarGoruntuleYetkisi && <GorunumSekme />}
         {secilen === "firma" && props.ayarGoruntuleYetkisi && <FirmaSekme firma={props.firma} sezon={props.sezon} guncelleYetkisi={props.firmaGuncelleYetkisi} />}
@@ -184,6 +190,43 @@ export function AyarIcerik(props: Props) {
         {secilen === "sistem" && props.sistemGoruntuleYetkisi && <SistemSekme {...props} />}
       </div>
     </div>
+  );
+}
+
+/* ─── FINDIK İŞLEME KISAYOLU ───────────────────── */
+
+/**
+ * Fındık İşleme modülünün kendi ayar ekranına kısayol.
+ *
+ * Etiket yazıcı profili, yazıcı hedefi (Bluetooth/USB) ve tahsilat kasası
+ * modüle özel ekranda (`/hizmet/ayarlar`) tutulur; Ayarlar ekranına gelen
+ * kullanıcı bu karttan tek dokunuşla ilgili bölüme iner.
+ */
+function IslemeAyarlariKisayolu() {
+  const baglantiSinifi =
+    "inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--surface-border)] px-3 text-xs font-bold text-sky-100 transition hover:text-white";
+  return (
+    <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4">
+      <div className="flex items-center gap-2">
+        <Printer className="h-4 w-4 text-[var(--primary)]" />
+        <h3 className="text-sm font-extrabold text-[var(--app-fg)]">Fındık İşleme Ayarları</h3>
+      </div>
+      <p className="mt-1 text-xs text-sky-100">
+        Etiket yazıcı profili (50×50 mm), yazıcı hedefi (Bluetooth/USB), tahsilat kasası ve
+        SMS bildirimleri Fındık İşleme modülünün ayar ekranında yapılandırılır.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href="/hizmet/ayarlar#etiket-yazici-profili" className={baglantiSinifi}>
+          <Printer className="h-3.5 w-3.5" /> Etiket Yazıcı Profili
+        </Link>
+        <Link href="/hizmet/ayarlar#yazici-hedefi" className={baglantiSinifi}>
+          <Usb className="h-3.5 w-3.5" /> Yazıcı Hedefi
+        </Link>
+        <Link href="/hizmet/sms" className={baglantiSinifi}>
+          <MessageSquare className="h-3.5 w-3.5" /> SMS Merkezi
+        </Link>
+      </div>
+    </section>
   );
 }
 

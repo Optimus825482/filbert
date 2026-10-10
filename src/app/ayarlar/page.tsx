@@ -101,6 +101,7 @@ export default async function AyarlarPage() {
         tanimGoruntuleYetkisi={tanimGoruntuleYetkisi}
         kullaniciYonetYetkisi={kullaniciYonetYetkisi}
         sistemGoruntuleYetkisi={sistemGoruntuleYetkisi}
+        hizmetGoruntuleYetkisi={izinVar(actor, "HIZMET", "GORUNTULE")}
         firmaGuncelleYetkisi={izinVar(actor, "AYARLAR", "GUNCELLE")}
         firma={
           firma

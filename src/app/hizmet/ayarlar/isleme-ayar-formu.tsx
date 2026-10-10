@@ -312,7 +312,10 @@ export function IslemeAyarFormu({
       </section>
 
       {/* ─── Etiket Yazıcı Profili ─── */}
-      <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl">
+      <section
+        id="etiket-yazici-profili"
+        className="scroll-mt-24 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl"
+      >
         <div className="flex items-center gap-2 text-sm font-extrabold text-white">
           <Printer className="h-4 w-4 text-[#f5c518]" /> Etiket Yazıcı Profili
         </div>
@@ -355,7 +358,10 @@ export function IslemeAyarFormu({
       </section>
 
       {/* ─── Doğrudan ESC/POS Yazıcı ─── */}
-      <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl">
+      <section
+        id="yazici-hedefi"
+        className="scroll-mt-24 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl"
+      >
         <div className="flex items-center gap-2 text-sm font-extrabold text-white">
           <Usb className="h-4 w-4 text-[#f5c518]" /> Doğrudan Yazıcı
         </div>
