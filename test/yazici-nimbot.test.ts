@@ -19,6 +19,8 @@ import {
   pikselParlakligi,
   qrMatrisiOlustur,
   qrNoktaOlcusu,
+  type NimbotIslemQrSatiri,
+  type NimbotMetinSatiri,
 } from "../src/lib/yazici/nimbot-etiket";
 import {
   ETIKET_BASKI_DAVRANISLARI,
@@ -56,6 +58,22 @@ const ORNEK: EtiketVerisi = {
   tarihSaatStr: "10.10.2026 14:30",
 };
 
+/** Etiket planındaki yalnızca metin satırları. */
+function metinSatirlari(veri: EtiketVerisi): NimbotMetinSatiri[] {
+  return nimbotEtiketIcerigi(veri).flatMap((satir) => (satir.tip === "metin" ? [satir] : []));
+}
+
+/** Etiket planındaki işlem + QR bloğu. */
+function islemQrBlogu(veri: EtiketVerisi): NimbotIslemQrSatiri {
+  const blok = nimbotEtiketIcerigi(veri).find(
+    (satir): satir is NimbotIslemQrSatiri => satir.tip === "islemQr"
+  );
+  assert.ok(blok, "işlem + QR bloğu bulunamadı");
+  return blok;
+}
+
+
+
 /** 2×2 RGBA tamponu üretir; verilen renk sırası satır satır uygulanır. */
 function rgbaOlustur(renkler: Array<[number, number, number]>): Uint8ClampedArray {
   const veri = new Uint8ClampedArray(renkler.length * 4);
@@ -68,63 +86,55 @@ function rgbaOlustur(renkler: Array<[number, number, number]>): Uint8ClampedArra
   return veri;
 }
 
-test("Etiket içeriği ekrandaki ve ESC/POS etiketindeki sırayı izler", () => {
-  const satirlar = nimbotEtiketIcerigi(ORNEK);
-  const duz = satirlar
-    .filter((s) => s.tip === "metin")
-    .map((s) => s.metin ?? "");
+test("Etiket içeriği kompakt düzeni izler (50×50 etikete taşmaz)", () => {
+  const satirlar = metinSatirlari(ORNEK);
+  const duz = satirlar.map((s) => s.metin);
 
-  assert.equal(duz[0], "AKAYDIN TARIM");
-  assert.equal(duz[1], "TALEP #0042");
-  assert.equal(duz[2], "MÜŞTERİ: Şükrü Çağlayan");
-  assert.equal(duz[3], "TELEFON: 05321112233");
-  assert.equal(duz[4], "MİKTAR: 25.00 KG");
-  assert.ok(duz.includes("YAPILACAK İŞLEMLER:"));
-  assert.ok(duz.includes("[X] Kırma"));
-  assert.ok(duz.includes("[X] Kavurma"));
-  assert.ok(duz.includes("[ ] Vakumlu Paketleme"));
-  assert.ok(duz.includes("Paket: 25x 1 KG"));
-  assert.ok(duz.includes("TARİH: 10.10.2026 14:30"));
-  assert.ok(duz.includes("TUTAR: 200.00 TL"));
+  assert.equal(duz[0], "AKAYDIN TARIM #0042");
+  assert.equal(duz[1], "Şükrü Çağlayan - 05321112233");
+  assert.equal(duz[2], "MİKTAR 25.00 KG");
+  // İstenmeyen başlıklar etikete yazılmaz.
+  assert.equal(duz.some((m) => m.startsWith("MÜŞTERİ")), false);
+  assert.equal(duz.some((m) => m.startsWith("TELEFON")), false);
+  assert.equal(duz.some((m) => m.startsWith("YAPILACAK")), false);
 });
 
-test("QR kodu etiketin en sonunda ve doğru içerikle yer alır", () => {
-  const satirlar = nimbotEtiketIcerigi(ORNEK);
-  const son = satirlar[satirlar.length - 1];
-  assert.equal(son.tip, "qr");
-  assert.equal(son.veri, "FILBERT-HIZMET:0042");
-  assert.equal(satirlar.filter((s) => s.tip === "qr").length, 1);
+test("İşlem satırları ile QR kod aynı blokta yer alır", () => {
+  const blok = islemQrBlogu(ORNEK);
+  assert.equal(blok.veri, "FILBERT-HIZMET:0042");
+  assert.deepEqual(blok.islemler, [
+    "[X] Kırma",
+    "[X] Kavurma",
+    "[ ] Vakumlu Paketleme",
+    "25x 1 KG",
+  ]);
+  // Ayrı bir QR satırı kalmaz; QR yalnızca işlem bloğunun içindedir.
+  assert.equal(nimbotEtiketIcerigi(ORNEK).filter((s) => s.tip === "islemQr").length, 1);
 });
 
-test("Ödeme durumu etikete ters (siyah zemin) şerit olarak eklenir", () => {
-  const odendi = nimbotEtiketIcerigi({ ...ORNEK, odemeDurumu: "ODENDI" });
-  const tahsil = odendi.find((s) => s.metin === "TAHSİL EDİLDİ");
-  assert.ok(tahsil);
-  assert.equal(tahsil.ters, true);
-  assert.equal(tahsil.hizala, "orta");
+test("Ödeme durumu ve tutar miktar satırının sağında özetlenir", () => {
+  assert.equal(metinSatirlari(ORNEK)[2].sagMetin, "200.00 TL");
 
-  const veresiye = nimbotEtiketIcerigi({ ...ORNEK, odemeDurumu: "VERESIYE" });
-  const serit = veresiye.find((s) => s.metin === "VERESİYE");
-  assert.equal(serit?.ters, true);
+  const odendi = metinSatirlari({ ...ORNEK, odemeDurumu: "ODENDI" })[2];
+  assert.equal(odendi.sagMetin, "TAHSİL EDİLDİ");
 
-  // Ödenmemiş talepte şerit eklenmez.
-  const bekleyen = nimbotEtiketIcerigi(ORNEK);
-  assert.equal(bekleyen.some((s) => s.ters), false);
+  const veresiye = metinSatirlari({ ...ORNEK, odemeDurumu: "VERESIYE" })[2];
+  assert.equal(veresiye.sagMetin, "VERESİYE");
 });
 
 test("Kopya bilgisi ve not yalnızca gerektiğinde eklenir", () => {
-  const tek = nimbotEtiketIcerigi(ORNEK);
-  assert.equal(tek.some((s) => s.metin?.startsWith("Kopya")), false);
-  assert.equal(tek.some((s) => s.metin?.startsWith("NOT:")), false);
+  const tek = metinSatirlari(ORNEK).map((s) => s.metin);
+  assert.equal(tek.some((m) => m.startsWith("Kopya")), false);
+  assert.equal(tek.some((m) => m.startsWith("NOT:")), false);
 
-  const coklu = nimbotEtiketIcerigi({
+  const coklu = metinSatirlari({
     ...ORNEK,
     kopyaNo: 2,
     kopyaSayisi: 3,
     notlar: "  Çuvallar ayrı teslim edilecek  ",
-  });
-  assert.ok(coklu.some((s) => s.metin === "Kopya 2/3"));
-  assert.ok(coklu.some((s) => s.metin === "NOT: Çuvallar ayrı teslim edilecek"));
+  }).map((s) => s.metin);
+  assert.ok(coklu.includes("Kopya 2/3"));
+  assert.ok(coklu.includes("NOT: Çuvallar ayrı teslim edilecek"));
 });
 
 test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {

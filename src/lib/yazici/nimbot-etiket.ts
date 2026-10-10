@@ -45,32 +45,66 @@ export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
   kucuk: 13,
 };
 
-export interface NimbotSatiri {
-  tip: "metin" | "ayrac" | "qr";
-  metin?: string;
+export interface NimbotMetinSatiri {
+  tip: "metin";
+  metin: string;
   rol?: NimbotSatirRolu;
   hizala?: "sol" | "orta" | "sag";
-  /** Siyah zemin üzerine beyaz yazı (TAHSİL EDİLDİ / VERESİYE). */
-  ters?: boolean;
-  /** QR içeriği (tip: "qr"). */
-  veri?: string;
+  /** Aynı satırın sağına yaslanan ikincil metin (ör. ödeme durumu). */
+  sagMetin?: string;
+  /** Sağdaki metnin rolü (varsayılan: "kucuk"). */
+  sagRol?: NimbotSatirRolu;
 }
 
 /**
- * Etiketin satır planını üretir. Sıralama ekrandaki ve ESC/POS etiketindeki
- * düzenle aynıdır; QR her zaman en sonda gelir ve tuvale alt taraftan
- * hizalanır (bkz. `nimbotTuvale`).
+ * Sol sütunda alt alta işlem satırları, sağında aynı yükseklikte QR kod.
+ * Talep etiketinin ana gövdesi budur.
+ */
+export interface NimbotIslemQrSatiri {
+  tip: "islemQr";
+  /** Sol sütunda alt alta yazılacak işlem satırları. */
+  islemler: string[];
+  /** QR kodun içeriği. */
+  veri: string;
+}
+
+export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemQrSatiri;
+
+/**
+ * Etiketin satır planını üretir. Sıralama operatörün istediği kompakt düzendir:
+ *
+ *   1) FİRMA #SIRA          (tek satır, ortada)
+ *   2) Müşteri - Telefon    (tek satır)
+ *   3) MİKTAR x KG          (solda; sağda tutar/ödeme durumu)
+ *   4) İşlemler + QR        (solda üç işlem satırı, sağında QR kod)
+ *   5) NOT                  (tek satır, yalnızca varsa)
+ *
+ * Böylece 50×50 mm etikete taşma yapmadan sığar.
  */
 export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
-  const satirlar: NimbotSatiri[] = [];
+  const satirlar: NimbotSatiri[] = [
+    {
+      tip: "metin",
+      metin: `${veri.firmaAdi} #${veri.siraNo}`,
+      rol: "baslik",
+      hizala: "orta",
+    },
+    {
+      tip: "metin",
+      metin: `${veri.musteriAdi} - ${veri.telefon}`,
+      rol: "vurgu",
+      hizala: "sol",
+    },
+    {
+      tip: "metin",
+      metin: `MİKTAR ${veri.kilo} KG`,
+      rol: "buyuk",
+      hizala: "sol",
+      sagMetin: odemeOzeti(veri),
+      sagRol: "kucuk",
+    },
+  ];
 
-  satirlar.push({ tip: "metin", metin: veri.firmaAdi, rol: "baslik", hizala: "orta" });
-  satirlar.push({
-    tip: "metin",
-    metin: `TALEP #${veri.siraNo}`,
-    rol: "buyuk",
-    hizala: "orta",
-  });
   if (veri.kopyaSayisi && veri.kopyaSayisi > 1) {
     satirlar.push({
       tip: "metin",
@@ -80,66 +114,31 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     });
   }
 
-  satirlar.push({ tip: "ayrac" });
-  satirlar.push({
-    tip: "metin",
-    metin: `MÜŞTERİ: ${veri.musteriAdi}`,
-    rol: "vurgu",
-    hizala: "sol",
-  });
-  satirlar.push({ tip: "metin", metin: `TELEFON: ${veri.telefon}`, rol: "normal", hizala: "sol" });
-  satirlar.push({ tip: "metin", metin: `MİKTAR: ${veri.kilo} KG`, rol: "buyuk", hizala: "sol" });
-
-  satirlar.push({ tip: "ayrac" });
-  satirlar.push({
-    tip: "metin",
-    metin: "YAPILACAK İŞLEMLER:",
-    rol: "kucuk",
-    hizala: "sol",
-  });
-  for (const satir of islemSatirlari(veri.islemler)) {
-    satirlar.push({ tip: "metin", metin: satir, rol: "normal", hizala: "sol" });
-  }
-
+  const islemler = islemSatirlari(veri.islemler);
   const paket = paketTipiEtiketi(veri.paketTipi);
   if (paket) {
     const adet = veri.paketAdedi ? `${veri.paketAdedi}x ` : "";
-    satirlar.push({ tip: "metin", metin: `Paket: ${adet}${paket}`, rol: "normal", hizala: "sol" });
+    islemler.push(`${adet}${paket}`);
+  }
+  satirlar.push({ tip: "islemQr", islemler, veri: `FILBERT-HIZMET:${veri.siraNo}` });
+
+  const not = veri.notlar?.trim();
+  if (not) {
+    satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "sol" });
   }
 
-  satirlar.push({ tip: "ayrac" });
-  satirlar.push({
-    tip: "metin",
-    metin: `TARİH: ${veri.tarihSaatStr}`,
-    rol: "kucuk",
-    hizala: "sol",
-  });
-  if (veri.toplamTutar) {
-    satirlar.push({
-      tip: "metin",
-      metin: `TUTAR: ${veri.toplamTutar} TL`,
-      rol: "normal",
-      hizala: "sol",
-    });
-  }
-
-  if (veri.odemeDurumu === "ODENDI") {
-    satirlar.push({ tip: "metin", metin: "TAHSİL EDİLDİ", rol: "vurgu", hizala: "orta", ters: true });
-  } else if (veri.odemeDurumu === "VERESIYE") {
-    satirlar.push({ tip: "metin", metin: "VERESİYE", rol: "vurgu", hizala: "orta", ters: true });
-  }
-
-  if (veri.notlar && veri.notlar.trim()) {
-    satirlar.push({
-      tip: "metin",
-      metin: `NOT: ${veri.notlar.trim()}`,
-      rol: "kucuk",
-      hizala: "sol",
-    });
-  }
-
-  satirlar.push({ tip: "qr", veri: `FILBERT-HIZMET:${veri.siraNo}` });
   return satirlar;
+}
+
+/**
+ * MİKTAR satırının sağında gösterilecek kısa özet: tahsilat durumu varsa o,
+ * yoksa tutar, o da yoksa tarih.
+ */
+function odemeOzeti(veri: EtiketVerisi): string | undefined {
+  if (veri.odemeDurumu === "ODENDI") return "TAHSİL EDİLDİ";
+  if (veri.odemeDurumu === "VERESIYE") return "VERESİYE";
+  if (veri.toplamTutar) return `${veri.toplamTutar} TL`;
+  return veri.tarihSaatStr || undefined;
 }
 
 // ─── Tuval ölçüsü (saf) ─────────────────────────────────────

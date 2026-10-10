@@ -26,8 +26,8 @@ import {
   PageColorType,
   PacketReceivedEvent,
   PrinterInfoFetchedEvent,
+  RawPacketSentEvent,
   ResponseCommandId,
-  SoundSettingsItemType,
   type NiimbotAbstractClient,
   type PrinterInfo,
 } from "@mmote/niimbluelib";
@@ -49,6 +49,7 @@ import {
   qrMatrisiOlustur,
   qrNoktaOlcusu,
   type NimbotSatiri,
+  type QrMatrisi,
 } from "@/lib/yazici/nimbot-etiket";
 
 /** Yazıcı seçim penceresinde gösterilecek Nimbot model adı önekleri. */
@@ -180,17 +181,41 @@ function metniSar(
   return satirlar;
 }
 
+/** Tek bir çizim parçası: satır planı ölçekle hesaplandıktan sonraki hâli. */
 interface CizimParcasi {
   satir: NimbotSatiri;
   punto: number;
-  satirlar: string[];
+  satirYuksekligi: number;
   yukseklik: number;
+  /** Metin satırının sarılmış hâli. */
+  satirlar: string[];
+  /** İşlem sütununun sarılmış hâli (tip: "islemQr"). */
+  islemSatirlari: string[][];
+  /** İşlem sütununun toplam yüksekliği (tip: "islemQr"). */
+  islemYukseklik: number;
+  /** QR matrisi ve nokta ölçüsü (tip: "islemQr"). */
+  qrMatris: QrMatrisi | null;
+  qrModulNokta: number;
+  qrKenarNokta: number;
+}
+
+/** Etiket ölçeklemesinin alt ve üst sınırı (taşmayı önlemek / boşluğu doldurmak). */
+export const NIMBOT_OLCEK_MIN = 0.55;
+export const NIMBOT_OLCEK_MAX = 1.7;
+
+/** QR kodun etiket genişliğinden alacağı pay ve işlem sütunuyla arası (nokta). */
+export const NIMBOT_QR_ORANI = 0.42;
+export const NIMBOT_QR_ARALIGI = 8;
+
+function qrAlaniGenisligi(icGenislik: number): number {
+  return Math.max(48, Math.round(icGenislik * NIMBOT_QR_ORANI));
 }
 
 /**
- * Etiketi B1 baskı alanına (384 nokta genişlik) çizer. İçerik yüksekliği
- * etikete sığmazsa punto oransal olarak küçültülür; QR kodu her zaman alt
- * tarafta tam nokta modüllerle çizilir.
+ * Etiketi B1 baskı alanına (384 nokta genişlik) çizer.
+ *
+ * İçerik yüksekliği etikete sığmazsa ölçek küçültülür; boşluk kalırsa ölçek
+ * büyütülür. Böylece içerik ne taşar ne de etiketin yarısı boş kalır.
  */
 export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): HTMLCanvasElement {
   const olcu = nimbotOlcusu(etiketProfili);
@@ -206,66 +231,118 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   ctx.textBaseline = "top";
 
   const icerik = nimbotEtiketIcerigi(veri);
-  const qrSatiri = icerik.find((s) => s.tip === "qr");
-  const govde = icerik.filter((s) => s.tip !== "qr");
 
   const kenar = NIMBOT_KENAR_BOSLUGU;
   const icGenislik = tuval.width - kenar * 2;
-
-  const matris = qrSatiri?.veri ? qrMatrisiOlustur(qrSatiri.veri) : null;
-  const qr = matris
-    ? qrNoktaOlcusu(matris, Math.min(icGenislik, Math.round(olcu.yukseklik * 0.3)))
-    : null;
-  const qrAlani = qr ? qr.kenarNokta + kenar : 0;
-  const govdeAlani = tuval.height - kenar * 2 - qrAlani;
+  const qrAlan = qrAlaniGenisligi(icGenislik);
+  const govdeAlani = tuval.height - kenar * 2;
 
   const planla = (katSayi: number): CizimParcasi[] =>
-    govde.map((satir) => {
-      if (satir.tip === "ayrac") {
-        return { satir, punto: 0, satirlar: [], yukseklik: 8 };
+    icerik.map((satir) => {
+      if (satir.tip === "islemQr") {
+        const punto = nimbotPunto("normal", olcu.olcek * katSayi);
+        ctx.font = yaziTipi(punto);
+        const satirYuksekligi = Math.round(punto * 1.22);
+        const solGenislik = icGenislik - qrAlan - NIMBOT_QR_ARALIGI;
+        const islemSatirlari = satir.islemler.map((metin) => metniSar(ctx, metin, solGenislik));
+        const satirSayisi = islemSatirlari.reduce((t, p) => t + p.length, 0);
+        const islemYukseklik = satirSayisi * satirYuksekligi;
+        const matris = qrMatrisiOlustur(satir.veri);
+        const qr = qrNoktaOlcusu(matris, qrAlan);
+        return {
+          satir,
+          punto,
+          satirYuksekligi,
+          yukseklik: Math.max(islemYukseklik, qr.kenarNokta),
+          satirlar: [],
+          islemSatirlari,
+          islemYukseklik,
+          qrMatris: matris,
+          qrModulNokta: qr.modulNokta,
+          qrKenarNokta: qr.kenarNokta,
+        };
       }
+
       const punto = nimbotPunto(satir.rol ?? "normal", olcu.olcek * katSayi);
       ctx.font = yaziTipi(punto);
-      const satirlar = metniSar(ctx, satir.metin ?? "", icGenislik);
+      const satirlar = metniSar(ctx, satir.metin, icGenislik);
       const satirYuksekligi = Math.round(punto * 1.22);
       return {
         satir,
         punto,
+        satirYuksekligi,
+        yukseklik: satirYuksekligi * satirlar.length,
         satirlar,
-        yukseklik: satirYuksekligi * satirlar.length + (satir.ters ? 6 : 0),
+        islemSatirlari: [],
+        islemYukseklik: 0,
+        qrMatris: null,
+        qrModulNokta: 0,
+        qrKenarNokta: 0,
       };
     });
 
   const topla = (parcalar: CizimParcasi[]) => parcalar.reduce((t, p) => t + p.yukseklik, 0);
 
-  let plan = planla(1);
-  const toplam = topla(plan);
-  if (toplam > govdeAlani && toplam > 0) {
-    const kucultulmus = planla(Math.max(0.55, govdeAlani / toplam));
-    if (topla(kucultulmus) < toplam) plan = kucultulmus;
+  // Sığdıran en büyük ölçeği ikili aramayla bul.
+  const altSinir = topla(planla(NIMBOT_OLCEK_MIN)) <= govdeAlani ? NIMBOT_OLCEK_MIN : null;
+  if (altSinir === null) throw new Error("Etiket içeriği en küçük ölçekte bile sığmadı");
+  let alt = NIMBOT_OLCEK_MIN;
+  let ust = NIMBOT_OLCEK_MAX;
+  if (topla(planla(ust)) <= govdeAlani) {
+    alt = ust;
+  } else {
+    for (let i = 0; i < 7; i++) {
+      const orta = (alt + ust) / 2;
+      if (topla(planla(orta)) <= govdeAlani) alt = orta;
+      else ust = orta;
+    }
   }
+  const katSayi = alt;
+  const plan = planla(katSayi);
 
-  let y = kenar;
+  // İçerik etiketi tam doldurmuyorsa dikey olarak ortalanır; alt/üst boşluk
+  // dengeli kalır, taşma olmaz.
+  let y = kenar + Math.max(0, Math.round((govdeAlani - topla(plan)) / 2));
   for (const parca of plan) {
-    if (parca.satir.tip === "ayrac") {
+    ctx.font = yaziTipi(parca.punto);
+    ctx.fillStyle = "#000000";
+
+    if (parca.satir.tip === "islemQr") {
+      let sy = y + Math.round((parca.yukseklik - parca.islemYukseklik) / 2);
+      for (const grup of parca.islemSatirlari) {
+        for (const metin of grup) {
+          ctx.fillText(metin, kenar, Math.round(sy));
+          sy += parca.satirYuksekligi;
+        }
+      }
+
+      const boyut = parca.qrKenarNokta;
+      const sol = kenar + icGenislik - boyut;
+      const ustKenar = y + Math.round((parca.yukseklik - boyut) / 2);
+      // Sessiz bölge: QR çevresinde beyaz boşluk bırakılır.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(sol - 6, ustKenar - 6, boyut + 12, boyut + 12);
       ctx.fillStyle = "#000000";
-      ctx.fillRect(kenar, Math.round(y + parca.yukseklik / 2), icGenislik, 2);
+      const matris = parca.qrMatris;
+      if (matris) {
+        for (let satirNo = 0; satirNo < matris.boyut; satirNo++) {
+          for (let sutunNo = 0; sutunNo < matris.boyut; sutunNo++) {
+            if (matris.koyu(satirNo, sutunNo)) {
+              ctx.fillRect(
+                sol + sutunNo * parca.qrModulNokta,
+                ustKenar + satirNo * parca.qrModulNokta,
+                parca.qrModulNokta,
+                parca.qrModulNokta
+              );
+            }
+          }
+        }
+      }
       y += parca.yukseklik;
       continue;
     }
 
-    const ters = Boolean(parca.satir.ters);
     const hizala = parca.satir.hizala ?? "sol";
-    const satirYuksekligi = Math.round(parca.punto * 1.22);
-    ctx.font = yaziTipi(parca.punto);
-
-    if (ters) {
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(kenar, Math.round(y), icGenislik, satirYuksekligi * parca.satirlar.length + 6);
-    }
-
-    ctx.fillStyle = ters ? "#ffffff" : "#000000";
-    const yaziBaslangici = y + (ters ? 3 : 0);
     parca.satirlar.forEach((metin, sira) => {
       const genislik = ctx.measureText(metin).width;
       const x =
@@ -274,26 +351,20 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
           : hizala === "sag"
             ? kenar + icGenislik - genislik
             : kenar;
-      ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(yaziBaslangici + sira * satirYuksekligi));
+      ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(y + sira * parca.satirYuksekligi));
     });
-    y += parca.yukseklik;
-  }
-
-  if (matris && qr) {
-    const boyut = qr.kenarNokta;
-    const sol = Math.round((tuval.width - boyut) / 2);
-    const ust = tuval.height - kenar - boyut;
-    // Sessiz bölge: QR çevresinde beyaz boşluk bırakılır.
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(sol - 4, ust - 4, boyut + 8, boyut + 8);
-    ctx.fillStyle = "#000000";
-    for (let satir = 0; satir < matris.boyut; satir++) {
-      for (let sutun = 0; sutun < matris.boyut; sutun++) {
-        if (matris.koyu(satir, sutun)) {
-          ctx.fillRect(sol + sutun * qr.modulNokta, ust + satir * qr.modulNokta, qr.modulNokta, qr.modulNokta);
-        }
-      }
+    if (parca.satir.sagMetin) {
+      const sagPunto = nimbotPunto(parca.satir.sagRol ?? "kucuk", olcu.olcek * katSayi);
+      ctx.font = yaziTipi(sagPunto);
+      const genislik = ctx.measureText(parca.satir.sagMetin).width;
+      const sagY = y + Math.round((parca.satirYuksekligi - sagPunto * 1.22) / 2);
+      ctx.fillText(
+        parca.satir.sagMetin,
+        Math.round(kenar + icGenislik - genislik),
+        Math.round(Math.max(y, sagY))
+      );
     }
+    y += parca.yukseklik;
   }
 
   return tuval;
@@ -448,6 +519,16 @@ export const NIMBOT_SERI_PAKET_ZAMAN_ASIMI = 20_000;
  */
 export const NIMBOT_SERI_BILGI_ZAMAN_ASIMI = 4_000;
 
+/**
+ * Ham yazma işlemi için üst sınır.
+ *
+ * Ölçüldü (Windows, Nimbot B1, USB seri): `writer.write` promise'i hiç
+ * sonuçlanmayabiliyor ama baytlar hatta gidiyor ve yazıcı yanıtlıyor. Yazmayı
+ * sonsuza kadar beklemek tüm akışı kilitlediği için üst sınır konur; aşılırsa
+ * uyarı kaydedilir ve akış sürer.
+ */
+export const NIMBOT_SERI_YAZMA_ZAMAN_ASIMI = 4_000;
+
 /** Bağlantı kurulurken denenecek en fazla tur (ilk tur uyanma yüzünden düşebilir). */
 export const NIMBOT_SERI_BAGLANTI_DENEMESI = 3;
 
@@ -496,6 +577,41 @@ export class NimbotUsbIstemcisi extends NiimbotSerialClient {
       }
     }
     return null;
+  }
+
+  /**
+   * Ham bayt yazımı (zaman aşımlı).
+   *
+   * Kütüphanenin `sendRaw`'u `writer.write` promise'ini koşulsuz bekliyor; bu
+   * promise Windows seri sürücüsünde hiç sonuçlanmadığında (ölçüldü) baskı akışı
+   * tamamen duruyor. Burada yazma üst sınırla beklenir ve aşım ölümcül sayılmaz.
+   */
+  override async sendRaw(veri: Uint8Array, force = false): Promise<void> {
+    const gonder = async () => {
+      if (!this.isConnected()) throw new Error("Port is not readable/writable");
+      await new Promise((coz) => setTimeout(coz, this.packetIntervalMs));
+      const yazan = (this as unknown as { writer?: WritableStreamDefaultWriter<Uint8Array> }).writer;
+      if (!yazan) throw new Error("Port is not readable/writable");
+      const sonuc = await Promise.race([
+        yazan
+          .write(veri)
+          .then(() => "yazildi" as const)
+          .catch((hata: unknown) => {
+            throw hata;
+          }),
+        new Promise<"zamanAsimi">((coz) =>
+          setTimeout(() => coz("zamanAsimi"), NIMBOT_SERI_YAZMA_ZAMAN_ASIMI)
+        ),
+      ]);
+      if (sonuc === "zamanAsimi") {
+        console.warn(
+          "[nimbot-usb] Yazma işlemi zaman aşımına düştü; baytlar hatta gitti, akış sürdürülüyor."
+        );
+      }
+      this.emit("rawpacketsent", new RawPacketSentEvent(veri));
+    };
+    if (force) await gonder();
+    else await this.mutex.runExclusive(gonder);
   }
 
   override async sendPacketWaitResponse(
@@ -599,7 +715,8 @@ export class NimbotUsbIstemcisi extends NiimbotSerialClient {
       } catch (hata) {
         console.warn("[nimbot-usb] Yazıcı bilgileri tam okunamadı, baskı yine denenecek:", hata);
       }
-      await this.fetchRfidInfo().catch(() => undefined);
+      // RFID/kağıt bilgisi baskı için gerekli değil; sorgular yanıtsız kalınca
+      // akışı yavaşlattığı için atlanır.
     } finally {
       // Bağlantı turu bitince erken paketler temizlenir; baskıda karışmasınlar.
       this.erkenPaketler.clear();
@@ -630,31 +747,16 @@ export class NimbotUsbIstemcisi extends NiimbotSerialClient {
     this.printerInfo.mac = await dene("bluetooth adresi", () =>
       this.protocol.getPrinterBluetoothMacAddress()
     );
-    this.printerInfo.batteryPercents = await dene("batarya", () => this.protocol.getBatteryChargeLevel());
-    this.printerInfo.autoShutdownTime = await dene("kapanma süresi", () =>
-      this.protocol.getAutoShutDownTime()
+    // Batarya, kapanma süresi ve ses ayarı sorguları baskı için gerekli değil;
+    // üstelik bu sorgular yazıcı uykudayken seri hatta takılmaya yol açıyordu
+    // (ölçüldü). Bu tur yalnızca baskı görevi seçimi ve etiket başlığı için
+    // gereken alanları okur.
+    this.printerInfo.hardwareVersion = await dene("donanım sürümü", () =>
+      this.protocol.getHardwareVersion()
     );
-    this.printerInfo.settings.connectionSound =
-      (await dene("bluetooth bağlantı sesi", () =>
-        this.protocol.isSoundEnabled(SoundSettingsItemType.BluetoothConnectionSound)
-      )) ?? false;
-    this.printerInfo.settings.powerSound =
-      (await dene("açılış sesi", () => this.protocol.isSoundEnabled(SoundSettingsItemType.PowerSound))) ??
-      false;
-    try {
-      const bilgi = await this.protocol.heartbeatPrinterInfo();
-      this.printerInfo.printheadWidth = bilgi.printheadWidth;
-      this.printerInfo.hardwareVersion = bilgi.hardwareVersion;
-      this.printerInfo.softwareVersion = bilgi.softwareVersion;
-      this.printerInfo.resolutionClass = bilgi.resolutionClass;
-    } catch {
-      this.printerInfo.hardwareVersion = await dene("donanım sürümü", () =>
-        this.protocol.getHardwareVersion()
-      );
-      this.printerInfo.softwareVersion = await dene("yazılım sürümü", () =>
-        this.protocol.getSoftwareVersion()
-      );
-    }
+    this.printerInfo.softwareVersion = await dene("yazılım sürümü", () =>
+      this.protocol.getSoftwareVersion()
+    );
     this.emit("printerinfofetched", new PrinterInfoFetchedEvent(this.printerInfo));
     return this.printerInfo;
   }
