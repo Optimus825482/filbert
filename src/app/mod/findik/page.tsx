@@ -1,62 +1,45 @@
+import { cookies } from "next/headers";
 import { ModulSekmeler, type Modul } from "@/components/modul-tabs";
-import { prisma } from "@/lib/db";
-import { getCurrentFirmaId } from "@/lib/auth";
+import { ModulTercihSenkronu } from "@/components/modul-tercih-senkronu";
 import { requirePagePermission } from "@/lib/rbac/guard";
 import { modulleriIzinlereGoreFiltrele } from "@/lib/rbac/modul-navigasyon";
+import { bekleyenRandimanSayisi } from "@/lib/queries";
+import {
+  alimModulu,
+  finansModulu,
+  musteriModulu,
+  raporModulu,
+} from "@/lib/modul-tanimlari";
+import { getCurrentFirmaId } from "@/lib/auth";
+import { MODUL_CEREZI, modulCoz } from "@/lib/modul";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Eski "Fındık İşlemleri" mobil girişi artık Fındık Alım Modülü ekranıdır.
+ * Modüler ayrım sonrası işleme tarafı /mod/islem altında toplanır; iki
+ * modülün menüleri birbirine karışmaz.
+ */
 export default async function FindikModulPage() {
   const actor = await requirePagePermission("ALIM", "GORUNTULE");
   const firmaId = await getCurrentFirmaId();
-  const bekleyenRandiman = await prisma.alimFisi.count({ where: { randimanDurumu: "BEKLIYOR", durum: { not: "IPTAL" }, cari: { firmaId } } });
+
+  const bekleyenRandiman = await bekleyenRandimanSayisi(firmaId);
+  // Doğrudan bu ekrana gelen kullanıcının modül tercihi eşitlenir; böylece
+  // Ayarlar → Modül ekranı da alım modülünü açık gösterir.
+  const cerezModulu = modulCoz((await cookies()).get(MODUL_CEREZI)?.value);
 
   const modüller: Modul[] = [
-    {
-      id: "findik",
-      etiket: "Fındık İşlemleri",
-      altModuller: [
-        { href: "/alim/yeni", etiket: "Yeni Alım Fişi", ikon: "alim-yeni", dekont: "Müşteri, miktar, fiyat, kalite — tek işlemde." },
-        { href: "/alim", etiket: "Alım Yönetimi", ikon: "alim-liste", badge: bekleyenRandiman > 0 ? bekleyenRandiman : undefined, dekont: "Fiş listesi, randıman tamamlama, emanet fişleri." },
-        { href: "/hizmet", etiket: "Kırma & Paketleme", ikon: "alim-liste", dekont: "Ev kullanımı fındık kırma, kavurma ve paketleme siparişleri." },
-        { href: "/randiman", etiket: "Randıman Takibi", ikon: "randiman", dekont: "Kalite sonuçlarını ürün ve müşteri hareketleriyle birlikte değerlendirin." },
-        { href: "/virman", etiket: "Virman Kontrolü", ikon: "virman", dekont: "Depolar veya hesaplar arasındaki miktar aktarımını izlenebilir biçimde yürütün." },
-        { href: "/sevkiyat", etiket: "Sevk Planlama", ikon: "sevk", dekont: "Hazırlanan ürünleri araç, müşteri ve teslimat bilgileriyle sevke bağlayın." },
-        { href: "/emanet", etiket: "Emanetler", ikon: "emanet", dekont: "Fiyatsız bırakılan emanetler ve bozma işlemleri." },
-      ],
-    },
-    {
-      id: "finans",
-      etiket: "Finans İşlemleri",
-      altModuller: [
-        { href: "/kasa", etiket: "Kasa", ikon: "kasa", dekont: "Tahsilat ve ödeme sonrası bakiye." },
-        { href: "/banka", etiket: "Banka", ikon: "banka", dekont: "Havale ve EFT hareketleri." },
-        { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
-        { href: "/finans/odeme", etiket: "Ödeme", ikon: "odeme", dekont: "Üretici/tüccar/fabrika ödemeleri." },
-        { href: "/masraf", etiket: "Masraf", ikon: "masraf", dekont: "Nakliye, kantar, hamaliye." },
-        { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Nakit/ayni/fındık karşılığı avans." },
-      ],
-    },
-    {
-      id: "musteri",
-      etiket: "Müşteri İşlemleri",
-      altModuller: [
-        { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: "cari", dekont: "Üretici, tüccar, fabrika — çoklu bakiye." },
-        { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Üretici avansı." },
-        { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
-        { href: "/satis", etiket: "Satış", ikon: "satis", dekont: "Müşteriye satış fişi." },
-      ],
-    },
-    {
-      id: "rapor",
-      etiket: "Raporlar",
-      altModuller: [
-        { href: "/raporlar", etiket: "Günlük Rapor", ikon: "rapor", dekont: "Alım, ödeme, tahsilat, emanet." },
-        { href: "/kar-zarar", etiket: "Kâr / Zarar", ikon: "kar-zarar", dekont: "Seçili tarih aralığında P&L raporu." },
-        { href: "/stok", etiket: "Stok Durumu", ikon: "stok", dekont: "Depo bazında stok özeti ve hareketleri." },
-      ],
-    },
+    alimModulu({ bekleyenRandiman }),
+    finansModulu(),
+    musteriModulu(),
+    raporModulu(),
   ];
 
-  return <ModulSekmeler modüller={modulleriIzinlereGoreFiltrele(actor, modüller)} aktifId="findik" />;
+  return (
+    <>
+      <ModulTercihSenkronu modul="alim" cerezModulu={cerezModulu} />
+      <ModulSekmeler modüller={modulleriIzinlereGoreFiltrele(actor, modüller)} aktifId="alim" />
+    </>
+  );
 }

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,6 +11,7 @@ import { OfflineSyncRegister } from "@/components/offline-sync-register";
 import { getCurrentOturum } from "@/lib/auth";
 import { bekleyenRandimanSayisi } from "@/lib/queries";
 import { izinVar } from "@/lib/rbac/guard";
+import { MODUL_BASLIGI, MODUL_CEREZI, MODULLER, aktifModulBelirle } from "@/lib/modul";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin", "latin-ext"] });
@@ -58,9 +59,16 @@ const MASAUSTU_ROTA_IZINLERI = [
   ["/stok", "STOK", "GORUNTULE"],
   ["/kar-zarar", "RAPORLAR", "GORUNTULE"],
   ["/ayarlar", "AYARLAR", "GORUNTULE"],
+  // Modül seçimi Ayarlar → Modül sekmesindedir. Yalnızca modül yetkisi olan
+  // (ör. sadece fındık işleme) kullanıcı da modül değiştirebilmelidir.
+  ["/ayarlar", "ALIM", "GORUNTULE"],
+  ["/ayarlar", "HIZMET", "GORUNTULE"],
   ["/sesli-not", "SESLI_NOT", "GORUNTULE"],
   ["/hizmet", "HIZMET", "GORUNTULE"],
   ["/hizmet/yeni", "HIZMET", "OLUSTUR"],
+  ["/hizmet/raporlar", "HIZMET", "GORUNTULE"],
+  ["/hizmet/ayarlar", "HIZMET", "GORUNTULE"],
+  ["/hizmet/kasa", "HIZMET", "GORUNTULE"],
 ] as const;
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -84,6 +92,19 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     })()
     : [];
 
+  // Aktif modül: istek yolu → çerez tercihi → kullanıcının varsayılan modülü.
+  // Yol en güçlü sinyaldir; modüle özel olmayan ekranlarda (ör. /ayarlar)
+  // kullanıcının son tercihi korunur.
+  const aktifModul = firmaOturumu && user
+    ? aktifModulBelirle({
+        yol: hdrs.get(MODUL_BASLIGI),
+        cerez: (await cookies()).get(MODUL_CEREZI)?.value,
+        varsayilan: user.varsayilanModul,
+      })
+    : null;
+  const digerModul = aktifModul ? MODULLER[MODULLER[aktifModul].karsiModul] : null;
+  const digerModulYetkisi = Boolean(user && digerModul && izinVar(user, digerModul.izinModulu, "GORUNTULE"));
+
   const bekleyenRandiman = user?.aktif && user.firma.aktif
     ? await bekleyenRandimanSayisi(user.firmaId)
     : 0;
@@ -101,7 +122,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             {isWindow || isPublicPage || sistemYoneticiOturumu ? (
               <main className="p-4">{children}</main>
             ) : (
-              <MobileShell izinliRotalar={izinliRotalar} bekleyenRandiman={bekleyenRandiman}>{children}</MobileShell>
+              <MobileShell izinliRotalar={izinliRotalar} bekleyenRandiman={bekleyenRandiman} aktifModul={aktifModul} digerModul={digerModul ? { id: digerModul.id, ad: digerModul.ad, izinli: digerModulYetkisi } : null}>{children}</MobileShell>
             )}
             <Toaster position="top-center" richColors closeButton />
           </AyarProvider>

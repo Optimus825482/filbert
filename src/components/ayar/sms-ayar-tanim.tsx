@@ -5,7 +5,11 @@ import { toast } from "sonner";
 import { MessageSquare, Send, Save } from "lucide-react";
 import { updateSmsAyarlari, testSmsGonder } from "@/lib/actions/hizmet-tanimlar";
 import type { SmsSaglayici } from "@/lib/sms/types";
-import { VARSAYILAN_KAYIT_SABLONU, VARSAYILAN_TAMAMLANDI_SABLONU } from "@/lib/sms/types";
+import {
+  VARSAYILAN_KAYIT_SABLONU,
+  VARSAYILAN_TAMAMLANDI_SABLONU,
+  VARSAYILAN_TESLIM_HATIRLATMA_SABLONU,
+} from "@/lib/sms/types";
 
 interface Props {
   ayarlar: {
@@ -17,6 +21,7 @@ interface Props {
     baslik?: string;
     kayitSablonu: string;
     tamamlandiSablonu: string;
+    teslimHatirlatmaSablonu: string;
     otomatikGirisSms: boolean;
   };
   guncelleYetkisi: boolean;
@@ -40,15 +45,23 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
   const [tamamlandiSablonu, setTamamlandiSablonu] = useState(
     ayarlar.tamamlandiSablonu || VARSAYILAN_TAMAMLANDI_SABLONU
   );
+  const [teslimHatirlatmaSablonu, setTeslimHatirlatmaSablonu] = useState(
+    ayarlar.teslimHatirlatmaSablonu || VARSAYILAN_TESLIM_HATIRLATMA_SABLONU
+  );
   const [otomatikGirisSms, setOtomatikGirisSms] = useState(ayarlar.otomatikGirisSms);
 
   // Test SMS State
   const [testTel, setTestTel] = useState("");
   const [testPending, setTestPending] = useState(false);
 
-  function degiskenEkle(sablonTipi: "KAYIT" | "TAMAMLANDI", degisken: string) {
+  function degiskenEkle(
+    sablonTipi: "KAYIT" | "TAMAMLANDI" | "HATIRLATMA",
+    degisken: string
+  ) {
     if (sablonTipi === "KAYIT") {
       setKayitSablonu((onceki) => onceki + ` {${degisken}}`);
+    } else if (sablonTipi === "HATIRLATMA") {
+      setTeslimHatirlatmaSablonu((onceki) => onceki + ` {${degisken}}`);
     } else {
       setTamamlandiSablonu((onceki) => onceki + ` {${degisken}}`);
     }
@@ -65,6 +78,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
         baslik: baslik.trim() || undefined,
         kayitSablonu,
         tamamlandiSablonu,
+        teslimHatirlatmaSablonu,
         otomatikGirisSms,
       });
 
@@ -319,6 +333,42 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             onChange={(e) => setTamamlandiSablonu(e.target.value)}
             className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:border-[#f5c518] focus:outline-none"
           />
+        </div>
+
+        {/* 3. Teslim Hatırlatma Şablonu */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-bold text-sky-200">
+              3. Teslim Hatırlatma Şablonu (Hazır ama Teslim Alınmadı)
+            </label>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => degiskenEkle("HATIRLATMA", "sira_no")}
+                className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-sky-300 hover:bg-white/10"
+              >
+                + Sıra No
+              </button>
+              <button
+                type="button"
+                onClick={() => degiskenEkle("HATIRLATMA", "tutar")}
+                className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-sky-300 hover:bg-white/10"
+              >
+                + Tutar
+              </button>
+            </div>
+          </div>
+          <textarea
+            rows={3}
+            value={teslimHatirlatmaSablonu}
+            onChange={(e) => setTeslimHatirlatmaSablonu(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:border-[#f5c518] focus:outline-none"
+          />
+          <p className="mt-1 text-[11px] text-sky-300">
+            Bu şablon, tamamlandı bildirimi daha önce gönderilmiş fakat müşterisi fındığını teslim
+            almamış talepler için kullanılır (Talep Listesi → Hazır · Teslim Alınmayanlar → toplu
+            SMS veya satır içi yeniden gönder).
+          </p>
         </div>
 
         {/* Kaydet Butonu */}

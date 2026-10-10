@@ -3,6 +3,14 @@
  * ise İstanbul gece yarısının gerçek UTC karşılığı kullanılır. */
 const ISTANBUL = "Europe/Istanbul";
 
+/**
+ * Sunucu tarafı "şimdi" değeri. Bileşenler doğrudan `Date.now()` çağırmaz;
+ * zaman okuması burada tek noktada toplanır ve render saf kalır.
+ */
+export function suAnMs(): number {
+  return Date.now();
+}
+
 type TarihParcalari = { yil: number; ay: number; gun: number; saat?: number; dakika?: number };
 
 const tarihBicimleyici = new Intl.DateTimeFormat("en-CA", {

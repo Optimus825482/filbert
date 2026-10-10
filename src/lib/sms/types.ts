@@ -9,6 +9,7 @@ export interface SmsAyarlari {
   baslik?: string;
   kayitSablonu: string;
   tamamlandiSablonu: string;
+  teslimHatirlatmaSablonu: string;
   otomatikGirisSms: boolean;
 }
 
@@ -20,7 +21,10 @@ export interface SmsGonderSonuc {
 }
 
 export const VARSAYILAN_KAYIT_SABLONU =
-  "Sayın {musteri_adi}, {kilo} kg fındığınız #{sira_no} sıra no ile teslim alınmıştır. Yapılacak işlemler: {hizmetler}. Bizi tercih ettiğiniz için teşekkür ederiz. {firma_adi}";
+  "Sayın {musteri_adi}, {kilo} kg fındığınız için #{sira_no} sıra no ile talebiniz alınmıştır. Yapılacak işlemler: {hizmetler}. Hazır olduğunda tarafınıza bilgi verilecektir. {firma_adi}";
+
+export const VARSAYILAN_TESLIM_HATIRLATMA_SABLONU =
+  "Sayın {musteri_adi}, #{sira_no} sıra no'lu {kilo} kg fındığınızın {hizmetler} işlemi tamamlanmıştır ve teslim alınmayı beklemektedir. Tutar: {tutar} TL. {firma_adi}";
 
 export const VARSAYILAN_TAMAMLANDI_SABLONU =
   "Sayın {musteri_adi}, #{sira_no} sıra no'lu {kilo} kg fındığınızın {hizmetler} işlemi tamamlanmıştır. Tutar: {tutar} TL. Teslim alabilirsiniz. {firma_adi}";

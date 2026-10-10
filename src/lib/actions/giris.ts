@@ -1,14 +1,33 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { gizliDegerDogrula, oturumKapat, oturumOlustur, setupYetkisiVer, sifreDogrula } from "@/lib/auth";
+import { izinVar } from "@/lib/rbac/guard";
+import { MODULLER, MODUL_CEREZI, MODUL_CEREZ_SURESI, dbModuluCoz, type ModulTanimi } from "@/lib/modul";
 import { basariliGirisTemizle, basarisizGirisKaydet, girisEngelliMi } from "@/lib/guvenlik/giris-sinirlayici";
 import { basarisizGirisDenemesiKaydet, girisAuditYaz, girisDenemesiEngelliMi } from "@/lib/guvenlik/giris-denemesi";
 
 type GirisSonucu = { ok: boolean; hata?: string; hedef?: string };
 
 /** Proxy/ters-ara katmandan gelen gerçek istemci adresi. */
+type GirisKullanicisi = { varsayilanModul: unknown; roller: { rol: { aktif: boolean; sistemRolu?: boolean; kod?: string; izinler: { modul: string; eylem: string }[] } }[] };
+
+/**
+ * Giriş sonrası açılacak ekran. Kullanıcının kaydındaki varsayılan modül
+ * okunur; kullanıcı o modüle yetkili değilse panoya düşer (menüler zaten
+ * yetkiye göre filtrelenir).
+ */
+function girisHedefi(kullanici: GirisKullanicisi): { modul: ModulTanimi; hedef: string } {
+  const modul = MODULLER[dbModuluCoz(kullanici.varsayilanModul)];
+  const yetkili = izinVar(
+    kullanici as unknown as Parameters<typeof izinVar>[0],
+    modul.izinModulu,
+    "GORUNTULE",
+  );
+  return { modul, hedef: yetkili ? modul.anaRota : "/" };
+}
+
 async function istemciIpAdresi(): Promise<string | undefined> {
   try {
     const hdrs = await headers();
@@ -51,13 +70,26 @@ export async function girisYap(form: FormData): Promise<GirisSonucu> {
       return { ok: true, hedef: "/platform" };
     }
 
-    const kullanici = await prisma.kullanici.findUnique({ where: { eposta }, include: { firma: true } });
+    const kullanici = await prisma.kullanici.findUnique({
+      where: { eposta },
+      include: { firma: true, roller: { include: { rol: { include: { izinler: true } } } } },
+    });
     if (!kullanici?.aktif || !kullanici.firma.aktif || !kullanici.sifreHash || !(await sifreDogrula(sifre, kullanici.sifreHash))) return await basarisiz();
     const beniHatirla2 = form.get("beniHatirla") !== null;
     await oturumOlustur({ kullaniciId: kullanici.id }, beniHatirla2);
+    // Kullanıcı kaydındaki varsayılan modül hem çereze yazılır hem de giriş
+    // yönlendirmesinde kullanılır; böylece ilgili modülün ekranı açılır.
+    const { modul, hedef } = girisHedefi(kullanici);
+    (await cookies()).set(MODUL_CEREZI, modul.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: MODUL_CEREZ_SURESI,
+    });
     basariliGirisTemizle(eposta);
     await girisAuditYaz({ firmaId: kullanici.firmaId, kullaniciId: kullanici.id, ipAdresi: ip }, "GIRIS");
-    return { ok: true, hedef: "/" };
+    return { ok: true, hedef };
   } catch (error) {
     // Bağlantı ve beklenmeyen altyapı detayları istemciye sızdırılmaz.
     console.error("girisYap", error);
@@ -67,5 +99,6 @@ export async function girisYap(form: FormData): Promise<GirisSonucu> {
 
 export async function cikisYap() {
   await oturumKapat();
+  (await cookies()).delete(MODUL_CEREZI);
   return { ok: true };
 }

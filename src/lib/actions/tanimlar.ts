@@ -29,6 +29,7 @@ function mesajVer(e: unknown, varsayilan: string): string {
 
 const BAKIYE_TURLERI = ["TL", "USD", "EUR", "XAU"] as const;
 const HESAP_TIPLERI = ["KASA", "BANKA"] as const;
+const KASA_MODULLERI = ["ALIM", "ISLEME"] as const;
 const ARAC_TIPLERI = ["KAMYON", "TIR", "PIKAP", "MINIVAN"] as const;
 const GOREVLER = ["SOFOR", "KANTAR", "HAMALI", "DEPOCI", "SAHA"] as const;
 
@@ -101,6 +102,8 @@ export interface KasaHesapGirdi {
   bakiyeTuru: string;
   bankaAdi?: string;
   iban?: string;
+  /** Hesabın ait olduğu modül; işleme kasası yalnızca işleme modülünde yönetilir. */
+  modul?: "ALIM" | "ISLEME";
 }
 
 function kasaHesapDogrula(g: KasaHesapGirdi): string | null {
@@ -108,6 +111,7 @@ function kasaHesapDogrula(g: KasaHesapGirdi): string | null {
   if (!HESAP_TIPLERI.includes(g.tip)) return "Geçersiz hesap tipi";
   if (!BAKIYE_TURLERI.includes(g.bakiyeTuru as (typeof BAKIYE_TURLERI)[number])) return "Geçersiz bakiye türü";
   if (g.tip === "BANKA" && !g.bankaAdi?.trim()) return "Banka adı girilmedi";
+  if (g.modul !== undefined && !(KASA_MODULLERI as readonly string[]).includes(g.modul)) return "Geçersiz modül";
   return null;
 }
 
@@ -125,9 +129,10 @@ export async function createKasaHesap(g: KasaHesapGirdi): Promise<Sonuc> {
         bakiyeTuru: g.bakiyeTuru as BakiyeTuru,
         bankaAdi: g.tip === "BANKA" ? metin(g.bankaAdi) : null,
         iban: g.tip === "BANKA" ? metin(g.iban) : null,
+        modul: g.modul === "ISLEME" ? "ISLEME" : "ALIM",
       },
     });
-    await prisma.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "TANIMLAR", eylem: "OLUSTUR", hedefTipi: "KasaHesap", hedefId: hesap.id, sonrakiVeri: { ad: hesap.ad, tip: hesap.tip, bakiyeTuru: hesap.bakiyeTuru, bankaAdi: hesap.bankaAdi, iban: hesap.iban, aktif: hesap.aktif } } });
+    await prisma.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "TANIMLAR", eylem: "OLUSTUR", hedefTipi: "KasaHesap", hedefId: hesap.id, sonrakiVeri: { ad: hesap.ad, tip: hesap.tip, bakiyeTuru: hesap.bakiyeTuru, bankaAdi: hesap.bankaAdi, iban: hesap.iban, modul: hesap.modul, aktif: hesap.aktif } } });
     yenile();
     revalidatePath("/finans");
     return { ok: true };
@@ -152,8 +157,10 @@ export async function updateKasaHesap(id: string, g: KasaHesapGirdi): Promise<So
         bakiyeTuru: g.bakiyeTuru as BakiyeTuru,
         bankaAdi: g.tip === "BANKA" ? metin(g.bankaAdi) : null,
         iban: g.tip === "BANKA" ? metin(g.iban) : null,
+        // Modül gönderilmediyse mevcut değer korunur.
+        modul: g.modul ? (g.modul === "ISLEME" ? ("ISLEME" as const) : ("ALIM" as const)) : onceki.modul,
     };
-    await prisma.$transaction(async (tx) => { await tx.kasaHesap.update({ where: { id }, data: sonraki }); await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "TANIMLAR", eylem: "GUNCELLE", hedefTipi: "KasaHesap", hedefId: id, oncekiVeri: { ad: onceki.ad, tip: onceki.tip, bakiyeTuru: onceki.bakiyeTuru, bankaAdi: onceki.bankaAdi, iban: onceki.iban, aktif: onceki.aktif }, sonrakiVeri: sonraki } }); });
+    await prisma.$transaction(async (tx) => { await tx.kasaHesap.update({ where: { id }, data: sonraki }); await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "TANIMLAR", eylem: "GUNCELLE", hedefTipi: "KasaHesap", hedefId: id, oncekiVeri: { ad: onceki.ad, tip: onceki.tip, bakiyeTuru: onceki.bakiyeTuru, bankaAdi: onceki.bankaAdi, iban: onceki.iban, modul: onceki.modul, aktif: onceki.aktif }, sonrakiVeri: sonraki } }); });
     yenile();
     revalidatePath("/finans");
     return { ok: true };

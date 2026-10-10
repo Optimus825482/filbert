@@ -6,7 +6,22 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { revalidatePath } from "next/cache";
 import { hizmetSiraNoUret, tutarHesapla } from "@/lib/hesap";
 import { getFirmaSmsAyarlari, sablonDoldur, smsGonder } from "@/lib/sms/sms-servisi";
-import type { HizmetDurumu } from "@/generated/prisma/client";
+import {
+  BLUETOOTH_YOGUNLUK_MAX,
+  BLUETOOTH_YOGUNLUK_MIN,
+  VARSAYILAN_BLUETOOTH_YOGUNLUGU,
+  etiketProfiliGecerliMi,
+  findikIslemeAyarBlogunuBirlestir,
+  findikIslemeAyarlariniCoz,
+  kodSayfasiGecerliMi,
+  yaziciHedefGecerliMi,
+  type EtiketProfili,
+  type FindikIslemeAyarlari,
+  type KodSayfasi,
+  type YaziciAyarlari,
+  type YaziciHedefTipi,
+} from "@/lib/findik-isleme";
+import { Prisma, type HizmetDurumu } from "@/generated/prisma/client";
 
 export interface HizmetKaydiGirdi {
   musteriAdi: string;
@@ -170,6 +185,36 @@ export async function createHizmetKaydi(
 
 // ─── DURUM GÜNCELLEME ──────────────────────────────────────
 
+// Talep akışı:
+//   SIRAYA_ALINDI (Bekliyor) → KIRIM → KAVURMA → PAKETLEME → TAMAMLANDI → TESLIM_EDILDI
+// Her aşamaya ilk geçişte zaman damgası bir kez yazılır; rapor aşama sürelerini
+// bu damgalardan hesaplar.
+type AsamaDamgaliKayit = {
+  hazirlaniyorAt: Date | null;
+  kirimAt: Date | null;
+  kavurmaAt: Date | null;
+  paketlemeAt: Date | null;
+  tamamlandiAt: Date | null;
+  teslimAt: Date | null;
+};
+
+function durumGuncellemeVerisi(
+  kayit: AsamaDamgaliKayit,
+  yeniDurum: HizmetDurumu,
+  now: Date
+): Record<string, unknown> {
+  const veri: Record<string, unknown> = { durum: yeniDurum };
+
+  if (yeniDurum !== "SIRAYA_ALINDI" && !kayit.hazirlaniyorAt) veri.hazirlaniyorAt = now;
+  if (yeniDurum === "KIRIM" && !kayit.kirimAt) veri.kirimAt = now;
+  else if (yeniDurum === "KAVURMA" && !kayit.kavurmaAt) veri.kavurmaAt = now;
+  else if (yeniDurum === "PAKETLEME" && !kayit.paketlemeAt) veri.paketlemeAt = now;
+  else if (yeniDurum === "TAMAMLANDI" && !kayit.tamamlandiAt) veri.tamamlandiAt = now;
+  else if (yeniDurum === "TESLIM_EDILDI" && !kayit.teslimAt) veri.teslimAt = now;
+
+  return veri;
+}
+
 export async function updateHizmetDurumu(
   id: string,
   yeniDurum: HizmetDurumu,
@@ -184,16 +229,8 @@ export async function updateHizmetDurumu(
     });
     if (!kayit) return { ok: false, hata: "İşlem kaydı bulunamadı" };
 
-    const updateData: Record<string, unknown> = { durum: yeniDurum };
     const now = new Date();
-
-    if (yeniDurum === "HAZIRLANIYOR" && !kayit.hazirlaniyorAt) {
-      updateData.hazirlaniyorAt = now;
-    } else if (yeniDurum === "TAMAMLANDI" && !kayit.tamamlandiAt) {
-      updateData.tamamlandiAt = now;
-    } else if (yeniDurum === "TESLIM_EDILDI" && !kayit.teslimAt) {
-      updateData.teslimAt = now;
-    }
+    const updateData = durumGuncellemeVerisi(kayit, yeniDurum, now);
 
     let smsGitti = false;
 
@@ -216,6 +253,8 @@ export async function updateHizmetDurumu(
       if (smsSonuc.basarili) {
         smsGitti = true;
         updateData.tamamlandiSmsGonderildi = true;
+        updateData.teslimSmsSayisi = { increment: 1 };
+        updateData.teslimSmsAt = now;
       }
     }
 
@@ -250,15 +289,16 @@ export async function topluHizmetDurumuGuncelle(
     if (kayitlar.length === 0) return { ok: false, hata: "Seçili kayıtlar bulunamadı" };
 
     const now = new Date();
-    const updateData: Record<string, unknown> = { durum: yeniDurum };
-    if (yeniDurum === "HAZIRLANIYOR") updateData.hazirlaniyorAt = now;
-    if (yeniDurum === "TAMAMLANDI") updateData.tamamlandiAt = now;
-    if (yeniDurum === "TESLIM_EDILDI") updateData.teslimAt = now;
 
-    await prisma.hizmetIslemi.updateMany({
-      where: { id: { in: ids }, firmaId: actor.firmaId },
-      data: updateData,
-    });
+    // Aşama damgaları kayıt bazında farklılaştığı için tek tek güncellenir.
+    await prisma.$transaction(
+      kayitlar.map((k) =>
+        prisma.hizmetIslemi.update({
+          where: { id: k.id },
+          data: durumGuncellemeVerisi(k, yeniDurum, now),
+        })
+      )
+    );
 
     let smsGonderilenAdet = 0;
     if (yeniDurum === "TAMAMLANDI" && smsGonderilsinMi) {
@@ -281,7 +321,11 @@ export async function topluHizmetDurumuGuncelle(
             smsGonderilenAdet += 1;
             await prisma.hizmetIslemi.update({
               where: { id: k.id },
-              data: { tamamlandiSmsGonderildi: true },
+              data: {
+                tamamlandiSmsGonderildi: true,
+                teslimSmsSayisi: { increment: 1 },
+                teslimSmsAt: new Date(),
+              },
             });
           }
         } catch (err) {
@@ -319,7 +363,12 @@ export async function topluSmsGonder(
 
     for (const k of kayitlar) {
       try {
-        const mesaj = sablonDoldur(smsAyari.tamamlandiSablonu, {
+        // Tamamlandı bildirimi daha önce gitmişse teslim hatırlatma şablonu kullanılır.
+        const sablonSecili =
+          k.durum === "TAMAMLANDI" && k.tamamlandiSmsGonderildi
+            ? smsAyari.teslimHatirlatmaSablonu
+            : smsAyari.tamamlandiSablonu;
+        const mesaj = sablonDoldur(sablonSecili, {
           musteri_adi: k.musteriAdi,
           telefon: k.telefon,
           sira_no: k.siraNo,
@@ -334,7 +383,11 @@ export async function topluSmsGonder(
           basariliAdet += 1;
           await prisma.hizmetIslemi.update({
             where: { id: k.id },
-            data: { tamamlandiSmsGonderildi: true },
+            data: {
+              tamamlandiSmsGonderildi: true,
+              teslimSmsSayisi: { increment: 1 },
+              teslimSmsAt: new Date(),
+            },
           });
         } else {
           hataliAdet += 1;
@@ -371,7 +424,7 @@ export async function etiketYazdirildi(id: string): Promise<Sonuc> {
 
 export async function hizmetSmsTekrarGonder(
   id: string,
-  tip: "KAYIT" | "TAMAMLANDI"
+  tip: "KAYIT" | "TAMAMLANDI" | "TESLIM_HATIRLATMA"
 ): Promise<Sonuc<{ mesajId?: string }>> {
   if (!id) return { ok: false, hata: "Kayıt seçilmedi" };
 
@@ -384,7 +437,12 @@ export async function hizmetSmsTekrarGonder(
 
     const firma = await getCurrentFirma();
     const smsAyari = await getFirmaSmsAyarlari(actor.firmaId);
-    const sablon = tip === "KAYIT" ? smsAyari.kayitSablonu : smsAyari.tamamlandiSablonu;
+    const sablon =
+      tip === "KAYIT"
+        ? smsAyari.kayitSablonu
+        : tip === "TESLIM_HATIRLATMA"
+          ? smsAyari.teslimHatirlatmaSablonu
+          : smsAyari.tamamlandiSablonu;
 
     const mesaj = sablonDoldur(sablon, {
       musteri_adi: kayit.musteriAdi,
@@ -409,7 +467,11 @@ export async function hizmetSmsTekrarGonder(
     } else {
       await prisma.hizmetIslemi.update({
         where: { id },
-        data: { tamamlandiSmsGonderildi: true },
+        data: {
+          tamamlandiSmsGonderildi: true,
+          teslimSmsSayisi: { increment: 1 },
+          teslimSmsAt: new Date(),
+        },
       });
     }
 
@@ -567,5 +629,163 @@ export async function getHizmetFormSecenekleri() {
     };
   } catch {
     return { cariler: [], kasalar: [] };
+  }
+}
+
+// ─── ETİKET YAZICI PROFİLİ (KAYIT BAZINDA) ────────────────
+
+export async function hizmetEtiketProfiliKaydet(
+  id: string,
+  profil: EtiketProfili
+): Promise<Sonuc> {
+  if (!id) return { ok: false, hata: "Kayıt seçilmedi" };
+  if (!etiketProfiliGecerliMi(profil)) return { ok: false, hata: "Geçersiz etiket profili" };
+
+  try {
+    const actor = await requirePermission("HIZMET", "GUNCELLE");
+    const kayit = await prisma.hizmetIslemi.findFirst({
+      where: { id, firmaId: actor.firmaId },
+      select: { id: true },
+    });
+    if (!kayit) return { ok: false, hata: "Kayıt bulunamadı" };
+
+    await prisma.hizmetIslemi.update({ where: { id }, data: { etiketProfili: profil } });
+    revalidatePath(`/hizmet/${id}/etiket`);
+    return { ok: true };
+  } catch (e) {
+    console.error("hizmetEtiketProfiliKaydet", e);
+    return { ok: false, hata: "Etiket profili kaydedilemedi" };
+  }
+}
+
+// ─── FINDIK İŞLEME MODÜL AYARLARI (KASA + ETİKET PROFİLİ) ──
+
+export async function getFindikIslemeAyarlari(): Promise<FindikIslemeAyarlari> {
+  try {
+    const firma = await getCurrentFirma();
+    return findikIslemeAyarlariniCoz(firma.ayarlar);
+  } catch {
+    return findikIslemeAyarlariniCoz(null);
+  }
+}
+
+export interface YaziciAyarGirdisi {
+  hedef?: YaziciHedefTipi;
+  kuyrukAdi?: string | null;
+  ip?: string | null;
+  port?: number;
+  kodSayfasi?: KodSayfasi;
+  /** Nimbot Bluetooth baskı yoğunluğu (1-5). */
+  bluetoothYogunluk?: number;
+}
+
+export async function findikIslemeAyarlariniKaydet(g: {
+  kasaHesapId?: string | null;
+  etiketProfili?: EtiketProfili;
+  yazici?: YaziciAyarGirdisi;
+}): Promise<Sonuc> {
+  try {
+    const actor = await requirePermission("HIZMET", "GUNCELLE");
+    const firma = await getCurrentFirma();
+    const mevcut = findikIslemeAyarlariniCoz(firma.ayarlar);
+
+    let kasaHesapId = g.kasaHesapId === undefined ? mevcut.kasaHesapId : g.kasaHesapId;
+    if (kasaHesapId) {
+      const kasa = await prisma.kasaHesap.findFirst({
+        where: { id: kasaHesapId, firmaId: actor.firmaId, aktif: true },
+        select: { id: true },
+      });
+      if (!kasa) return { ok: false, hata: "Seçilen kasa/hesap bulunamadı" };
+      kasaHesapId = kasa.id;
+    }
+
+    const etiketProfili =
+      g.etiketProfili === undefined ? mevcut.etiketProfili : g.etiketProfili;
+    if (!etiketProfiliGecerliMi(etiketProfili)) {
+      return { ok: false, hata: "Geçersiz etiket profili" };
+    }
+
+    // Yazıcı ayarları: gönderilmeyen alanlar mevcut değeri korur.
+    const yaziciHam = g.yazici ?? {};
+    const yaziciHedef = yaziciHam.hedef === undefined ? mevcut.yazici.hedef : yaziciHam.hedef;
+    if (!yaziciHedefGecerliMi(yaziciHedef)) return { ok: false, hata: "Geçersiz yazıcı hedefi" };
+
+    const kuyrukAdi =
+      yaziciHam.kuyrukAdi === undefined
+        ? mevcut.yazici.kuyrukAdi
+        : yaziciHam.kuyrukAdi?.trim() || null;
+
+    const ipHam = yaziciHam.ip === undefined ? mevcut.yazici.ip : yaziciHam.ip?.trim() || null;
+    if (ipHam && !/^[0-9A-Za-z._-]+$/.test(ipHam)) {
+      return { ok: false, hata: "Yazıcı adresi geçersiz" };
+    }
+
+    const portHam = yaziciHam.port === undefined ? mevcut.yazici.port : Number(yaziciHam.port);
+    if (!Number.isInteger(portHam) || portHam < 1 || portHam > 65535) {
+      return { ok: false, hata: "Yazıcı portu 1-65535 arasında olmalıdır" };
+    }
+
+    const kodSayfasi =
+      yaziciHam.kodSayfasi === undefined ? mevcut.yazici.kodSayfasi : yaziciHam.kodSayfasi;
+    if (!kodSayfasiGecerliMi(kodSayfasi)) return { ok: false, hata: "Geçersiz kod sayfası" };
+
+    const yogunlukHam =
+      yaziciHam.bluetoothYogunluk === undefined
+        ? mevcut.yazici.bluetoothYogunluk
+        : Number(yaziciHam.bluetoothYogunluk);
+    if (
+      !Number.isInteger(yogunlukHam) ||
+      yogunlukHam < BLUETOOTH_YOGUNLUK_MIN ||
+      yogunlukHam > BLUETOOTH_YOGUNLUK_MAX
+    ) {
+      return {
+        ok: false,
+        hata:
+          "Bluetooth baskı yoğunluğu " +
+          BLUETOOTH_YOGUNLUK_MIN +
+          "-" +
+          BLUETOOTH_YOGUNLUK_MAX +
+          " arasında olmalıdır",
+      };
+    }
+    // Alan hiç gönderilmediyse kayıtlı değer korunur.
+    const bluetoothYogunluk =
+      yaziciHam.bluetoothYogunluk === undefined
+        ? mevcut.yazici.bluetoothYogunluk || VARSAYILAN_BLUETOOTH_YOGUNLUGU
+        : yogunlukHam;
+
+    const yazici: YaziciAyarlari = {
+      hedef: yaziciHedef,
+      kuyrukAdi,
+      ip: ipHam,
+      port: portHam,
+      kodSayfasi,
+      bluetoothYogunluk,
+    };
+
+    if (yazici.hedef === "WINDOWS_KUYRUK" && !yazici.kuyrukAdi) {
+      return { ok: false, hata: "Windows yazıcı kuyruğu seçmelisiniz" };
+    }
+    if (yazici.hedef === "AG_9100" && !yazici.ip) {
+      return { ok: false, hata: "Ağ yazıcısı IP adresini girmelisiniz" };
+    }
+
+    const sonraki = findikIslemeAyarBlogunuBirlestir(firma.ayarlar, {
+      kasaHesapId: kasaHesapId ?? null,
+      etiketProfili,
+      yazici,
+    });
+
+    await prisma.firma.update({
+      where: { id: firma.id },
+      data: { ayarlar: sonraki as Prisma.InputJsonValue },
+    });
+
+    revalidatePath("/hizmet/ayarlar");
+    revalidatePath("/hizmet");
+    return { ok: true };
+  } catch (e) {
+    console.error("findikIslemeAyarlariniKaydet", e);
+    return { ok: false, hata: "Fındık işleme ayarları kaydedilemedi" };
   }
 }

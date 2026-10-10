@@ -324,13 +324,9 @@ export async function getHesaplar() {
  * yansır; bu nedenle hesap bazında yön işareti uygulanırken virman, hesabın
  * etkisini hesap tarafı denklemler.
  */
-export async function getHesapBakiyeleri(tip: "KASA" | "BANKA"): Promise<Map<string, { tur: string; tutar: number }>> {
-  const fid = await firmaId();
-  const gr = await prisma.finansHareket.groupBy({
-    by: ["hesapId", "bakiyeTuru", "tip"],
-    where: { hesap: { firmaId: fid, aktif: true, tip } },
-    _sum: { tutar: true },
-  });
+function bakiyeleriTopla(
+  gr: { hesapId: string; bakiyeTuru: string; tip: string; _sum: { tutar: unknown } }[],
+): Map<string, { tur: string; tutar: number }> {
   const bakiyeler = new Map<string, { tur: string; tutar: number }>();
   for (const satir of gr) {
     const etki = satir.tip === "TAHSILAT" || satir.tip === "VIRMAN" ? n(satir._sum.tutar) : -n(satir._sum.tutar);
@@ -339,6 +335,33 @@ export async function getHesapBakiyeleri(tip: "KASA" | "BANKA"): Promise<Map<str
     bakiyeler.set(satir.hesapId, mevcut);
   }
   return bakiyeler;
+}
+
+export async function getHesapBakiyeleri(
+  tip: "KASA" | "BANKA",
+  modul?: "ALIM" | "ISLEME",
+): Promise<Map<string, { tur: string; tutar: number }>> {
+  const fid = await firmaId();
+  const gr = await prisma.finansHareket.groupBy({
+    by: ["hesapId", "bakiyeTuru", "tip"],
+    where: { hesap: { firmaId: fid, aktif: true, tip, ...(modul ? { modul } : {}) } },
+    _sum: { tutar: true },
+  });
+  return bakiyeleriTopla(gr);
+}
+
+/** Modül bazlı bakiye. İşleme kasası ekranı kasa ve banka hesaplarını birlikte
+ * gösterdiği için hesap tipi filtresi uygulanmaz. */
+export async function getModulHesapBakiyeleri(
+  modul: "ALIM" | "ISLEME",
+): Promise<Map<string, { tur: string; tutar: number }>> {
+  const fid = await firmaId();
+  const gr = await prisma.finansHareket.groupBy({
+    by: ["hesapId", "bakiyeTuru", "tip"],
+    where: { hesap: { firmaId: fid, aktif: true, modul } },
+    _sum: { tutar: true },
+  });
+  return bakiyeleriTopla(gr);
 }
 
 export async function getSonFinansHareketler(take = 20) {
@@ -662,3 +685,33 @@ export async function getGunlukRapor(tarih: Date) {
     emanetHareket,
   };
 }
+
+/**
+ * Fındık İşleme Modülü menü sayaçları.
+ * Aşama durumları tek `groupBy` ile sayılır; bildirim bekleyenler için ikinci
+ * hafif bir sayım yapılır (tamamlandı + bildirimi gönderilmemiş).
+ */
+export const islemeSayaclari = cache(async (fid: string) => {
+  const [gruplar, smsBekleyen] = await Promise.all([
+    prisma.hizmetIslemi.groupBy({
+      by: ["durum"],
+      where: { firmaId: fid },
+      _count: { _all: true },
+    }),
+    prisma.hizmetIslemi.count({
+      where: { firmaId: fid, durum: "TAMAMLANDI", tamamlandiSmsGonderildi: false },
+    }),
+  ]);
+
+  const say = (durumlar: readonly string[]) =>
+    gruplar
+      .filter((grup) => durumlar.includes(grup.durum))
+      .reduce((toplam, grup) => toplam + grup._count._all, 0);
+
+  return {
+    bekleyenTalep: say(["SIRAYA_ALINDI"]),
+    uretimdeTalep: say(["KIRIM", "KAVURMA", "PAKETLEME"]),
+    hazirBekleyen: say(["TAMAMLANDI"]),
+    smsBekleyen,
+  };
+});

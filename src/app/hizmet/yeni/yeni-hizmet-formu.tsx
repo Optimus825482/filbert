@@ -19,6 +19,10 @@ import Link from "next/link";
 import { createHizmetKaydi } from "@/lib/actions/hizmet";
 import { tutarHesapla } from "@/lib/hesap";
 
+/** Müşteri önerisi: adın ilk 4 harfi girildiğinde en yakın 5 kayıt önerilir. */
+const ONERI_MIN_HARF = 4;
+const ONERI_LIMIT = 5;
+
 interface HizmetTipiSecenek {
   id: string;
   ad: string;
@@ -73,18 +77,40 @@ export function YeniHizmetFormu({
     }));
   }, [musteriOnerileri, cariler]);
 
-  // Canlı arama filtresi (Ad veya Telefon)
+  // Canlı müşteri önerisi — daha önce gelen müşteriler arasından ilk 4 harf
+  // girildiğinde en yakın 5 kaydı (ad soyad + telefon) sıralı önerir.
   const filtrelenmisOneriler = useMemo(() => {
     const q = musteriAdi.trim().toLocaleLowerCase("tr-TR");
-    if (!q || q.length < 1) return [];
     const qRakam = q.replace(/\D/g, "");
+    const adAramasi = q.length >= ONERI_MIN_HARF;
+    const telAramasi = qRakam.length >= 3;
+    if (!adAramasi && !telAramasi) return [];
+
     return tumOneriler
-      .filter((m) => {
-        const adUygun = m.ad.toLocaleLowerCase("tr-TR").includes(q);
-        const telUygun = qRakam.length >= 2 && m.telefon.replace(/\D/g, "").includes(qRakam);
-        return adUygun || telUygun;
+      .map((m) => {
+        const ad = m.ad.toLocaleLowerCase("tr-TR");
+        const kelimeler = ad.split(/\s+/);
+        const tel = m.telefon.replace(/\D/g, "");
+        let puan = Number.POSITIVE_INFINITY;
+
+        if (adAramasi) {
+          if (ad.startsWith(q)) puan = 0; // En yakın: ad baştan eşleşiyor
+          else if (kelimeler.some((kelime) => kelime.startsWith(q))) puan = 1; // Soyad/kelime başı
+          else if (ad.includes(q)) puan = 2; // Ad içinde geçiyor
+        }
+        if (telAramasi && (tel.startsWith(qRakam) || tel.includes(qRakam))) {
+          puan = Math.min(puan, 3);
+        }
+
+        return { musteri: m, puan };
       })
-      .slice(0, 8);
+      .filter((satir) => Number.isFinite(satir.puan))
+      .sort(
+        (a, b) =>
+          a.puan - b.puan || a.musteri.ad.localeCompare(b.musteri.ad, "tr-TR")
+      )
+      .slice(0, ONERI_LIMIT)
+      .map((satir) => satir.musteri);
   }, [musteriAdi, tumOneriler]);
 
   // Tıklama dışı algılama (Açılır listeyi kapatmak için)
@@ -321,7 +347,7 @@ export function YeniHizmetFormu({
                 type="text"
                 required
                 autoComplete="off"
-                placeholder="İsim yazmaya başlayın (örn: Ahmet)..."
+                placeholder="Müşteri adının ilk 4 harfi (örn: Ahme)..."
                 value={musteriAdi}
                 onFocus={() => setAramaOdak(true)}
                 onChange={(e) => {
@@ -336,8 +362,10 @@ export function YeniHizmetFormu({
               {aramaOdak && filtrelenmisOneriler.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-sky-400/30 bg-[#081226]/98 p-1.5 shadow-2xl backdrop-blur-md">
                   <div className="mb-1 flex items-center justify-between border-b border-white/10 px-2 py-1 text-[11px] font-bold text-sky-300">
-                    <span>Kayıtlı Müşteri Önerileri ({filtrelenmisOneriler.length})</span>
-                    <span className="text-[10px] text-sky-400/70">Seçmek için dokunun</span>
+                    <span>En Yakın {filtrelenmisOneriler.length} Müşteri Önerisi</span>
+                    <span className="text-[10px] text-sky-400/70">
+                      Seçince ad ve telefon otomatik dolar
+                    </span>
                   </div>
                   {filtrelenmisOneriler.map((m, idx) => (
                     <button

@@ -49,7 +49,14 @@ export default async function AnaSayfa() {
     izinler.finans ? prisma.finansTaslagi.count({ where: { firmaId: actor.firmaId, durum: { in: ["INCELEME_BEKLIYOR", "EKSIK_BILGI"] }, hatirlatmaAt: { lte: new Date() } } }) : Promise.resolve(0),
     izinler.alim ? getSonGunlerAlim(7) : Promise.resolve(bosTrend),
     izinler.stok ? getStokOzet() : Promise.resolve(bosStok),
-    izinler.hizmet ? prisma.hizmetIslemi.count({ where: { firmaId: actor.firmaId, durum: { in: ["SIRAYA_ALINDI", "HAZIRLANIYOR"] } } }) : Promise.resolve(0),
+    izinler.hizmet
+      ? prisma.hizmetIslemi.count({
+          where: {
+            firmaId: actor.firmaId,
+            durum: { in: ["SIRAYA_ALINDI", "KIRIM", "KAVURMA", "PAKETLEME"] },
+          },
+        })
+      : Promise.resolve(0),
   ]);
   const bekleyenRandiman = ozet.bekleyenRandiman;
   const sonFisler = ozet.sonFisler;
@@ -70,7 +77,7 @@ export default async function AnaSayfa() {
     bekleyenler.push({ href: "/emanet", ikon: PackageOpen, etiket: "Üreticilere emanet borcu", rozet: kg(ozet.emanetKgBorcumuz) });
   }
   if (izinler.hizmet && bekleyenHizmetSayisi > 0) {
-    bekleyenler.push({ href: "/hizmet", ikon: PackageCheck, etiket: "Kırma/paketleme bekleyen", rozet: `${bekleyenHizmetSayisi} sipariş` });
+    bekleyenler.push({ href: "/hizmet", ikon: PackageCheck, etiket: "Fındık işleme bekleyen", rozet: `${bekleyenHizmetSayisi} talep` });
   }
 
   return (
@@ -78,7 +85,8 @@ export default async function AnaSayfa() {
       {/* ═══════════ MOBİL GÖRÜNÜM (md altı) ═══════════ */}
       <div className="space-y-4 pb-2 md:hidden">
         <div className="grid grid-cols-2 gap-3">
-          {izinli("ALIM", "GORUNTULE") && <MobilModul href="/mod/findik" etiket={"Fındık\nİşlemleri"} ikon={ShoppingBasket} badge={bekleyenRandiman} />}
+          {izinli("ALIM", "GORUNTULE") && <MobilModul href="/mod/alim" etiket={"Fındık\nAlım"} ikon={ShoppingBasket} badge={bekleyenRandiman} />}
+          {izinli("HIZMET", "GORUNTULE") && <MobilModul href="/mod/islem" etiket={"Fındık\nİşleme"} ikon={PackageCheck} badge={bekleyenHizmetSayisi} />}
           {izinli("FINANS", "GORUNTULE") && <MobilModul href="/mod/finans" etiket={"Finans\nİşlemleri"} ikon={Wallet} />}
           {izinli("CARI", "GORUNTULE") && <MobilModul href="/mod/musteri" etiket={"Müşteri\nİşlemleri"} ikon={Users} />}
           {izinli("RAPORLAR", "GORUNTULE") && <MobilModul href="/mod/rapor" etiket="Raporlar" ikon={FileBarChart} />}
@@ -104,7 +112,7 @@ export default async function AnaSayfa() {
           </div>
           <div className="flex flex-wrap gap-2">
             {izinli("ALIM", "OLUSTUR") && <HizliButon href="/alim/yeni" ikon={Plus} etiket="Yeni Alım Fişi" birincil />}
-            {izinli("HIZMET", "OLUSTUR") && <HizliButon href="/hizmet/yeni" ikon={PackageCheck} etiket="Kırma & Paketleme" />}
+            {izinli("HIZMET", "OLUSTUR") && <HizliButon href="/hizmet/yeni" ikon={PackageCheck} etiket="Fındık İşleme Talebi" />}
             {izinli("EMANET", "OLUSTUR") && <HizliButon href="/emanet" ikon={PackageOpen} etiket="Emanet Boz" />}
             {izinli("FINANS", "OLUSTUR") && <HizliButon href="/finans/odeme" ikon={HandCoins} etiket="Ödeme" />}
             {izinli("AVANS", "OLUSTUR") && <HizliButon href="/avans" ikon={PiggyBank} etiket="Avans Ver" />}
@@ -118,6 +126,7 @@ export default async function AnaSayfa() {
           {izinler.randiman && <Metrik baslik="RANDIMAN BEKLEYEN" deger={String(bekleyenRandiman)} alt={bekleyenRandiman > 0 ? "giriş bekliyor" : "bekleyen yok"} vurgu={bekleyenRandiman > 0} href="/randiman" />}
           {izinler.stok && <Metrik baslik="STOK (KENDİ)" deger={kg(ozet.stokKendi)} alt={izinler.emanet ? `Emanette ${kg(ozet.stokEmanet)}` : undefined} href="/stok" />}
           {izinler.emanet && <Metrik baslik="EMANET BORCUMUZ" deger={kg(ozet.emanetKgBorcumuz)} alt="üreticilere kg olarak" vurgu={ozet.emanetKgBorcumuz > 0} href="/emanet" />}
+          {izinler.hizmet && <Metrik baslik="İŞLEME BEKLEYEN" deger={String(bekleyenHizmetSayisi)} alt="kırım · kavurma · paketleme" vurgu={bekleyenHizmetSayisi > 0} href="/hizmet" />}
         </section>
 
         {/* ── Alım trendi + bekleyen işler ── */}

@@ -25,6 +25,12 @@ const ROTA_IZINLERI: Readonly<Record<string, Izin>> = {
   "/stok": ["STOK", "GORUNTULE"],
   "/hizmet": ["HIZMET", "GORUNTULE"],
   "/hizmet/yeni": ["HIZMET", "OLUSTUR"],
+  "/hizmet/raporlar": ["HIZMET", "GORUNTULE"],
+  "/hizmet/ayarlar": ["HIZMET", "GORUNTULE"],
+  "/hizmet/kasa": ["HIZMET", "GORUNTULE"],
+  "/mod/alim": ["ALIM", "GORUNTULE"],
+  "/mod/findik": ["ALIM", "GORUNTULE"],
+  "/mod/islem": ["HIZMET", "GORUNTULE"],
 };
 
 type ModulGrubu<Tile extends { href: string }> = { altModuller: Tile[] };
@@ -36,7 +42,9 @@ export function modulleriIzinlereGoreFiltrele<Tile extends { href: string }, Gru
 ): Grup[] {
   return moduller
     .map((modul) => ({ ...modul, altModuller: modul.altModuller.filter((tile) => {
-      const izin = ROTA_IZINLERI[tile.href];
+      // Sorgu parametreli kısayollar (örn. /hizmet?liste=hazir) yol üzerinden
+      // yetkilendirilir.
+      const izin = ROTA_IZINLERI[tile.href.split("?")[0]];
       return !izin || izinVar(actor, izin[0], izin[1]);
     }) }))
     .filter((modul) => modul.altModuller.length > 0) as Grup[];

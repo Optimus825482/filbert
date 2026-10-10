@@ -1,3 +1,4 @@
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import {
   getAraclar,
@@ -13,6 +14,15 @@ import { PageBaslik } from "@/components/page-baslik";
 import { AyarIcerik } from "./ayar-icerik";
 import { izinVar, requireAnyPagePermission } from "@/lib/rbac/guard";
 import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
+import {
+  MODULLER,
+  MODUL_BASLIGI,
+  MODUL_CEREZI,
+  MODUL_IDLERI,
+  aktifModulBelirle,
+  dbModuluCoz,
+  type ModulId,
+} from "@/lib/modul";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +31,24 @@ export default async function AyarlarPage() {
     ["AYARLAR", "GORUNTULE"],
     ["TANIMLAR", "GORUNTULE"],
     ["KULLANICI_YONETIMI", "YONET"],
+    // Modül değiştirme ekranı her modül kullanıcısına açıktır; diğer sekmeler
+    // kendi izinlerine göre gizlenir.
+    ["ALIM", "GORUNTULE"],
+    ["HIZMET", "GORUNTULE"],
   );
   const firmaId = actor.firmaId;
+  // Modül sekmesi: aktif modül istek yolu → çerez → kullanıcı varsayılanı
+  // sırasıyla belirlenir (Ayarlar modüle özel bir ekran olmadığı için yol
+  // genellikle boştur).
+  const hdrs = await headers();
+  const aktifModul = aktifModulBelirle({
+    yol: hdrs.get(MODUL_BASLIGI),
+    cerez: (await cookies()).get(MODUL_CEREZI)?.value,
+    varsayilan: actor.varsayilanModul,
+  });
+  const yetkiliModuller: ModulId[] = MODUL_IDLERI.filter((modul) =>
+    izinVar(actor, MODULLER[modul].izinModulu, "GORUNTULE"),
+  );
   const ayarGoruntuleYetkisi = izinVar(actor, "AYARLAR", "GORUNTULE");
   const tanimGoruntuleYetkisi = izinVar(actor, "TANIMLAR", "GORUNTULE");
   const kullaniciYonetYetkisi = izinVar(actor, "KULLANICI_YONETIMI", "YONET");
@@ -89,6 +115,7 @@ export default async function AyarlarPage() {
           rol: k.rol ?? "ROL_ATANMAMIS",
           rolIds: k.roller.map((rol) => rol.rolId),
           aktif: k.aktif,
+          varsayilanModul: dbModuluCoz(k.varsayilanModul),
         }))}
         kullaniciSayisi={kullaniciSayisi}
         cariSayisi={cariSayisi}
@@ -103,6 +130,7 @@ export default async function AyarlarPage() {
           bankaAdi: h.bankaAdi,
           iban: h.iban,
           aktif: h.aktif,
+          modul: h.modul,
         }))}
         araclar={araclar.map((a) => ({
           id: a.id,
@@ -130,6 +158,9 @@ export default async function AyarlarPage() {
         subeler={subeler.map((s) => ({ id: s.id, ad: s.ad }))}
         masrafTurleri={masrafTurleri.map((t) => ({ id: t.id, ad: t.ad, aktif: t.aktif }))}
         roller={roller}
+        aktifModul={aktifModul}
+        varsayilanModul={dbModuluCoz(actor.varsayilanModul)}
+        yetkiliModuller={yetkiliModuller}
         hizmetTipleri={hizmetTipleri.map((h) => ({
           id: h.id,
           ad: h.ad,
@@ -150,6 +181,7 @@ export default async function AyarlarPage() {
             baslik: "",
             kayitSablonu: "",
             tamamlandiSablonu: "",
+            teslimHatirlatmaSablonu: "",
             otomatikGirisSms: true,
           }
         }

@@ -7,6 +7,7 @@ import {
   ShoppingBasket, ClipboardList, Calculator, ArrowLeftRight, Truck, PackageOpen,
   Wallet, Banknote, CreditCard, HandCoins, ArrowDownUp, Receipt, PiggyBank,
   Users, FileText, LineChart, Warehouse, FileBarChart, TrendingUp,
+  Flame, Package, Printer, Settings, PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -31,6 +32,16 @@ export const IKONLAR: Record<string, LucideIcon> = {
   "stok": Warehouse,
   "rapor": FileBarChart,
   "kar-zarar": TrendingUp,
+  // Fındık İşleme Modülü
+  "isleme-talep": ClipboardList,
+  "isleme-kir": Flame,
+  "isleme-kavur": Flame,
+  "isleme-paket": Package,
+  "isleme-etiket": Printer,
+  "isleme-rapor": FileBarChart,
+  "isleme-ayar": Settings,
+  "isleme-kasa": Wallet,
+  "isleme-hazir": PackageCheck,
 };
 
 export type ModulTile = {
@@ -44,7 +55,7 @@ export type ModulTile = {
 };
 
 export type Modul = {
-  id: "findik" | "finans" | "musteri" | "rapor";
+  id: "alim" | "islem" | "findik" | "finans" | "musteri" | "rapor";
   etiket: string;
   altModuller: ModulTile[];
 };

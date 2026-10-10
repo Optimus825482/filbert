@@ -144,6 +144,7 @@ export interface SmsAyariGirdi {
   baslik?: string;
   kayitSablonu: string;
   tamamlandiSablonu: string;
+  teslimHatirlatmaSablonu: string;
   otomatikGirisSms: boolean;
 }
 
@@ -164,6 +165,7 @@ export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
         baslik: g.baslik?.trim() || null,
         kayitSablonu: g.kayitSablonu.trim(),
         tamamlandiSablonu: g.tamamlandiSablonu.trim(),
+        teslimHatirlatmaSablonu: g.teslimHatirlatmaSablonu.trim(),
         otomatikGirisSms: g.otomatikGirisSms,
       },
       update: {
@@ -175,6 +177,7 @@ export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
         baslik: g.baslik?.trim() || null,
         kayitSablonu: g.kayitSablonu.trim(),
         tamamlandiSablonu: g.tamamlandiSablonu.trim(),
+        teslimHatirlatmaSablonu: g.teslimHatirlatmaSablonu.trim(),
         otomatikGirisSms: g.otomatikGirisSms,
       },
     });

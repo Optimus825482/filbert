@@ -5,9 +5,10 @@ import {
   type SmsSaglayici,
   VARSAYILAN_KAYIT_SABLONU,
   VARSAYILAN_TAMAMLANDI_SABLONU,
+  VARSAYILAN_TESLIM_HATIRLATMA_SABLONU,
 } from "./types";
 
-import { telefonTemizle, sablonDoldur } from "./utils";
+import { telefonTemizle } from "./utils";
 export { telefonTemizle, sablonDoldur } from "./utils";
 
 /** Firma SMS ayarlarını veritabanından getirir, yoksa varsayılan ayarları döndürür. */
@@ -26,6 +27,7 @@ export async function getFirmaSmsAyarlari(firmaId: string): Promise<SmsAyarlari>
       baslik: "",
       kayitSablonu: VARSAYILAN_KAYIT_SABLONU,
       tamamlandiSablonu: VARSAYILAN_TAMAMLANDI_SABLONU,
+      teslimHatirlatmaSablonu: VARSAYILAN_TESLIM_HATIRLATMA_SABLONU,
       otomatikGirisSms: true,
     };
   }
@@ -39,6 +41,8 @@ export async function getFirmaSmsAyarlari(firmaId: string): Promise<SmsAyarlari>
     baslik: kayit.baslik ?? "",
     kayitSablonu: kayit.kayitSablonu || VARSAYILAN_KAYIT_SABLONU,
     tamamlandiSablonu: kayit.tamamlandiSablonu || VARSAYILAN_TAMAMLANDI_SABLONU,
+    teslimHatirlatmaSablonu:
+      kayit.teslimHatirlatmaSablonu || VARSAYILAN_TESLIM_HATIRLATMA_SABLONU,
     otomatikGirisSms: kayit.otomatikGirisSms,
   };
 }

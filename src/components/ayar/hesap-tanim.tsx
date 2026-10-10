@@ -25,6 +25,8 @@ export interface HesapSatir {
   bankaAdi: string | null;
   iban: string | null;
   aktif: boolean;
+  /** ALIM | ISLEME — işleme kasası işleme modülünde yönetilir. */
+  modul?: string;
 }
 
 const TIPLER = [
@@ -41,6 +43,11 @@ const BAKIYELER = [
 
 const BAKIYE_ETIKET: Record<string, string> = { TL: "TL", USD: "USD", EUR: "EUR", XAU: "Altın" };
 
+const MODULLER = [
+  { v: "ALIM", e: "Fındık Alım Modülü" },
+  { v: "ISLEME", e: "Fındık İşleme Modülü" },
+];
+
 export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesaplar: HesapSatir[]; olusturYetkisi: boolean; guncelleYetkisi: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -51,6 +58,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
   const [bakiyeTuru, setBakiyeTuru] = useState("TL");
   const [bankaAdi, setBankaAdi] = useState("");
   const [iban, setIban] = useState("");
+  const [modul, setModul] = useState("ALIM");
 
   function yeniAc() {
     setDuzenlenen(null);
@@ -59,6 +67,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
     setBakiyeTuru("TL");
     setBankaAdi("");
     setIban("");
+    setModul("ALIM");
     setAcik(true);
   }
 
@@ -69,6 +78,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
     setBakiyeTuru(h.bakiyeTuru);
     setBankaAdi(h.bankaAdi ?? "");
     setIban(h.iban ?? "");
+    setModul(h.modul === "ISLEME" ? "ISLEME" : "ALIM");
     setAcik(true);
   }
 
@@ -80,6 +90,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
         bakiyeTuru,
         bankaAdi: tip === "BANKA" ? bankaAdi.trim() || undefined : undefined,
         iban: tip === "BANKA" ? iban.trim() || undefined : undefined,
+        modul: modul === "ISLEME" ? ("ISLEME" as const) : ("ALIM" as const),
       };
       const sonuc = duzenlenen ? await updateKasaHesap(duzenlenen.id, girdi) : await createKasaHesap(girdi);
       if (sonuc.ok) {
@@ -119,6 +130,7 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
                 <div className="truncate text-xs text-sky-100">
                   {h.tip === "BANKA" ? h.bankaAdi ?? "Banka" : "Kasa"} · {BAKIYE_ETIKET[h.bakiyeTuru] ?? h.bakiyeTuru}
                   {h.tip === "BANKA" && h.iban ? ` · ${h.iban}` : ""}
+                  {h.modul === "ISLEME" ? " · İşleme kasası" : ""}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
@@ -179,6 +191,23 @@ export function HesapTanim({ hesaplar, olusturYetkisi, guncelleYetkisi }: { hesa
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Modül</Label>
+              <Select value={modul} onValueChange={setModul}>
+                <SelectTrigger className="saha-input w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODULLER.map((m) => (
+                    <SelectItem key={m.v} value={m.v}>{m.e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-sky-100">
+                İşleme kasası yalnızca Fındık İşleme Modülü&apos;nün kasa ekranında yönetilir; alım modülünde görüntülenir.
+              </p>
             </div>
 
             {tip === "BANKA" && (

@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Banknote,
   Check,
+  Download,
 } from "lucide-react";
 import {
   updateHizmetDurumu,
@@ -57,10 +58,26 @@ export interface HizmetSatir {
   birimFiyat: number;
   toplamTutar: number;
   notlar?: string | null;
-  durum: "SIRAYA_ALINDI" | "HAZIRLANIYOR" | "TAMAMLANDI" | "TESLIM_EDILDI" | "IPTAL";
+  durum:
+    | "SIRAYA_ALINDI"
+    | "KIRIM"
+    | "KAVURMA"
+    | "PAKETLEME"
+    | "TAMAMLANDI"
+    | "TESLIM_EDILDI"
+    | "IPTAL";
   girisSmsGonderildi: boolean;
   tamamlandiSmsGonderildi: boolean;
   etiketBasildiSayisi: number;
+  etiketProfili?: string;
+  hazirlaniyorAt?: string | null;
+  kirimAt?: string | null;
+  kavurmaAt?: string | null;
+  paketlemeAt?: string | null;
+  tamamlandiAt?: string | null;
+  teslimAt?: string | null;
+  teslimSmsSayisi?: number;
+  teslimSmsAt?: string | null;
   createdAt: string;
   tarihSaatStr: string;
 }
@@ -70,15 +87,31 @@ interface Props {
   smsAktif: boolean;
   kasalar?: Array<{ id: string; ad: string; tip: string }>;
   firmaAdi?: string;
+  /** Fındık işleme modülü varsayılan kasası (Ayarlar → Fındık İşleme). */
+  varsayilanKasaId?: string | null;
+  /** Modül menüsünden gelen hızlı liste başlangıcı. */
+  baslangicHizliFiltre?: "HEPSI" | "TESLIM_ALINMADI" | "SMS_BEKLEYEN";
 }
 
-export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" }: Props) {
+export function HizmetTablosu({
+  kayitlar,
+  smsAktif,
+  kasalar = [],
+  firmaAdi = "",
+  varsayilanKasaId = null,
+  baslangicHizliFiltre = "HEPSI",
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   // Arama & Filtre State
   const [arama, setArama] = useState("");
   const [durumFiltresi, setDurumFiltresi] = useState<string>("HEPSI");
+  // Hazır ama teslim alınmayanlar ve bildirimi gönderilmemiş tamamlananlar
+  // için tek dokunuşla açılan hızlı listeler.
+  const [hizliFiltre, setHizliFiltre] = useState<"HEPSI" | "TESLIM_ALINMADI" | "SMS_BEKLEYEN">(
+    baslangicHizliFiltre
+  );
 
   // Toplu Seçim State
   const [seciliIds, setSeciliIds] = useState<string[]>([]);
@@ -94,7 +127,9 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
   const [tahsilatModalAcik, setTahsilatModalAcik] = useState(false);
   const [tahsilatKayit, setTahsilatKayit] = useState<HizmetSatir | null>(null);
   const [tahsilatYontem, setTahsilatYontem] = useState<"NAKIT" | "POS" | "HAVALE" | "VERESIYE">("NAKIT");
-  const [tahsilatKasaId, setTahsilatKasaId] = useState<string>(kasalar[0]?.id || "");
+  const [tahsilatKasaId, setTahsilatKasaId] = useState<string>(
+    varsayilanKasaId || kasalar[0]?.id || ""
+  );
   const [tahsilatTutarStr, setTahsilatTutarStr] = useState<string>("");
   const [tahsilatTeslimEt, setTahsilatTeslimEt] = useState<boolean>(true);
 
@@ -102,7 +137,7 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
     setTahsilatKayit(kayit);
     setTahsilatTutarStr(String(kayit.toplamTutar));
     setTahsilatYontem((kayit.odemeYontemi as "NAKIT" | "POS" | "HAVALE" | "VERESIYE") || "NAKIT");
-    setTahsilatKasaId(kayit.kasaHesapId || kasalar[0]?.id || "");
+    setTahsilatKasaId(kayit.kasaHesapId || varsayilanKasaId || kasalar[0]?.id || "");
     setTahsilatTeslimEt(kayit.durum !== "TESLIM_EDILDI");
     setTahsilatModalAcik(true);
   }
@@ -150,8 +185,13 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
 
   // Filtrelenmiş Liste
   const filtrelenmis = kayitlar.filter((k) => {
-    // Durum filtresi
-    if (durumFiltresi !== "HEPSI" && k.durum !== durumFiltresi) {
+    if (hizliFiltre === "TESLIM_ALINMADI") {
+      // İşi bitmiş (TAMAMLANDI) ama müşteri henüz teslim almamış talepler.
+      if (k.durum !== "TAMAMLANDI") return false;
+    } else if (hizliFiltre === "SMS_BEKLEYEN") {
+      // Tamamlandı fakat tamamlandı bildirimi gönderilmemiş talepler.
+      if (k.durum !== "TAMAMLANDI" || k.tamamlandiSmsGonderildi) return false;
+    } else if (durumFiltresi !== "HEPSI" && k.durum !== durumFiltresi) {
       return false;
     }
     // Arama metni
@@ -260,7 +300,10 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
   }
 
   // Tekil SMS Tekrar Gönder
-  function handleTekrarSms(id: string, tip: "KAYIT" | "TAMAMLANDI") {
+  function handleTekrarSms(
+    id: string,
+    tip: "KAYIT" | "TAMAMLANDI" | "TESLIM_HATIRLATMA"
+  ) {
     startTransition(async () => {
       const res = await hizmetSmsTekrarGonder(id, tip);
       if (res.ok) {
@@ -287,6 +330,12 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
       }
     });
   }
+
+  // Hızlı liste sayaçları — bildirim bekleyen ve teslim alınmayan talepler.
+  const teslimAlinmayanAdet = kayitlar.filter((k) => k.durum === "TAMAMLANDI").length;
+  const smsBekleyenAdet = kayitlar.filter(
+    (k) => k.durum === "TAMAMLANDI" && !k.tamamlandiSmsGonderildi
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -321,17 +370,22 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
         <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
           {[
             { key: "HEPSI", etiket: "Tümü" },
-            { key: "SIRAYA_ALINDI", etiket: "Sırada" },
-            { key: "HAZIRLANIYOR", etiket: "Hazırlanıyor" },
+            { key: "SIRAYA_ALINDI", etiket: "Bekliyor" },
+            { key: "KIRIM", etiket: "Kırım" },
+            { key: "KAVURMA", etiket: "Kavurma" },
+            { key: "PAKETLEME", etiket: "Paketleme" },
             { key: "TAMAMLANDI", etiket: "Tamamlandı" },
-            { key: "TESLIM_EDILDI", etiket: "Teslim Edildi" },
+            { key: "TESLIM_EDILDI", etiket: "Teslim" },
           ].map((sekme) => (
             <button
               key={sekme.key}
               type="button"
-              onClick={() => setDurumFiltresi(sekme.key)}
+              onClick={() => {
+                setDurumFiltresi(sekme.key);
+                setHizliFiltre("HEPSI");
+              }}
               className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                durumFiltresi === sekme.key
+                hizliFiltre === "HEPSI" && durumFiltresi === sekme.key
                   ? "bg-[#f5c518] text-[#081226] shadow-sm"
                   : "text-sky-200 hover:bg-white/5 hover:text-white"
               }`}
@@ -351,6 +405,47 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
         </Link>
       </div>
 
+      {/* ─── Hızlı Listeler: teslim alınmayanlar & bildirimi bekleyenler ─── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            setHizliFiltre((o) => (o === "TESLIM_ALINMADI" ? "HEPSI" : "TESLIM_ALINMADI"))
+          }
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+            hizliFiltre === "TESLIM_ALINMADI"
+              ? "border-purple-400/50 bg-purple-500/25 text-white"
+              : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+          }`}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5 text-purple-300" />
+          Hazır · Teslim Alınmayan
+          <span className="rounded-full bg-black/30 px-1.5 font-mono">{teslimAlinmayanAdet}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setHizliFiltre((o) => (o === "SMS_BEKLEYEN" ? "HEPSI" : "SMS_BEKLEYEN"))
+          }
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+            hizliFiltre === "SMS_BEKLEYEN"
+              ? "border-amber-400/50 bg-amber-500/25 text-white"
+              : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+          }`}
+        >
+          <Send className="h-3.5 w-3.5 text-amber-300" />
+          Tamamlandı · Bildirimi Gönderilmemiş
+          <span className="rounded-full bg-black/30 px-1.5 font-mono">{smsBekleyenAdet}</span>
+        </button>
+
+        {hizliFiltre !== "HEPSI" && (
+          <span className="text-[11px] font-semibold text-sky-300">
+            Hızlı liste açık — &quot;Seçilenlere SMS Gönder&quot; ile toplu bildirim yapabilirsiniz.
+          </span>
+        )}
+      </div>
+
       {/* ─── Toplu İşlem Çubuğu (Seçim Varsa) ─── */}
       {seciliIds.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/30 bg-sky-950/80 p-3 shadow-lg backdrop-blur">
@@ -361,10 +456,26 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => handleTopluDurum("HAZIRLANIYOR")}
+              onClick={() => handleTopluDurum("KIRIM")}
               className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-500/30"
             >
-              <Play className="h-3.5 w-3.5" /> Hazırlanıyor Yap
+              <Play className="h-3.5 w-3.5" /> Kırıma Al
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTopluDurum("KAVURMA")}
+              className="rounded-xl border border-orange-500/40 bg-orange-500/20 px-3 py-1.5 text-xs font-bold text-orange-200 hover:bg-orange-500/30"
+            >
+              Kavurmaya Al
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTopluDurum("PAKETLEME")}
+              className="rounded-xl border border-sky-500/40 bg-sky-500/20 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-sky-500/30"
+            >
+              Paketlemeye Al
             </button>
 
             <button
@@ -377,11 +488,27 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
 
             <button
               type="button"
+              onClick={() => handleTopluDurum("TESLIM_EDILDI")}
+              className="rounded-xl border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs font-bold text-purple-200 hover:bg-purple-500/30"
+            >
+              Teslim Edildi Yap
+            </button>
+
+            <button
+              type="button"
               onClick={() => setTopluSmsModalAcik(true)}
               className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-500"
             >
               <Send className="h-3.5 w-3.5" /> Seçilenlere SMS Gönder
             </button>
+
+            <a
+              href="/api/hizmet/raporlar/csv?durum=HEPSI"
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 hover:text-white"
+              title="Fındık işleme taleplerini durum bilgileriyle CSV olarak indir"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV İndir
+            </a>
 
             <button
               type="button"
@@ -545,6 +672,7 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
                         durum={k.durum}
                         onChange={(yeniDurum) => handleDurumDegistir(k, yeniDurum)}
                       />
+                      <AsamaIlerlemesi kayit={k} />
                     </td>
 
                     {/* SMS Durum Rozetleri */}
@@ -569,7 +697,12 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
                         {/* Tamamlandı SMS */}
                         <button
                           type="button"
-                          onClick={() => handleTekrarSms(k.id, "TAMAMLANDI")}
+                          onClick={() =>
+                            handleTekrarSms(
+                              k.id,
+                              k.tamamlandiSmsGonderildi ? "TESLIM_HATIRLATMA" : "TAMAMLANDI"
+                            )
+                          }
                           title={`Tamamlandı SMS&apos;i: ${
                             k.tamamlandiSmsGonderildi
                               ? "Gönderildi"
@@ -584,6 +717,11 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
                           <Send className="h-4 w-4" />
                         </button>
                       </div>
+                      {(k.teslimSmsSayisi ?? 0) > 0 && (
+                        <div className="mt-0.5 text-[9px] font-bold text-sky-400">
+                          {k.teslimSmsSayisi}× teslim bildirimi
+                        </div>
+                      )}
                     </td>
 
                     {/* Hızlı Aksiyonlar */}
@@ -698,7 +836,8 @@ export function HizmetTablosu({ kayitlar, smsAktif, kasalar = [], firmaAdi = "" 
             </DialogTitle>
             <DialogDescription className="text-sky-200">
               Seçilen <span className="font-bold text-[#f5c518]">{seciliIds.length}</span> müşteriye
-              fındıklarının hazır olduğuna dair hazır SMS bildirimi gönderilecektir.
+              fındıklarının hazır olduğuna dair SMS gönderilecektir. Tamamlandı bildirimi daha önce
+              iletilmiş kayıtlar için teslim hatırlatma şablonu kullanılır.
             </DialogDescription>
           </DialogHeader>
 
@@ -857,7 +996,9 @@ function DurumSecici({
 }) {
   const renkler: Record<HizmetSatir["durum"], string> = {
     SIRAYA_ALINDI: "bg-blue-500/15 text-blue-300 border-blue-500/30",
-    HAZIRLANIYOR: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    KIRIM: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    KAVURMA: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+    PAKETLEME: "bg-sky-500/15 text-sky-300 border-sky-500/30",
     TAMAMLANDI: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
     TESLIM_EDILDI: "bg-purple-500/15 text-purple-300 border-purple-500/30",
     IPTAL: "bg-red-500/15 text-red-400 border-red-500/30 line-through",
@@ -870,10 +1011,16 @@ function DurumSecici({
       className={`rounded-lg border px-2 py-1 text-xs font-black focus:outline-none ${renkler[durum]}`}
     >
       <option value="SIRAYA_ALINDI" className="bg-[#081226] text-blue-300">
-        Sıraya Alındı
+        Bekliyor
       </option>
-      <option value="HAZIRLANIYOR" className="bg-[#081226] text-amber-300">
-        Hazırlanıyor
+      <option value="KIRIM" className="bg-[#081226] text-amber-300">
+        Kırım
+      </option>
+      <option value="KAVURMA" className="bg-[#081226] text-orange-300">
+        Kavurma
+      </option>
+      <option value="PAKETLEME" className="bg-[#081226] text-sky-300">
+        Paketleme
       </option>
       <option value="TAMAMLANDI" className="bg-[#081226] text-emerald-300">
         Tamamlandı
@@ -885,5 +1032,36 @@ function DurumSecici({
         İptal
       </option>
     </select>
+  );
+}
+
+// ─── Aşama İlerlemesi Göstergesi ───────────────────────────────
+// Talepte istenen her işlem için aşama tamamlandı mı sorusunu tek bakışta
+// yanıtlar; zaman damgası yazılmışsa aşama tamamlanmış sayılır.
+function AsamaIlerlemesi({ kayit }: { kayit: HizmetSatir }) {
+  const asamalar = [
+    kayit.kirma ? { ad: "Kırım", tamam: Boolean(kayit.kirimAt) } : null,
+    kayit.kavurma ? { ad: "Kavurma", tamam: Boolean(kayit.kavurmaAt) } : null,
+    kayit.paketleme ? { ad: "Paket", tamam: Boolean(kayit.paketlemeAt) } : null,
+  ].filter((a): a is { ad: string; tamam: boolean } => a !== null);
+
+  if (asamalar.length === 0 || kayit.durum === "IPTAL") return null;
+
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {asamalar.map((asama) => (
+        <span
+          key={asama.ad}
+          title={`${asama.ad} aşaması: ${asama.tamam ? "tamamlandı" : "bekliyor"}`}
+          className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+            asama.tamam
+              ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30"
+              : "bg-white/5 text-sky-400 ring-1 ring-white/10"
+          }`}
+        >
+          {asama.tamam ? "✓" : "○"} {asama.ad}
+        </span>
+      ))}
+    </div>
   );
 }

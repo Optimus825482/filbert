@@ -1,18 +1,27 @@
 import { prisma } from "@/lib/db";
+import Link from "next/link";
 import { getCurrentFirma } from "@/lib/auth";
 import { requirePagePermission } from "@/lib/rbac/guard";
 import { tarihSaat, kg, paraTL } from "@/lib/format";
 import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
+import { getFindikIslemeAyarlari } from "@/lib/actions/hizmet";
 import { HizmetTablosu, type HizmetSatir } from "./hizmet-tablosu";
 import { Clock, Play, CheckCircle2, PackageCheck, Banknote, Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function HizmetPage() {
+export default async function HizmetPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ liste?: string }>;
+}) {
   await requirePagePermission("HIZMET", "GORUNTULE");
   const firma = await getCurrentFirma();
+  const { liste } = await searchParams;
+  const baslangicHizliFiltre =
+    liste === "hazir" ? "TESLIM_ALINMADI" : liste === "sms" ? "SMS_BEKLEYEN" : "HEPSI";
 
-  const [kayitlar, smsAyari, kasalar] = await Promise.all([
+  const [kayitlar, smsAyari, kasalar, islemeAyarlari] = await Promise.all([
     prisma.hizmetIslemi.findMany({
       where: { firmaId: firma.id },
       orderBy: [{ createdAt: "desc" }, { siraSayisi: "desc" }],
@@ -24,6 +33,7 @@ export default async function HizmetPage() {
       select: { id: true, ad: true, tip: true },
       orderBy: { ad: "asc" },
     }),
+    getFindikIslemeAyarlari(),
   ]);
 
   // Rapor / Metrik Hesaplamaları
@@ -35,6 +45,7 @@ export default async function HizmetPage() {
   let tamamlandiKg = 0;
   let teslimAdet = 0;
   let teslimKg = 0;
+  let smsBekleyenAdet = 0;
 
   // Hacim & Ciro İstatistikleri
   let toplamKirmaKg = 0;
@@ -64,12 +75,13 @@ export default async function HizmetPage() {
     if (k.durum === "SIRAYA_ALINDI") {
       siradaAdet += 1;
       siradaKg += kilo;
-    } else if (k.durum === "HAZIRLANIYOR") {
+    } else if (k.durum === "KIRIM" || k.durum === "KAVURMA" || k.durum === "PAKETLEME") {
       hazirlaniyorAdet += 1;
       hazirlaniyorKg += kilo;
     } else if (k.durum === "TAMAMLANDI") {
       tamamlandiAdet += 1;
       tamamlandiKg += kilo;
+      if (!k.tamamlandiSmsGonderildi) smsBekleyenAdet += 1;
     } else if (k.durum === "TESLIM_EDILDI") {
       teslimAdet += 1;
       teslimKg += kilo;
@@ -101,6 +113,15 @@ export default async function HizmetPage() {
     girisSmsGonderildi: k.girisSmsGonderildi,
     tamamlandiSmsGonderildi: k.tamamlandiSmsGonderildi,
     etiketBasildiSayisi: k.etiketBasildiSayisi,
+    etiketProfili: k.etiketProfili,
+    hazirlaniyorAt: k.hazirlaniyorAt?.toISOString() ?? null,
+    kirimAt: k.kirimAt?.toISOString() ?? null,
+    kavurmaAt: k.kavurmaAt?.toISOString() ?? null,
+    paketlemeAt: k.paketlemeAt?.toISOString() ?? null,
+    tamamlandiAt: k.tamamlandiAt?.toISOString() ?? null,
+    teslimAt: k.teslimAt?.toISOString() ?? null,
+    teslimSmsSayisi: k.teslimSmsSayisi,
+    teslimSmsAt: k.teslimSmsAt?.toISOString() ?? null,
     createdAt: k.createdAt.toISOString(),
     tarihSaatStr: tarihSaat(k.createdAt),
   }));
@@ -111,11 +132,31 @@ export default async function HizmetPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-white">
-            Fındık Kırma & Paketleme Hizmeti
+            Fındık İşleme Atölyesi — Kırma · Kavurma · Paketleme
           </h1>
           <p className="mt-0.5 text-xs font-semibold text-sky-200">
-            Ev kullanımı / fason müşteriler için kırma, kavurma, vakumlu paketleme ve sıra takibi
+            Talep kaydı, aşama takibi (bekliyor → kırım → kavurma → paketleme → tamamlandı),
+            teslim ve tahsilat akışı
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {smsBekleyenAdet > 0 && (
+            <span className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-300">
+              {smsBekleyenAdet} tamamlandı · bildirimi gönderilmedi
+            </span>
+          )}
+          <Link
+            href="/hizmet/raporlar"
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Durum Raporları
+          </Link>
+          <Link
+            href="/hizmet/ayarlar"
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            İşleme Ayarları
+          </Link>
         </div>
       </div>
 
@@ -141,7 +182,7 @@ export default async function HizmetPage() {
         <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-black uppercase tracking-wider text-amber-300">
-              Hazırlanıyor
+              Üretimde (Kırım/Kavurma/Paket)
             </span>
             <Play className="h-4 w-4 text-amber-400" />
           </div>
@@ -256,6 +297,8 @@ export default async function HizmetPage() {
         smsAktif={smsAyari.aktif || smsAyari.saglayici === "TEST"}
         kasalar={kasalar.map((k) => ({ id: k.id, ad: k.ad, tip: k.tip }))}
         firmaAdi={firma.unvan}
+        varsayilanKasaId={islemeAyarlari.kasaHesapId}
+        baslangicHizliFiltre={baslangicHizliFiltre}
       />
     </div>
   );

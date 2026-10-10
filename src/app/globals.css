@@ -982,3 +982,34 @@ html.light .border-sky-200\/35 {
 html.light .text-cyan-100 { color: #164e63 !important; }
 html.light .bg-emerald-500 { background-color: #059669 !important; }
 html.light .text-\[\#031a13\] { color: #ffffff !important; }
+
+/* ─── FINDIK İŞLEME ETİKETLERİ (YAZICI PROFİLLERİ) ────────────────
+   Nimbot B1 etiketleri 50×50 mm'dir; termal rulo profili 80×70 mm
+   olarak basılır. Yazdırma sırasında tarayıcı kâğıt boyutu bu @page
+   kurallarından gelir; kenar boşlukları "Yok" seçilmelidir. */
+@page etiket50 {
+  size: 50mm 50mm;
+  margin: 1mm;
+}
+
+@page etiket80x70 {
+  size: 80mm 70mm;
+  margin: 2mm;
+}
+
+.etiket-sayfa-50 {
+  page: etiket50;
+}
+
+.etiket-sayfa-80x70 {
+  page: etiket80x70;
+}
+
+@media print {
+  .etiket-sayfa-50,
+  .etiket-sayfa-80x70 {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}

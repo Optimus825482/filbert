@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Mic, User, Home } from "lucide-react";
+import { Search, Mic, Settings, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav({ izinliRotalar }: { izinliRotalar: string[] }) {
@@ -49,17 +49,17 @@ export function BottomNav({ izinliRotalar }: { izinliRotalar: string[] }) {
             </Link>
           </div>}
 
-          {/* 4. Profil — en sağ */}
+          {/* 4. Ayarlar — en sağ. Modül değişimi de bu ekrandan yapılır. */}
           {izinli("/ayarlar") && <Link
             href="/ayarlar"
-            aria-label="Profil"
+            aria-label="Ayarlar"
             className={cn(
               "flex flex-col items-center gap-0.5 rounded-xl py-1.5 transition-colors",
               pathname.startsWith("/ayarlar") ? "text-[#f5c518]" : "text-sky-100 active:bg-white/5"
             )}
           >
-            <User className="h-6 w-6" />
-            <span className="text-[10px] font-bold">Profil</span>
+            <Settings className="h-6 w-6" />
+            <span className="text-[10px] font-bold">Ayarlar</span>
           </Link>}
         </div>
       </nav>

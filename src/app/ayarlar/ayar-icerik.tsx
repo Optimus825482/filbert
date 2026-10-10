@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Users, ShieldAlert, Database, Palette, Sun, Moon, FolderCog, Pencil, MapPin, Phone } from "lucide-react";
+import { Building2, Users, ShieldAlert, Database, Palette, Sun, Moon, FolderCog, LayoutGrid, Pencil, MapPin, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,8 @@ import { FontAyar } from "@/components/ayar/font-ayar";
 import { TanimlarSekme } from "@/components/ayar/tanimlar-sekme";
 import { HizmetTipiTanim, type HizmetTipiSatir } from "@/components/ayar/hizmet-tipi-tanim";
 import { SmsAyarTanim } from "@/components/ayar/sms-ayar-tanim";
+import { ModulSecim } from "@/components/ayar/modul-secim";
+import type { ModulId } from "@/lib/modul";
 import { PackageCheck, MessageSquare } from "lucide-react";
 import type { DepoSatir, SubeSecenek } from "@/components/ayar/depo-tanim";
 import type { HesapSatir } from "@/components/ayar/hesap-tanim";
@@ -35,7 +37,7 @@ import { Label } from "@/components/ui/label";
 
 interface FirmaBilgi { unvan: string; vergiNo: string; vergiDairesi: string; adres: string; telefon: string }
 interface SezonBilgi { ad: string; baslangic: string; bitis: string }
-interface KullaniciOzet { id: string; ad: string; telefon: string; rol: string; aktif: boolean }
+interface KullaniciOzet { id: string; ad: string; telefon: string; rol: string; aktif: boolean; varsayilanModul?: string }
 
 interface Props {
   ayarGoruntuleYetkisi: boolean;
@@ -60,6 +62,10 @@ interface Props {
   subeler: SubeSecenek[];
   masrafTurleri: MasrafTuruSatir[];
   roller: { id: string; ad: string }[];
+  /** Modül sekmesi: şu an açık modül ve kullanıcının giriş varsayılanı. */
+  aktifModul: ModulId;
+  varsayilanModul: ModulId;
+  yetkiliModuller: ModulId[];
   hizmetTipleri: HizmetTipiSatir[];
   smsAyarlari: {
     aktif: boolean;
@@ -70,13 +76,17 @@ interface Props {
     baslik?: string;
     kayitSablonu: string;
     tamamlandiSablonu: string;
+    teslimHatirlatmaSablonu: string;
     otomatikGirisSms: boolean;
   };
 }
 
-type Sekme = "gorunum" | "firma" | "tanimlar" | "hizmetler" | "sms" | "kullanicilar" | "sistem";
+type Sekme = "modul" | "gorunum" | "firma" | "tanimlar" | "hizmetler" | "sms" | "kullanicilar" | "sistem";
 
 const SEKME_BILGI: { key: Sekme; etiket: string; ikon: LucideIcon }[] = [
+  // Modül seçimi ilk sekmedir: modül değiştirmek isteyen kullanıcı (özellikle
+  // mobilde alt menüdeki Ayarlar butonundan gelen) doğrudan buraya düşer.
+  { key: "modul", etiket: "Modül", ikon: LayoutGrid },
   { key: "gorunum", etiket: "Görünüm", ikon: Palette },
   { key: "firma", etiket: "Firma", ikon: Building2 },
   { key: "tanimlar", etiket: "Tanımlar", ikon: FolderCog },
@@ -125,6 +135,13 @@ export function AyarIcerik(props: Props) {
 
       {/* İçerik alanı */}
       <div className="min-w-0 flex-1 space-y-6">
+        {secilen === "modul" && (
+          <ModulSecim
+            aktifModul={props.aktifModul}
+            varsayilanModul={props.varsayilanModul}
+            yetkiliModuller={props.yetkiliModuller}
+          />
+        )}
         {secilen === "gorunum" && props.ayarGoruntuleYetkisi && <GorunumSekme />}
         {secilen === "firma" && props.ayarGoruntuleYetkisi && <FirmaSekme firma={props.firma} sezon={props.sezon} guncelleYetkisi={props.firmaGuncelleYetkisi} />}
         {secilen === "tanimlar" && props.tanimGoruntuleYetkisi && (
