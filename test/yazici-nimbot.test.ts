@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ImageEncoder, PageColorType } from "@mmote/niimbluelib";
+import {
+  ImageEncoder,
+  NiimbotPacket,
+  PageColorType,
+  RequestCommandId,
+  ResponseCommandId,
+} from "@mmote/niimbluelib";
 
 import {
   NIMBOT_BASLIK_NOKTASI,
@@ -26,6 +32,11 @@ import {
   yaziciYapilandirildiMi,
   type FindikIslemeAyarlari,
 } from "../src/lib/findik-isleme";
+import {
+  NIMBOT_SERI_BAGLANTI_DENEMESI,
+  NIMBOT_SERI_PAKET_ZAMAN_ASIMI,
+  NimbotUsbIstemcisi,
+} from "../src/lib/yazici/nimbot";
 import type { EtiketVerisi } from "../src/lib/yazici/escpos";
 
 const ORNEK: EtiketVerisi = {
@@ -286,4 +297,33 @@ test("USB seri hedefi ayarlara yazılıp geri okunur ve sunucu ayarı gerektirme
   // Bilinmeyen hedef sessizce kapalıya düşer.
   const bozuk = findikIslemeAyarlariniCoz({ findikIsleme: { yazici: { hedef: "USB_SERI" } } });
   assert.equal(bozuk.yazici.hedef, "YOK");
+});
+
+test("USB seri istemcisi yanıt dinleyicisini paketi yazmadan önce bağlar", async () => {
+  // Kütüphane yanıt dinleyicisini yazdıktan sonra bağlıyor; USB seri çok hızlı
+  // yanıt verdiği için yanıt kaybolabiliyordu. Bu istemci sırayı çevirir.
+  const istemci = new NimbotUsbIstemcisi();
+  const sira: string[] = [];
+  const yanit = new NiimbotPacket(ResponseCommandId.In_Connect, [1]);
+
+  (istemci as unknown as { waitForPacket: () => Promise<NiimbotPacket> }).waitForPacket = () => {
+    sira.push("dinle");
+    return Promise.resolve(yanit);
+  };
+  (istemci as unknown as { sendPacket: () => Promise<void> }).sendPacket = async () => {
+    sira.push("yaz");
+  };
+
+  const paket = new NiimbotPacket(RequestCommandId.Connect, [1], [ResponseCommandId.In_Connect]);
+  const sonuc = await istemci.sendPacketWaitResponse(paket);
+
+  assert.deepEqual(sira, ["dinle", "yaz"]);
+  assert.equal(sonuc, yanit);
+});
+
+test("USB seri istemcisi kütüphanenin 1 sn varsayılanı yerine geniş zaman aşımı kullanır", () => {
+  const istemci = new NimbotUsbIstemcisi();
+  assert.equal(istemci.protocol.getPacketTimeout(), NIMBOT_SERI_PAKET_ZAMAN_ASIMI);
+  assert.ok(NIMBOT_SERI_PAKET_ZAMAN_ASIMI >= 5000);
+  assert.ok(NIMBOT_SERI_BAGLANTI_DENEMESI >= 2);
 });

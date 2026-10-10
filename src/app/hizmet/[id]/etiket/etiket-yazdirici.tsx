@@ -418,10 +418,15 @@ export function HizmetEtiketYazdirici({
           {!nimbotDestekli ? (
             <span className="text-amber-300">{nimbotDestekHatasi}</span>
           ) : nimbotSeriMi ? (
-            <span className="text-emerald-300">
-              USB seri: <b>{seriPort ?? "port seçilmedi"}</b> · yoğunluk {bluetoothYogunluk} · etiket
-              tarayıcıda çizilip kabloyla gönderilir.
-            </span>
+            <>
+              <span className="text-emerald-300">
+                USB seri: <b>{seriPort ?? "port seçilmedi"}</b> · yoğunluk {bluetoothYogunluk} · etiket
+                tarayıcıda çizilip kabloyla gönderilir.
+              </span>
+              <span className="text-sky-300">
+                İlk baskıda yazıcı uyanırken birkaç saniye sürebilir; sonrakiler hızlıdır.
+              </span>
+            </>
           ) : yaziciHedefi === "BLUETOOTH_BLE" ? (
             <span className="text-emerald-300">
               Bluetooth: <b>{btCihaz ?? "yazıcı seçilmedi"}</b> · yoğunluk {bluetoothYogunluk} ·

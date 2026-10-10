@@ -21,8 +21,10 @@ import {
   ImageEncoder,
   LabelType,
   NiimbotBluetoothClient,
+  NiimbotPacket,
   NiimbotSerialClient,
   PageColorType,
+  ResponseCommandId,
   type NiimbotAbstractClient,
 } from "@mmote/niimbluelib";
 import type { EtiketVerisi } from "@/lib/yazici/escpos";
@@ -428,9 +430,57 @@ export const NIMBOT_SERI_DESTEK_HATASI =
   "Bu tarayıcı USB seri (Web Serial) desteklemiyor. Chrome veya Edge kullanın; " +
   "sayfa https veya localhost üzerinden açılmalıdır.";
 
+/**
+ * USB seri taşımasında paket başına yanıt bekleme süresi.
+ *
+ * Nimbot B1 uzun süre boşta kaldığında ilk paketlere geç yanıt verebiliyor
+ * (ölçülen: 1-5 sn). Kütüphanenin varsayılanı 1 sn kaldığı için USB
+ * bağlantısı bu değerle kurulur.
+ */
+export const NIMBOT_SERI_PAKET_ZAMAN_ASIMI = 10_000;
+
+/** Bağlantı kurulurken denenecek en fazla tur (ilk tur uyanma yüzünden düşebilir). */
+export const NIMBOT_SERI_BAGLANTI_DENEMESI = 3;
+
+/**
+ * USB seri için Nimbot istemcisi.
+ *
+ * Kütüphane yanıt dinleyicisini paketi yazdıktan SONRA bağlıyor. USB seri,
+ * Bluetooth'a göre çok daha hızlı yanıt verdiği için yanıt dinleyici
+ * bağlanmadan önce gelip kaybolabiliyor. Bu sınıf dinleyiciyi yazmadan önce
+ * bağlar ve USB için daha geniş paket zaman aşımı kullanır.
+ */
+export class NimbotUsbIstemcisi extends NiimbotSerialClient {
+  constructor() {
+    super();
+    this.protocol.setPacketTimeout(NIMBOT_SERI_PAKET_ZAMAN_ASIMI);
+  }
+
+  override async sendPacketWaitResponse(
+    packet: NiimbotPacket,
+    timeoutMs: number = NIMBOT_SERI_PAKET_ZAMAN_ASIMI
+  ): Promise<NiimbotPacket> {
+    return this.mutex.runExclusive(async () => {
+      if (packet.oneWay) {
+        await this.sendPacket(packet, true);
+        return new NiimbotPacket(ResponseCommandId.In_Invalid, []);
+      }
+      // Dinleyici yazmadan ÖNCE bağlanır; aksi hâlde hızlı yanıt kaybolur.
+      const bekleme = this.waitForPacket(packet.validResponseIds, true, timeoutMs);
+      try {
+        await this.sendPacket(packet, true);
+      } catch (yazmaHatasi) {
+        void bekleme.catch(() => undefined);
+        throw yazmaHatasi;
+      }
+      return bekleme;
+    });
+  }
+}
+
 // Sayfa oturumu boyunca USB portu ve istemcisi hatırlanır; böylece sonraki
 // baskılarda port seçme penceresi yeniden açılmaz.
-let seriIstemci: NiimbotSerialClient | null = null;
+let seriIstemci: NimbotUsbIstemcisi | null = null;
 let seriPort: SerialPort | null = null;
 
 /** Web Serial API bu tarayıcıda kullanılabilir mi? */
@@ -467,6 +517,26 @@ async function seriPortuAl(): Promise<SerialPort> {
 }
 
 /**
+ * USB bağlantısını kurar. Yazıcı uyanmadıysa ilk tur zaman aşımına düşebildiği
+ * için birkaç kez denenir; her tur arasında kısa bir bekleme vardır.
+ */
+async function seriBaglan(istemci: NimbotUsbIstemcisi, port: SerialPort): Promise<void> {
+  let sonHata: unknown = null;
+  for (let deneme = 1; deneme <= NIMBOT_SERI_BAGLANTI_DENEMESI; deneme++) {
+    try {
+      await istemci.connect({ authorizedPort: port });
+      return;
+    } catch (hata) {
+      sonHata = hata;
+      if (deneme < NIMBOT_SERI_BAGLANTI_DENEMESI) {
+        await new Promise((coz) => setTimeout(coz, 400));
+      }
+    }
+  }
+  throw sonHata instanceof Error ? sonHata : new Error("USB yazıcıya bağlanılamadı");
+}
+
+/**
  * Ayarlar ekranından USB portunu seçer ve okunur etiketini döndürür. İlk
  * çağrıda tarayıcının port seçme penceresi açılır.
  */
@@ -494,11 +564,11 @@ export async function nimbotSeriEtiketiYazdir(
 
   const { kopya, yogunluk } = baskiDegerleriniNormalizeEt(secenekler);
   const port = await seriPortuAl();
-  const aktifIstemci = seriIstemci ?? (seriIstemci = new NiimbotSerialClient());
+  const aktifIstemci = seriIstemci ?? (seriIstemci = new NimbotUsbIstemcisi());
 
   try {
     if (!aktifIstemci.isConnected()) {
-      await aktifIstemci.connect({ authorizedPort: port });
+      await seriBaglan(aktifIstemci, port);
     }
     return await nimbotGoreviniYazdir(
       aktifIstemci,

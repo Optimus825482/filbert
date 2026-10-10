@@ -658,6 +658,11 @@ export function IslemeAyarFormu({
               )}
             </div>
 
+            <p className="text-[11px] leading-relaxed text-sky-300">
+              USB kablosuyla ilk baskıda yazıcı uyanana kadar birkaç saniye sürebilir;
+              sonraki baskılar hızlıdır. Yazıcı uyanmazsa bağlantı birkaç kez denenir.
+            </p>
+
             {seriYaziyor && (
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <div

@@ -351,6 +351,26 @@ Kablo takılıyken Bluetooth yerine USB seri kullanılabilir; Nimbot B1 USB'de h
 - Tarayıcı port izni origin bazlıdır; farklı bir adres/port ile açılan sayfa izni
   yeniden ister.
 
+#### USB seri dayanıklılık ayarları (ölçülmüş davranış)
+
+USB kablosu takılı Nimbot B1, Nimbot el sıkışmasına doğru yanıt verir: `Connect`
+(`0xC1`) paketine `0xC2 / ConnectResult=3 (ConnectedV3)` döner. Ölçümler (Windows,
+COM5, 115200 baud):
+
+- Port açıldıktan sonra **ilk** paketin yanıtı 1 ms ile 5 sn arasında değişebiliyor
+  (yazıcı uyanma gecikmesi); sonraki paketler 1-2 ms.
+- Yanıt, Bluetooth'a göre çok hızlı geldiği için `niimbluelib`'in "önce yaz, sonra
+  dinle" sırası yanıtı kaçırabiliyor.
+
+Bu yüzden `src/lib/yazici/nimbot.ts` USB için özel bir istemci kullanır
+(`NimbotUsbIstemcisi`):
+
+- Paket zaman aşımı `NIMBOT_SERI_PAKET_ZAMAN_ASIMI` (10 sn) — kütüphanenin 1 sn
+  varsayılanı USB'de yetersiz.
+- `sendPacketWaitResponse` yanıt dinleyicisini paketi yazmadan **önce** bağlar.
+- Bağlantı `NIMBOT_SERI_BAGLANTI_DENEMESI` (3) kez denenir; turlar arasında 400 ms
+  beklenir (yazıcı uyanmadıysa ilk tur düşebilir).
+
 ### Talep kaydı sonrası etiket baskısı
 
 Yeni talep formundaki **Kaydet ve Etiket Yazdır** düğmesi, kaydı oluşturduktan sonra
