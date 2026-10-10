@@ -144,19 +144,18 @@ test("Fiyat etikete yazılmaz, yalnızca tahsilat durumu özetlenir", () => {
   assert.equal(veresiye?.sagMetin, "VERESİYE");
 });
 
-test("Kopya bilgisi ve not yalnızca gerektiğinde eklenir", () => {
+test("kopya numarası etikete yazılmaz, not yalnızca gerektiğinde eklenir", () => {
   const tek = metinSatirlari(ORNEK).map((s) => s.metin);
   assert.equal(tek.some((m) => m.startsWith("Kopya")), false);
   assert.equal(tek.some((m) => m.startsWith("NOT:")), false);
 
-  const coklu = metinSatirlari({
+  // Kopya sayısı etiket içeriğini değiştirmez: aynı etiket N kez basılır.
+  const notlu = metinSatirlari({
     ...ORNEK,
-    kopyaNo: 2,
-    kopyaSayisi: 3,
     notlar: "  Çuvallar ayrı teslim edilecek  ",
   }).map((s) => s.metin);
-  assert.ok(coklu.includes("Kopya 2/3"));
-  assert.ok(coklu.includes("NOT: Çuvallar ayrı teslim edilecek"));
+  assert.equal(notlu.some((m) => m.includes("Kopya")), false);
+  assert.ok(notlu.includes("NOT: Çuvallar ayrı teslim edilecek"));
 });
 
 test("Rulo şablonları ayrı punto tablosu ve yayma davranışı taşır", () => {

@@ -141,11 +141,9 @@ test("hizmet etiketi; müşteri, miktar, işlem kutuları, tarih ve QR verisini 
   assert.ok(bayt.includes(0x8d));
 });
 
-test("kopya sayısı birden fazla olduğunda etikette kopya numarası yazılır", () => {
-  const bayt = baytlar(
-    hizmetEtiketiOlustur({ ...ORNEK, kopyaNo: 2, kopyaSayisi: 3 }, "TERMAL_80x70", "CP857")
-  );
-  assert.ok(metinVar(bayt, "Kopya 2/3"));
+test("etiket içeriği kopya sayısından bağımsızdır, kopya numarası basılmaz", () => {
+  const bayt = baytlar(hizmetEtiketiOlustur(ORNEK, "TERMAL_80x70", "CP857"));
+  assert.equal(metinVar(bayt, "Kopya"), false);
 });
 
 test("tahsil edilmiş talep etiketinde TAHSİL EDİLDİ şerhi basılır", () => {

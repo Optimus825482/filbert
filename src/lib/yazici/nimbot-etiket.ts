@@ -198,15 +198,6 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     sagRol: "kucuk",
   });
 
-  if (veri.kopyaSayisi && veri.kopyaSayisi > 1) {
-    satirlar.push({
-      tip: "metin",
-      metin: `Kopya ${veri.kopyaNo ?? 1}/${veri.kopyaSayisi}`,
-      rol: "kucuk",
-      hizala: "orta",
-    });
-  }
-
   // NOT, etiket kimliği ve firma adı akışa katılmaz: etiketin en altına
   // yaslanır. NOT alanı her zaman iki satırdır; not yazılmayan satırlar
   // teslim sırasında elle not alınmak üzere boş bırakılır.

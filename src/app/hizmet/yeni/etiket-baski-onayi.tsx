@@ -98,12 +98,12 @@ export function EtiketBaskiOnayi({
   const onizleme = useMemo(() => {
     if (!acik || !tarayicida) return null;
     try {
-      return nimbotEtiketOnizleme({ ...etiket, kopyaNo: 1, kopyaSayisi }, profil.kod);
+      return nimbotEtiketOnizleme(etiket, profil.kod);
     } catch (e) {
       console.error("Etiket önizlemesi oluşturulamadı", e);
       return null;
     }
-  }, [acik, tarayicida, etiket, kopyaSayisi, profil.kod]);
+  }, [acik, tarayicida, etiket, profil.kod]);
 
   // Otomatik baskı denemesi başarısız olduysa nedeni pencere içinde gösterilir.
   const gosterilenHata = hata ?? otomatikHata ?? null;
@@ -142,7 +142,7 @@ export function EtiketBaskiOnayi({
         ilerleme: setIlerleme,
       };
       const gonder = nimbotSeriMi ? nimbotSeriEtiketiYazdir : nimbotEtiketiYazdir;
-      const sonuc = await gonder({ ...etiket, kopyaNo: 1, kopyaSayisi }, secenekler);
+      const sonuc = await gonder(etiket, secenekler);
       setCihaz(sonuc.cihazAdi);
       // Baskı istemcide yapıldı; etiket sayacı sunucuda güncellenir.
       const kayit = await etiketBaskisiKaydet(hizmetId, sonuc.kopya);

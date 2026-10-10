@@ -113,11 +113,7 @@ export async function hizmetEtiketiYazdir(
     const veri = kayittanEtiketVerisi(kayit, firma.unvan);
 
     for (let kopya = 1; kopya <= adet; kopya++) {
-      const bayt = hizmetEtiketiOlustur(
-        { ...veri, kopyaNo: kopya, kopyaSayisi: adet },
-        profil,
-        ayarlar.yazici.kodSayfasi
-      );
+      const bayt = hizmetEtiketiOlustur(veri, profil, ayarlar.yazici.kodSayfasi);
       const sonuc = await escposGonder(ayarlar.yazici, bayt);
       if (!sonuc.ok) {
         return {

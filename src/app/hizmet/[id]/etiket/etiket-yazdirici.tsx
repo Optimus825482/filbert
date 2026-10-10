@@ -175,7 +175,7 @@ export function HizmetEtiketYazdirici({
       // Önizleme, yazıcıya gidecek ilk kopyayı birebir gösterir.
       setBtOnizleme(
         nimbotEtiketOnizleme(
-          etiketVerisiniOlustur({ kopyaNo: 1, kopyaSayisi: kopyaSayisi }),
+          etiketVerisiniOlustur(),
           profil
         )
       );
@@ -531,11 +531,6 @@ export function HizmetEtiketYazdirici({
                   >
                     #{siraNo}
                   </div>
-                  {kopyaSayisi > 1 && (
-                    <div className={`font-bold text-neutral-600 ${kucuk ? "text-[6px]" : "mt-1 text-[9px]"}`}>
-                      Kopya {index + 1}/{kopyaSayisi}
-                    </div>
-                  )}
                   {odemeDurumu === "ODENDI" ? (
                     <span
                       className={`mt-0.5 inline-block rounded border border-black bg-black font-black text-white ${

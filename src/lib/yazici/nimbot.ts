@@ -557,9 +557,9 @@ async function nimbotGoreviniYazdir(
   aktifIstemci.on("printpacketprogress", ilerleme);
   try {
     await gorev.printInit();
-    // Her kopya ayrı sayfa olarak gönderilir; böylece "Kopya n/N" doğru basılır.
-    for (let sira = 1; sira <= kopya; sira++) {
-      await gorev.printPage(sayfaKodla({ ...veri, kopyaNo: sira, kopyaSayisi: kopya }), 1);
+    // Aynı etiket `kopya` kez basılır; sayfa içeriği kopyadan kopyaya değişmez.
+    for (let sira = 0; sira < kopya; sira++) {
+      await gorev.printPage(sayfaKodla(veri), 1);
     }
     await gorev.waitForFinished();
   } finally {

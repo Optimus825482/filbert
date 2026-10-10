@@ -304,8 +304,6 @@ export interface EtiketVerisi {
   toplamTutar?: string | null;
   tarihSaatStr: string;
   notlar?: string | null;
-  kopyaNo?: number;
-  kopyaSayisi?: number;
 }
 
 function ayrac(genislik: number): string {
@@ -351,9 +349,6 @@ export function hizmetEtiketiOlustur(
   escpos.baslat();
   baslikYaz(escpos, veri.firmaAdi, olcu);
   escpos.hizala("orta").kalin(true).satir(`TALEP #${veri.siraNo}`).kalin(false);
-  if (veri.kopyaSayisi && veri.kopyaSayisi > 1) {
-    escpos.satir(`Kopya ${veri.kopyaNo ?? 1}/${veri.kopyaSayisi}`);
-  }
   escpos.hizala("sol").satir(ayrac(genislik));
 
   for (const satir of etiketSatirlaraSar(`MÜŞTERİ: ${veri.musteriAdi}`, genislik)) {
