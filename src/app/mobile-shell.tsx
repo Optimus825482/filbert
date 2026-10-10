@@ -17,13 +17,11 @@ export function MobileShell({
   izinliRotalar,
   bekleyenRandiman = 0,
   aktifModul = null,
-  digerModul = null,
 }: {
   children: React.ReactNode;
   izinliRotalar: string[];
   bekleyenRandiman?: number;
   aktifModul?: ModulId | null;
-  digerModul?: { id: ModulId; ad: string; izinli: boolean } | null;
 }) {
   return (
     <>
@@ -33,7 +31,6 @@ export function MobileShell({
           izinliRotalar={izinliRotalar}
           bekleyenRandiman={bekleyenRandiman}
           aktifModul={aktifModul}
-          digerModul={digerModul}
         />
         <main className="min-w-0 flex-1 px-4 pb-24 pt-4 md:px-6 md:pb-10">
           <div className="mx-auto w-full max-w-3xl md:max-w-6xl">{children}</div>

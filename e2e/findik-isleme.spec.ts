@@ -238,26 +238,41 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await expect(page.locator("main").getByRole("link", { name: /Alım Yönetimi/ })).toHaveCount(0);
   });
 
-  test("masaüstü kenar çubuğundan modül değiştirilir", async ({ page }) => {
+  test("modül geçişi kenar çubuğunda menü öğesi olarak yer almaz", async ({ page }) => {
+    // Modül değişimi yalnızca Ayarlar → Modül ekranındadır; kenar çubuğunda
+    // geçiş düğmesi bulunmaz.
     await page.goto("/mod/islem");
     const kenar = page.locator("aside");
+    await expect(kenar.getByText("Fındık İşleme Modülü")).toBeVisible();
+    await expect(kenar.getByRole("button", { name: /Modülüne Geç/ })).toHaveCount(0);
+    await expect(kenar.getByRole("link", { name: "Ayarlar", exact: true })).toBeVisible();
 
-    const alimaGec = kenar.getByRole("button", { name: /Fındık Alım Modülüne Geç/ });
-    await expect(alimaGec).toBeVisible();
-    await alimaGec.click();
-    await page.waitForURL(/\/mod\/alim$/);
-
-    await expect(page.getByRole("heading", { name: "Fındık Alım Modülü" })).toBeVisible();
+    await page.goto("/mod/alim");
+    await expect(kenar.getByText("Fındık Alım Modülü")).toBeVisible();
+    await expect(kenar.getByRole("button", { name: /Modülüne Geç/ })).toHaveCount(0);
     await expect(kenar.getByRole("link", { name: /Alım Yönetimi/ })).toBeVisible();
     // İşleme modülünün menüleri alım modülünde görünmez.
     await expect(kenar.getByRole("link", { name: "İşleme Kasası" })).toHaveCount(0);
+  });
 
-    // Geri dönüş de aynı butonla yapılır.
-    const islemeGec = kenar.getByRole("button", { name: /Fındık İşleme Modülüne Geç/ });
-    await expect(islemeGec).toBeVisible();
-    await islemeGec.click();
-    await page.waitForURL(/\/mod\/islem$/);
-    await expect(page.getByRole("heading", { name: "Fındık İşleme Modülü" })).toBeVisible();
+  test("pano modüle göre ayrılır: işleme ve alım panoları karışmaz", async ({ page, context }) => {
+    const modulCerezi = async () => (await context.cookies()).find((c) => c.name === "filbert_modul")?.value;
+
+    // Fındık İşleme panosu yalnızca işleme akışını gösterir.
+    await page.goto("/mod/islem");
+    await expect.poll(modulCerezi).toBe("islem");
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Pano" })).toBeVisible();
+    await expect(page.getByText("Fındık işleme kuyruğu")).toBeVisible();
+    await expect(page.getByText("Son alım fişleri")).toHaveCount(0);
+    await expect(page.getByText("Depo stok durumu")).toHaveCount(0);
+
+    // Fındık Alım panosu yalnızca alım akışını gösterir.
+    await page.goto("/mod/alim");
+    await expect.poll(modulCerezi).toBe("alim");
+    await page.goto("/");
+    await expect(page.getByText("Son alım fişleri")).toBeVisible();
+    await expect(page.getByText("Fındık işleme kuyruğu")).toHaveCount(0);
   });
 
   test("mobil alt menüdeki Ayarlar butonundan modül değiştirilir", async ({ page, context }) => {

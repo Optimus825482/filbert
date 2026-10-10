@@ -8,7 +8,6 @@
  * (`Kullanici.varsayilanModul`) saklanır ve giriş yönlendirmesinde okunur.
  */
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getCurrentOturum } from "@/lib/auth";
@@ -44,17 +43,6 @@ async function modulCereziniYaz(modul: ModulId) {
     path: "/",
     maxAge: MODUL_CEREZ_SURESI,
   });
-}
-
-/** Sidebar/ayarlar formlarından çağrılan geçiş: çerezi yazar, modülü açar. */
-export async function modulDegistirVeGec(form: FormData): Promise<void> {
-  const hedef = modulCoz(form.get("modul"));
-  const user = await oturumKullanicisi();
-  if (!user) redirect("/giris");
-  if (!hedef || !modulYetkisiVar(user, hedef)) redirect("/yetkisiz");
-  await modulCereziniYaz(hedef);
-  revalidatePath("/", "layout");
-  redirect(MODULLER[hedef].anaRota);
 }
 
 /** İstemci bileşenlerinden çağrılan geçiş; yönlendirmeyi çağıran yapar. */

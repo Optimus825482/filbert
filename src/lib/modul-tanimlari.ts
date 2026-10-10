@@ -6,9 +6,10 @@
  *   2) Fındık İşleme Modülü — kırma / kavurma / paketleme talep akışı
  * Modül menüleri birbirinden bağımsızdır: her modül yalnızca kendi alt
  * modüllerini listeler. İşleme modülü kendi kasasını (İşleme Kasası), alım
- * modülü ise finans/müşteri/rapor kısayollarını taşır. Modüller arası geçiş,
- * masaüstünde kenar çubuğunun altından, mobilde Ayarlar → Modül ekranından
- * yapılır.
+ * modülü ise finans/müşteri/rapor kısayollarını taşır. Modüller arası geçiş
+ * yalnızca Ayarlar → Modül ekranından yapılır (masaüstü ve mobil aynı ekran);
+ * kenar çubuğunda modül geçiş düğmesi bulunmaz. Pano da modüle göre ayrılır:
+ * her modülün panosu yalnızca kendi akışını gösterir.
  */
 import type { Modul } from "@/components/modul-tabs";
 

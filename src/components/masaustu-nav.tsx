@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MODULLER, navGrubuGorunur, type ModulId } from "@/lib/modul";
-import { modulDegistirVeGec } from "@/lib/actions/modul";
 
 type NavOge = { href: string; etiket: string; ikon: LucideIcon };
 // Grupların hangi modüle ait olduğu `@/lib/modul` içindeki NAV_GRUPLARI
@@ -84,12 +83,10 @@ export function MasaustuNav({
   izinliRotalar,
   bekleyenRandiman,
   aktifModul = null,
-  digerModul = null,
 }: {
   izinliRotalar: string[];
   bekleyenRandiman: number;
   aktifModul?: ModulId | null;
-  digerModul?: { id: ModulId; ad: string; izinli: boolean } | null;
 }) {
   const pathname = usePathname();
   // Yalnızca kullanıcının kapattığı gruplar saklanır; açıklık buradan türetilir.
@@ -100,7 +97,7 @@ export function MasaustuNav({
     .filter((grup) => navGrubuGorunur(grup.baslik, aktifModul))
     .map((grup) => ({ ...grup, ogeler: grup.ogeler.filter((oge) => izinliRotalar.includes(oge.href)) }))
     .filter((grup) => grup.ogeler.length > 0);
-  if (gruplar.length === 0 && !digerModul?.izinli && !izinliRotalar.includes("/ayarlar")) return null;
+  if (gruplar.length === 0 && !izinliRotalar.includes("/ayarlar")) return null;
 
   const aktifMi = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const rozeti = (href: string) => (href === "/randiman" ? bekleyenRandiman : 0);
@@ -196,20 +193,8 @@ export function MasaustuNav({
       </nav>
 
       <div className="space-y-1 border-t border-slate-800 p-3">
-        {/* Modül geçişi — kullanıcı yalnızca karşı modüle yetkiliyse gösterilir. */}
-        {digerModul?.izinli && (
-          <form action={modulDegistirVeGec}>
-            <input type="hidden" name="modul" value={digerModul.id} />
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2.5 rounded-lg border border-[#f5c518]/30 bg-[#f5c518]/10 px-2.5 py-2 text-left text-xs font-extrabold text-[#f5c518] transition-colors hover:bg-[#f5c518]/20"
-            >
-              <ArrowLeftRight className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{MODULLER[digerModul.id].gecEtiketi}</span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-            </button>
-          </form>
-        )}
+        {/* Modül geçişi kenar çubuğunda menü öğesi olarak yer almaz; Ayarlar →
+            Modül ekranından yapılır. Burada yalnızca Ayarlar kısayolu kalır. */}
         {izinliRotalar.includes("/ayarlar") && (
           <Link
             href="/ayarlar"

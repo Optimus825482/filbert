@@ -11,7 +11,7 @@ import { OfflineSyncRegister } from "@/components/offline-sync-register";
 import { getCurrentOturum } from "@/lib/auth";
 import { bekleyenRandimanSayisi } from "@/lib/queries";
 import { izinVar } from "@/lib/rbac/guard";
-import { MODUL_BASLIGI, MODUL_CEREZI, MODULLER, aktifModulBelirle } from "@/lib/modul";
+import { MODUL_BASLIGI, MODUL_CEREZI, aktifModulBelirle } from "@/lib/modul";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin", "latin-ext"] });
@@ -102,9 +102,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         varsayilan: user.varsayilanModul,
       })
     : null;
-  const digerModul = aktifModul ? MODULLER[MODULLER[aktifModul].karsiModul] : null;
-  const digerModulYetkisi = Boolean(user && digerModul && izinVar(user, digerModul.izinModulu, "GORUNTULE"));
-
   const bekleyenRandiman = user?.aktif && user.firma.aktif
     ? await bekleyenRandimanSayisi(user.firmaId)
     : 0;
@@ -122,7 +119,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             {isWindow || isPublicPage || sistemYoneticiOturumu ? (
               <main className="p-4">{children}</main>
             ) : (
-              <MobileShell izinliRotalar={izinliRotalar} bekleyenRandiman={bekleyenRandiman} aktifModul={aktifModul} digerModul={digerModul ? { id: digerModul.id, ad: digerModul.ad, izinli: digerModulYetkisi } : null}>{children}</MobileShell>
+              <MobileShell izinliRotalar={izinliRotalar} bekleyenRandiman={bekleyenRandiman} aktifModul={aktifModul}>{children}</MobileShell>
             )}
             <Toaster position="top-center" richColors closeButton />
           </AyarProvider>

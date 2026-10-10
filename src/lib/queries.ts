@@ -715,3 +715,37 @@ export const islemeSayaclari = cache(async (fid: string) => {
     smsBekleyen,
   };
 });
+
+// ─── Fındık işleme (hizmet) ─────────────────────────────────
+
+export type GunlukHizmet = { anahtar: Date; baslangic: Date; bitis: Date; kg: number; adet: number };
+
+/**
+ * Son N günün fındık işleme talebi toplamları. Aralıklar İstanbul iş günü
+ * sınırlarıdır; sonuç en eski günden bugüne sıralıdır ve boş günler 0 ile yer
+ * alır. Pano parasal veri göstermez; yalnızca kg ve talep adedi döner.
+ */
+export async function getSonGunlerHizmet(gunSayisi = 7): Promise<GunlukHizmet[]> {
+  const fid = await firmaId();
+  const bugun = Date.now();
+  const gunler: GunlukHizmet[] = [];
+  for (let geri = gunSayisi - 1; geri >= 0; geri -= 1) {
+    const { baslangic, bitis } = istanbulGunAraligi(new Date(bugun - geri * 86_400_000));
+    gunler.push({ anahtar: istanbulTarihAnahtari(baslangic), baslangic, bitis, kg: 0, adet: 0 });
+  }
+  if (gunler.length === 0) return gunler;
+
+  const talepler = await prisma.hizmetIslemi.findMany({
+    where: { firmaId: fid, createdAt: { gte: gunler[0].baslangic, lt: gunler[gunler.length - 1].bitis } },
+    select: { createdAt: true, kilo: true },
+  });
+
+  const indeks = new Map(gunler.map((gun, i) => [gun.anahtar.getTime(), i]));
+  for (const talep of talepler) {
+    const i = indeks.get(istanbulTarihAnahtari(talep.createdAt).getTime());
+    if (i === undefined) continue;
+    gunler[i].kg += n(talep.kilo);
+    gunler[i].adet += 1;
+  }
+  return gunler;
+}

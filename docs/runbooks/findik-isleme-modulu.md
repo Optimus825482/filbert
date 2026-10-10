@@ -19,10 +19,22 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 - **Fındık İşleme Modülü** (`/mod/islem`) — talep kaydı, kuyruk, aşama takibi,
   teslim/tahsilat, raporlar ve **kendine ait kasa yönetimi**.
 
-**Modül değiştirme:**
+**Pano modüle göre ayrılır:** ana pano (`src/app/page.tsx` → `AnaSayfa`) aktif modülü
+`aktifModuluOku()` (`src/lib/aktif-modul.ts`) ile çözer; işleme modülünde
+`PanoIsleme` (`src/app/pano-isleme.tsx`) render edilir.
 
-- **Masaüstü:** Sol menünün en altındaki modül değiştirme düğmesi kullanılır
-  (Alım'da → *Fındık İşleme Modülüne Geç*, İşleme'de → *Fındık Alım Modülüne Geç*).
+- **İşleme panosu:** yalnızca kırma/kavurma/paketleme talepleri — İŞLEME BEKLEYEN,
+  TESLİME HAZIR, TAHSİLAT BEKLEYEN ve BUGÜN GELEN metrikleri, kuyruk aşama dağılımı,
+  7 günlük talep trendi, teslim alınmayan hazır talepler ve son talepler.
+- **Alım panosu:** yalnızca alım akışıdır (alım fişi, randıman, emanet, depo, sevkiyat).
+  İşleme metrikleri, "Fındık İşleme Talebi" kısayolu ve işleme bekleyen satırı burada
+  **yer almaz**.
+
+**Modül değiştirme (yalnızca Ayarlar'dan):** modül geçişi bir menü ögesi değildir.
+
+- **Masaüstü:** Sol menüde modül değiştirme düğmesi **yoktur**; menünün altında
+  yalnızca **Ayarlar** bağlantısı bulunur. Modül değişimi **Ayarlar → Modül**
+  sekmesinden yapılır.
 - **Mobil:** Alt (sticky) menünün en sağındaki **Ayarlar** ikonu Ayarlar ekranını
   açar; **Modül** sekmesinden aktif modül değiştirilir. Böylece mobilde de
   modül değişimi mümkündür.
@@ -338,8 +350,9 @@ SMS'i, QR etiket + yazıcı profili, doğrudan ESC/POS baskı kontrolü, Bluetoo
 ve baskı düğmeleri, tahsilat → `TESLIM_EDILDI`, durum raporları ve CSV, ayarlar
 ekranındaki yazıcı hedefi (Bluetooth dahil) bölümü, `/mod/islem` modül sayaçları.
 Modül ayrımı için ayrıca: menü daraltma (her modülde yalnızca kendi grupları),
-modül değiştirme düğmesi/linki, Ayarlar → Modül sekmesi ve giriş varsayılan modülü
-yönlendirmesi doğrulanır.
+panonun modüle göre ayrılması (işleme ve alım panoları karışmaz), modül geçişinin
+kenar çubuğunda menü öğesi olarak **yer almadığı**, Ayarlar → Modül sekmesi ve
+giriş varsayılan modülü yönlendirmesi doğrulanır.
 
 Web Bluetooth'un kendisi (yazıcı eşleştirme ve fiziksel baskı) tarayıcı izni ve donanım
 gerektirdiğinden e2e'de taklit edilir. Gerçek baskı **yazıcının bağlı olduğu makinede**
