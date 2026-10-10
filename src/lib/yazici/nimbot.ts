@@ -195,6 +195,12 @@ interface CizimParcasi {
 
 /** Etiket ölçeklemesinin alt sınırı (taşmayı önlemek için küçültme sınırı). */
 export const NIMBOT_OLCEK_MIN = 0.55;
+/** Sağdaki ikincil metinle ana metin arasında bırakılan boşluk (nokta). */
+export const NIMBOT_SAG_METIN_BOSLUGU = 8;
+/** Sığdırma sırasında ana metne bırakılan en küçük genişlik (nokta). */
+export const NIMBOT_ASGARI_METIN_GENISLIGI = 60;
+/** Ölçü satırı küçültülürken inilebilecek en küçük punto. */
+export const NIMBOT_ASGARI_PUNTO = 14;
 /**
  * Ölçek büyütmesinin üst sınırı.
  *
@@ -250,9 +256,28 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
         };
       }
 
-      const punto = nimbotPunto(satir.rol ?? "normal", olcu.olcek * katSayi, sablon.rolPuntosu);
+      // Sağdaki ikincil metin (tahsilat durumu) ana metnin alanını daraltır;
+      // daraltılmazsa iki metin sağ kenarda üst üste biner.
+      let sagGenislik = 0;
+      if (satir.sagMetin) {
+        const sagPunto = nimbotPunto(satir.sagRol ?? "kucuk", olcu.olcek * katSayi, sablon.rolPuntosu);
+        ctx.font = yaziTipi(sagPunto);
+        sagGenislik = Math.ceil(ctx.measureText(satir.sagMetin).width) + NIMBOT_SAG_METIN_BOSLUGU;
+      }
+      const anaGenislik = Math.max(NIMBOT_ASGARI_METIN_GENISLIGI, icGenislik - sagGenislik);
+
+      const rol = satir.rol ?? "normal";
+      let punto = nimbotPunto(rol, olcu.olcek * katSayi, sablon.rolPuntosu);
       ctx.font = yaziTipi(punto);
-      const satirlar = metniSar(ctx, satir.metin, icGenislik);
+      // Ölçü satırı (MİKTAR) sarılmaz: "KG" alt satıra düşmesin diye punto,
+      // metin tek satıra sığana kadar küçültülür.
+      if (rol === "buyuk") {
+        while (punto > NIMBOT_ASGARI_PUNTO && ctx.measureText(satir.metin).width > anaGenislik) {
+          punto -= 1;
+          ctx.font = yaziTipi(punto);
+        }
+      }
+      const satirlar = metniSar(ctx, satir.metin, anaGenislik);
       const satirYuksekligi = Math.round(punto * 1.22);
       return {
         satir,
