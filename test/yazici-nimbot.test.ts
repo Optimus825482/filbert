@@ -103,9 +103,13 @@ test("Etiket içeriği müşteri öncelikli düzeni izler (50×50 etikete taşma
   assert.equal(satirlar[0].rol, "baslik");
   assert.equal(duz[1], "05321112233");
   assert.equal(satirlar[1].rol, "baslik");
-  // Miktar başlıksız yazılır; etiket kimliği en altta durur.
+  // Miktar başlıksız yazılır; sıra no büyük puntoyla, firma adı en altta durur.
   assert.equal(duz[2], "25.00 KG");
-  assert.equal(duz[duz.length - 1], "AKAYDIN TARIM #0042");
+  assert.equal(duz[duz.length - 2], "#0042");
+  assert.equal(satirlar[satirlar.length - 2].rol, "vurgu");
+  assert.equal(duz[duz.length - 1], "AKAYDIN TARIM");
+  // Tüm satırlar ortalanır (operatör onaylı düzen).
+  assert.equal(satirlar.every((s) => s.hizala === "orta"), true);
   // İstenmeyen başlıklar etikete yazılmaz.
   assert.equal(duz.some((m) => m.startsWith("MİKTAR")), false);
   assert.equal(duz.some((m) => m.startsWith("MÜŞTERİ")), false);
@@ -117,6 +121,7 @@ test("Seçili hizmetler tek satırda yazılır, QR kod basılmaz", () => {
   const blok = islemBlogu(ORNEK);
   // İşaret kutuları kaldırıldı; yalnızca yapılacak işler ve paket bilgisi yazılır.
   assert.deepEqual(blok.islemler, ["Kırma - Kavurma - 25x 1 KG"]);
+  assert.equal(blok.hizala, "orta");
   assert.equal(blok.islemler.join(" ").includes("[X]"), false);
   // Etikette QR kod artık yok.
   assert.equal(nimbotEtiketIcerigi(ORNEK).some((s) => "veri" in s), false);
@@ -175,19 +180,22 @@ test("Başlık puntosu büyütüldü, diğer rollerden ayrışır", () => {
   assert.ok(NIMBOT_ROL_PUNTOSU.baslik > NIMBOT_ROL_PUNTOSU.normal);
 });
 
-test("NOT ve etiket kimliği planın sonunda etiketin dibine yaslanır", () => {
+test("NOT, sıra no ve firma adı planın sonunda etiketin dibine yaslanır", () => {
   const veri: EtiketVerisi = { ...ORNEK, notlar: "Çuvallar ayrı teslim edilecek" };
   const plan = nimbotEtiketIcerigi(veri);
-  const son = plan[plan.length - 1];
-  const not = plan[plan.length - 2];
+  const firma = plan[plan.length - 1];
+  const sira = plan[plan.length - 2];
+  const not = plan[plan.length - 3];
 
-  // En altta firma kimliği, hemen üstünde NOT satırı durur.
-  assert.equal(son.tip === "metin" && son.metin, "AKAYDIN TARIM #0042");
-  assert.equal(son.tip === "metin" && son.dibe, true);
+  // En altta firma adı, üstünde sıra no, onun üstünde NOT satırı durur.
+  assert.equal(firma.tip === "metin" && firma.metin, "AKAYDIN TARIM");
+  assert.equal(firma.tip === "metin" && firma.dibe, true);
+  assert.equal(sira.tip === "metin" && sira.metin, "#0042");
+  assert.equal(sira.tip === "metin" && sira.dibe, true);
   assert.equal(not.tip === "metin" && not.metin, "NOT: Çuvallar ayrı teslim edilecek");
   assert.equal(not.tip === "metin" && not.dibe, true);
-  // Diğer satırlar akışta kalır; dibe işareti bu iki satıra aittir.
-  assert.equal(plan.filter((s) => s.tip === "metin" && s.dibe).length, 2);
+  // Diğer satırlar akışta kalır; dibe işareti bu üç satıra aittir.
+  assert.equal(plan.filter((s) => s.tip === "metin" && s.dibe).length, 3);
 });
 
 test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {

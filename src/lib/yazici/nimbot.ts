@@ -180,7 +180,29 @@ function metniSar(
   return satirlar;
 }
 
-/** Tek bir çizim parçası: satır planı ölçekle hesaplandıktan sonraki hâli. */
+/**
+ * Hizalamaya göre metnin sol x konumunu döndürür.
+ *
+ * `alanGenisligi` hizalamaya açık alandır: sağda ikincil metin varsa bu alan
+ * onun genişliği kadar daraltılır, böylece ortalama sağ metne taşmaz.
+ */
+function hizaliX(
+  ctx: CanvasRenderingContext2D,
+  metin: string,
+  kenar: number,
+  alanGenisligi: number,
+  hizala: "sol" | "orta" | "sag"
+): number {
+  const genislik = ctx.measureText(metin).width;
+  const x =
+    hizala === "orta"
+      ? kenar + (alanGenisligi - genislik) / 2
+      : hizala === "sag"
+        ? kenar + alanGenisligi - genislik
+        : kenar;
+  return Math.max(kenar, Math.round(x));
+}
+
 /** Tek bir çizim parçası: satır planı ölçekle hesaplandıktan sonraki hâli. */
 interface CizimParcasi {
   satir: NimbotSatiri;
@@ -191,6 +213,8 @@ interface CizimParcasi {
   satirlar: string[];
   /** İşlem bloğunun sarılmış hâli (tip: "islem"). */
   islemSatirlari: string[][];
+  /** Sağdaki ikincil metnin kapladığı genişlik (yoksa 0). */
+  sagGenislik: number;
 }
 
 /** Etiket ölçeklemesinin alt sınırı (taşmayı önlemek için küçültme sınırı). */
@@ -253,6 +277,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
           yukseklik: satirSayisi * satirYuksekligi,
           satirlar: [],
           islemSatirlari,
+          sagGenislik: 0,
         };
       }
 
@@ -286,6 +311,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
         yukseklik: satirYuksekligi * satirlar.length,
         satirlar,
         islemSatirlari: [],
+        sagGenislik,
       };
     });
 
@@ -342,9 +368,14 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
     ctx.fillStyle = "#000000";
 
     if (parca.satir.tip === "islem") {
+      const islemHizasi = parca.satir.hizala ?? "sol";
       for (const grup of parca.islemSatirlari) {
         for (const metin of grup) {
-          ctx.fillText(metin, kenar, Math.round(akisY));
+          ctx.fillText(
+            metin,
+            hizaliX(ctx, metin, kenar, icGenislik, islemHizasi),
+            Math.round(akisY)
+          );
           akisY += parca.satirYuksekligi + akisAraligi;
         }
       }
@@ -354,15 +385,15 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
     const dibe = dibeMi(parca);
     const ust = dibe ? dipY : akisY;
     const hizala = parca.satir.hizala ?? "sol";
+    // Sağdaki metin hizalama alanını daraltır; daraltılmazsa ortalanan metin
+    // sağdaki tutar/ödeme metninin üstüne biner.
+    const hizaAlani = icGenislik - parca.sagGenislik;
     parca.satirlar.forEach((metin, sira) => {
-      const genislik = ctx.measureText(metin).width;
-      const x =
-        hizala === "orta"
-          ? kenar + (icGenislik - genislik) / 2
-          : hizala === "sag"
-            ? kenar + icGenislik - genislik
-            : kenar;
-      ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(ust + sira * parca.satirYuksekligi));
+      ctx.fillText(
+        metin,
+        hizaliX(ctx, metin, kenar, hizaAlani, hizala),
+        Math.round(ust + sira * parca.satirYuksekligi)
+      );
     });
     if (parca.satir.sagMetin) {
       const sagPunto = nimbotPunto(parca.satir.sagRol ?? "kucuk", olcu.olcek * katSayi, sablon.rolPuntosu);

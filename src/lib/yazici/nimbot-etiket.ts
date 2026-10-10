@@ -77,7 +77,7 @@ export const NIMBOT_SABLONLARI: Readonly<Record<EtiketProfili, NimbotSablonu>> =
   },
   NIMBOT_B1_50x50: {
     ad: "Nimbot B1 · 50×50 mm",
-    rolPuntosu: { baslik: 32, buyuk: 42, vurgu: 24, normal: 24, kucuk: 16 },
+    rolPuntosu: { baslik: 40, buyuk: 42, vurgu: 26, normal: 24, kucuk: 16 },
     olcekMax: 1,
     yay: true,
   },
@@ -115,6 +115,8 @@ export interface NimbotMetinSatiri {
 export interface NimbotIslemSatiri {
   tip: "islem";
   islemler: string[];
+  /** Blok satırlarının yatay hizası (varsayılan: "sol"). */
+  hizala?: "sol" | "orta" | "sag";
 }
 
 export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemSatiri;
@@ -142,12 +144,13 @@ export function seciliHizmetlerMetni(
 /**
  * Etiketin satır planını üretir. Düzen (üstten alta):
  *
- *   1) Müşteri adı         (en büyük punto, solda)
- *   2) Telefon             (aynı punto)
- *   3) Seçili hizmetler    (Kırma - Kavurma - Paketleme)
- *   4) Miktar              ("100.00 KG"; sağda ödeme durumu)
- *   5) NOT                 (yalnızca varsa, en alta yaslı)
- *   6) FİRMA #SIRA         (etiket kimliği, en altta)
+ *   1) Müşteri adı         (en büyük punto, ortada)
+ *   2) Telefon             (aynı punto, ortada)
+ *   3) Seçili hizmetler    (Kırma - Kavurma - Paketleme, ortada)
+ *   4) Miktar              ("100.00 KG" ortada; sağda ödeme durumu)
+ *   5) NOT                 (yalnızca varsa, ortada, en alta yaslı)
+ *   6) #SIRA               (etiket kimliği, büyük punto, ortada)
+ *   7) FİRMA ADI           (en alt satır, ortada)
  *
  * QR kod operatör isteğiyle etiketten çıkarıldı; talep kimliği sıra numarası
  * ile okunur.
@@ -155,18 +158,18 @@ export function seciliHizmetlerMetni(
 export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
   const satirlar: NimbotSatiri[] = [
     // Teslim sırasında ilk okunan bilgi müşteridir: etiketin en üstünde durur.
-    { tip: "metin", metin: veri.musteriAdi, rol: "baslik", hizala: "sol" },
-    { tip: "metin", metin: veri.telefon, rol: "baslik", hizala: "sol" },
+    { tip: "metin", metin: veri.musteriAdi, rol: "baslik", hizala: "orta" },
+    { tip: "metin", metin: veri.telefon, rol: "baslik", hizala: "orta" },
   ];
 
   const hizmetler = seciliHizmetlerMetni(veri);
-  if (hizmetler) satirlar.push({ tip: "islem", islemler: [hizmetler] });
+  if (hizmetler) satirlar.push({ tip: "islem", islemler: [hizmetler], hizala: "orta" });
 
   satirlar.push({
     tip: "metin",
     metin: `${veri.kilo} KG`,
     rol: "buyuk",
-    hizala: "sol",
+    hizala: "orta",
     sagMetin: odemeOzeti(veri),
     sagRol: "kucuk",
   });
@@ -180,16 +183,24 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     });
   }
 
-  // NOT ve firma kimliği akışa katılmaz: etiketin en altına yaslanır.
+  // NOT ve etiket kimliği akışa katılmaz: etiketin en altına yaslanır.
+  // Sıra numarası büyük puntoyla ortalanır, firma adı en alt satırda kalır.
   const not = veri.notlar?.trim();
   if (not) {
-    satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "sol", dibe: true });
+    satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "orta", dibe: true });
   }
   satirlar.push({
     tip: "metin",
-    metin: `${veri.firmaAdi} #${veri.siraNo}`,
+    metin: `#${veri.siraNo}`,
+    rol: "vurgu",
+    hizala: "orta",
+    dibe: true,
+  });
+  satirlar.push({
+    tip: "metin",
+    metin: veri.firmaAdi,
     rol: "kucuk",
-    hizala: "sol",
+    hizala: "orta",
     dibe: true,
   });
 
