@@ -12,11 +12,7 @@
  */
 
 import QRCode from "qrcode";
-import {
-  islemSatirlari,
-  paketTipiEtiketi,
-  type EtiketVerisi,
-} from "@/lib/yazici/escpos";
+import { paketTipiEtiketi, type EtiketVerisi } from "@/lib/yazici/escpos";
 import { etiketProfiliGetir, type EtiketProfili } from "@/lib/findik-isleme";
 
 /** NIMBOT cihazlarının kullandığı GATT servis UUID'si. */
@@ -111,7 +107,11 @@ export interface NimbotMetinSatiri {
   dibe?: boolean;
 }
 
-/** Alt alta yazılan işlem satırları bloğu (kırma / kavurma / paketleme). */
+/**
+ * Alt alta yazılan satırlar bloğu (normal puntoyla, sarılabilir).
+ *
+ * Etikette seçili hizmetler tek satırda bu blokla yazılır.
+ */
 export interface NimbotIslemSatiri {
   tip: "islem";
   islemler: string[];
@@ -120,40 +120,56 @@ export interface NimbotIslemSatiri {
 export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemSatiri;
 
 /**
- * Etiketin satır planını üretir. Kompakt düzen:
+ * Seçili hizmetleri tek satırda özetler: "Kırma - Kavurma - 25x 1 KG".
  *
- *   1) FİRMA #SIRA          (tek satır, ortada)
- *   2) Müşteri - Telefon    (tek satır)
- *   3) MİKTAR x KG          (solda; sağda tutar/ödeme durumu)
- *   4) İşlemler             (kırma / kavurma / paketleme, alt alta)
- *   5) NOT                  (tek satır, yalnızca varsa)
+ * Operatör isteğiyle işaret kutuları ([X]/[ ]) kaldırıldı; yalnızca yapılacak
+ * işler yazılır. Hiçbiri seçilmemişse boş metin döner.
+ */
+export function seciliHizmetlerMetni(
+  veri: Pick<EtiketVerisi, "islemler" | "paketTipi" | "paketAdedi">
+): string {
+  const parcalar: string[] = [];
+  if (veri.islemler.kirma) parcalar.push("Kırma");
+  if (veri.islemler.kavurma) parcalar.push("Kavurma");
+  if (veri.islemler.paketleme) parcalar.push("Paketleme");
+
+  const paket = paketTipiEtiketi(veri.paketTipi);
+  if (paket) parcalar.push(veri.paketAdedi ? `${veri.paketAdedi}x ${paket}` : paket);
+
+  return parcalar.join(" - ");
+}
+
+/**
+ * Etiketin satır planını üretir. Düzen (üstten alta):
+ *
+ *   1) Müşteri adı         (en büyük punto, solda)
+ *   2) Telefon             (aynı punto)
+ *   3) Seçili hizmetler    (Kırma - Kavurma - Paketleme)
+ *   4) Miktar              ("100.00 KG"; sağda ödeme durumu)
+ *   5) NOT                 (yalnızca varsa, en alta yaslı)
+ *   6) FİRMA #SIRA         (etiket kimliği, en altta)
  *
  * QR kod operatör isteğiyle etiketten çıkarıldı; talep kimliği sıra numarası
  * ile okunur.
  */
 export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
   const satirlar: NimbotSatiri[] = [
-    {
-      tip: "metin",
-      metin: `${veri.firmaAdi} #${veri.siraNo}`,
-      rol: "baslik",
-      hizala: "orta",
-    },
-    {
-      tip: "metin",
-      metin: `${veri.musteriAdi} - ${veri.telefon}`,
-      rol: "vurgu",
-      hizala: "sol",
-    },
-    {
-      tip: "metin",
-      metin: `MİKTAR ${veri.kilo} KG`,
-      rol: "buyuk",
-      hizala: "sol",
-      sagMetin: odemeOzeti(veri),
-      sagRol: "kucuk",
-    },
+    // Teslim sırasında ilk okunan bilgi müşteridir: etiketin en üstünde durur.
+    { tip: "metin", metin: veri.musteriAdi, rol: "baslik", hizala: "sol" },
+    { tip: "metin", metin: veri.telefon, rol: "baslik", hizala: "sol" },
   ];
+
+  const hizmetler = seciliHizmetlerMetni(veri);
+  if (hizmetler) satirlar.push({ tip: "islem", islemler: [hizmetler] });
+
+  satirlar.push({
+    tip: "metin",
+    metin: `${veri.kilo} KG`,
+    rol: "buyuk",
+    hizala: "sol",
+    sagMetin: odemeOzeti(veri),
+    sagRol: "kucuk",
+  });
 
   if (veri.kopyaSayisi && veri.kopyaSayisi > 1) {
     satirlar.push({
@@ -164,25 +180,24 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     });
   }
 
-  const islemler = islemSatirlari(veri.islemler);
-  const paket = paketTipiEtiketi(veri.paketTipi);
-  if (paket) {
-    const adet = veri.paketAdedi ? `${veri.paketAdedi}x ` : "";
-    islemler.push(`${adet}${paket}`);
-  }
-  satirlar.push({ tip: "islem", islemler });
-
-  // Not satırı işlemlerin hemen ardından değil, etiketin en altına yaslanır.
+  // NOT ve firma kimliği akışa katılmaz: etiketin en altına yaslanır.
   const not = veri.notlar?.trim();
   if (not) {
     satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "sol", dibe: true });
   }
+  satirlar.push({
+    tip: "metin",
+    metin: `${veri.firmaAdi} #${veri.siraNo}`,
+    rol: "kucuk",
+    hizala: "sol",
+    dibe: true,
+  });
 
   return satirlar;
 }
 
 /**
- * MİKTAR satırının sağında gösterilecek özet.
+ * Miktar satırının sağında gösterilecek özet.
  *
  * Fiyat/tutar operatör isteğiyle etikete basılmaz; yalnızca tahsilat durumu
  * (TAHSİL EDİLDİ / VERESİYE) yazılır. Bekleyen talepte sağ taraf boş kalır.

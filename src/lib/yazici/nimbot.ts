@@ -269,7 +269,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       const rol = satir.rol ?? "normal";
       let punto = nimbotPunto(rol, olcu.olcek * katSayi, sablon.rolPuntosu);
       ctx.font = yaziTipi(punto);
-      // Ölçü satırı (MİKTAR) sarılmaz: "KG" alt satıra düşmesin diye punto,
+      // Miktar satırı sarılmaz: "KG" alt satıra düşmesin diye punto,
       // metin tek satıra sığana kadar küçültülür.
       if (rol === "buyuk") {
         while (punto > NIMBOT_ASGARI_PUNTO && ctx.measureText(satir.metin).width > anaGenislik) {
