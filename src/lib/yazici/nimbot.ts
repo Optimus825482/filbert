@@ -273,8 +273,9 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const katSayi = alt;
   const plan = planla(katSayi);
 
-  // İçerik etiketi tam doldurmuyorsa dikey olarak ortalanır; alt kenara yapışmaz.
-  let y = kenar + Math.max(0, Math.round((govdeAlani - topla(plan)) / 2));
+  // İçerik etiketin ÜSTÜNDEN başlar. Dikey ortalama, yazıcı etiketin tepesine
+  // hizalanmadığı için içeriği aşağı kaydırıp alttaki etikete taşırıyordu.
+  let y = kenar;
   for (const parca of plan) {
     ctx.font = yaziTipi(parca.punto);
     ctx.fillStyle = "#000000";

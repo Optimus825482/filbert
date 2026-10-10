@@ -131,14 +131,15 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
 }
 
 /**
- * MİKTAR satırının sağında gösterilecek kısa özet: tahsilat durumu varsa o,
- * yoksa tutar, o da yoksa tarih.
+ * MİKTAR satırının sağında gösterilecek özet.
+ *
+ * Fiyat/tutar operatör isteğiyle etikete basılmaz; yalnızca tahsilat durumu
+ * (TAHSİL EDİLDİ / VERESİYE) yazılır. Bekleyen talepte sağ taraf boş kalır.
  */
 function odemeOzeti(veri: EtiketVerisi): string | undefined {
   if (veri.odemeDurumu === "ODENDI") return "TAHSİL EDİLDİ";
   if (veri.odemeDurumu === "VERESIYE") return "VERESİYE";
-  if (veri.toplamTutar) return `${veri.toplamTutar} TL`;
-  return veri.tarihSaatStr || undefined;
+  return undefined;
 }
 
 // ─── Tuval ölçüsü (saf) ─────────────────────────────────────

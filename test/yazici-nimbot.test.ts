@@ -112,8 +112,9 @@ test("İşlem satırları tek blokta alt alta yer alır, QR kod basılmaz", () =
   assert.equal(nimbotEtiketIcerigi(ORNEK).some((s) => "veri" in s), false);
 });
 
-test("Ödeme durumu ve tutar miktar satırının sağında özetlenir", () => {
-  assert.equal(metinSatirlari(ORNEK)[2].sagMetin, "200.00 TL");
+test("Fiyat etikete yazılmaz, yalnızca tahsilat durumu özetlenir", () => {
+  // Tutar bilgisi etikete basılmaz.
+  assert.equal(metinSatirlari(ORNEK)[2].sagMetin, undefined);
 
   const odendi = metinSatirlari({ ...ORNEK, odemeDurumu: "ODENDI" })[2];
   assert.equal(odendi.sagMetin, "TAHSİL EDİLDİ");
