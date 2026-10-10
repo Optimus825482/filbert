@@ -108,6 +108,7 @@ test("Etiket içeriği müşteri öncelikli düzeni izler (50×50 etikete taşma
   assert.equal(duz[duz.length - 2], "#0042");
   assert.equal(satirlar[satirlar.length - 2].rol, "vurgu");
   assert.equal(duz[duz.length - 1], "AKAYDIN TARIM");
+  assert.equal(satirlar[satirlar.length - 1].rol, "normal");
   // Tüm satırlar ortalanır (operatör onaylı düzen).
   assert.equal(satirlar.every((s) => s.hizala === "orta"), true);
   // İstenmeyen başlıklar etikete yazılmaz.
@@ -168,6 +169,10 @@ test("Rulo şablonları ayrı punto tablosu ve yayma davranışı taşır", () =
   }
   assert.equal(genis.yay, true);
   assert.ok(genis.olcekMax <= NIMBOT_ROL_MAX_BEKLEME);
+
+  // Etiket kimliği (#SIRA) firma adından büyük, müşteri adından küçüktür.
+  assert.ok(genis.rolPuntosu.vurgu > genis.rolPuntosu.normal);
+  assert.ok(genis.rolPuntosu.vurgu < genis.rolPuntosu.baslik);
 
   // Tanımsız profil sessizce 50×50 şablonuna düşer.
   assert.equal(nimbotSablonu("YOK" as never).ad, genis.ad);

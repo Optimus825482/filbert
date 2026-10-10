@@ -41,7 +41,7 @@ export type NimbotSatirRolu = "baslik" | "buyuk" | "vurgu" | "normal" | "kucuk";
 export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
   baslik: 25,
   buyuk: 26,
-  vurgu: 18,
+  vurgu: 22,
   normal: 16,
   kucuk: 12,
 };
@@ -77,7 +77,7 @@ export const NIMBOT_SABLONLARI: Readonly<Record<EtiketProfili, NimbotSablonu>> =
   },
   NIMBOT_B1_50x50: {
     ad: "Nimbot B1 · 50×50 mm",
-    rolPuntosu: { baslik: 40, buyuk: 42, vurgu: 26, normal: 24, kucuk: 16 },
+    rolPuntosu: { baslik: 40, buyuk: 42, vurgu: 32, normal: 24, kucuk: 16 },
     olcekMax: 1,
     yay: true,
   },
@@ -199,7 +199,7 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
   satirlar.push({
     tip: "metin",
     metin: veri.firmaAdi,
-    rol: "kucuk",
+    rol: "normal",
     hizala: "orta",
     dibe: true,
   });
