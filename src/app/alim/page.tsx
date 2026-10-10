@@ -32,14 +32,14 @@ export default async function AlimYonetimiPage() {
     <div>
       {/* Mobil başlık */}
       <div className="md:hidden">
-        <PageBaslik baslik="Alım Yönetimi" alt="Müşteri · miktar · fiyat · kalite — tek işlemde" geri="/findik-islemleri" />
+        <PageBaslik baslik="Alım Yönetimi" alt="Müstahsil · miktar · fiyat · kalite — tek işlemde" geri="/findik-islemleri" />
       </div>
 
       {/* Masaüstü başlık */}
       <div className="mb-4 hidden items-center justify-between md:flex">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Alım Yönetimi</h1>
-          <p className="text-sm text-sky-100">Müşteri · miktar · fiyat · kalite — tek işlemde</p>
+          <p className="text-sm text-sky-100">Müstahsil · miktar · fiyat · kalite — tek işlemde</p>
         </div>
         {olusturmaYetkisi && <Link href="/alim/yeni" className="flex items-center gap-2 rounded-xl bg-[#f5c518] px-4 py-2.5 text-sm font-extrabold text-[#0b1b3a] shadow-[0_2px_0_#7a5b08] transition-transform duration-150 ease-out active:scale-[0.97]">
           <Plus className="h-4 w-4" /> Yeni Alım Fişi
@@ -105,7 +105,7 @@ export default async function AlimYonetimiPage() {
           <thead>
             <tr className="border-b border-slate-800 text-left text-[10px] uppercase tracking-wider text-sky-500">
               <th className="px-5 py-2.5 font-bold">Fiş No</th>
-              <th className="px-3 py-2.5 font-bold">Üretici</th>
+              <th className="px-3 py-2.5 font-bold">Müstahsil</th>
               <th className="px-3 py-2.5 font-bold">Bölge</th>
               <th className="px-3 py-2.5 font-bold">Tarih</th>
               <th className="px-3 py-2.5 font-bold text-right">Net kg</th>

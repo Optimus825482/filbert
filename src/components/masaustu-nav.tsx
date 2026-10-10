@@ -58,7 +58,7 @@ const GRUPLAR: NavGrup[] = [
     ],
   },
   {
-    baslik: "MÜŞTERİ",
+    baslik: "CARİ",
     ogeler: [
       { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: Users },
       { href: "/satis", etiket: "Satış", ikon: FileText },

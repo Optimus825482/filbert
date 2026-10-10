@@ -84,11 +84,11 @@ export function AvansForm({
         <PiggyBank className="h-4 w-4 text-violet-400" /> YENİ AVANS GİRİŞİ
       </div>
 
-      {/* Üretici Seçimi */}
+      {/* Müstahsil Seçimi */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-bold text-[var(--app-fg)]">
-            Üretici (Müstahsil) <span className="text-red-400">*</span>
+            Müstahsil <span className="text-red-400">*</span>
           </Label>
         </div>
 
@@ -99,7 +99,7 @@ export function AvansForm({
               type="text"
               value={cariArama}
               onChange={(e) => setCariArama(e.target.value)}
-              placeholder="Üretici adıyla filtrele..."
+              placeholder="Müstahsil adıyla filtrele..."
               className="flex h-9 w-full rounded-lg border border-[var(--surface-border)] bg-[var(--surface-secondary)] pl-8 pr-3 text-xs text-[var(--app-fg)] placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-[var(--primary)]/40"
             />
           </div>
@@ -107,7 +107,7 @@ export function AvansForm({
 
         <Select value={cariId} onValueChange={setCariId}>
           <SelectTrigger className="saha-input">
-            <SelectValue placeholder="Üretici seçin..." />
+            <SelectValue placeholder="Müstahsil seçin..." />
           </SelectTrigger>
           <SelectContent>
             {filtrelenmisCariler.map((c) => (

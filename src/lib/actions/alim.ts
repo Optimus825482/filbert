@@ -60,7 +60,7 @@ export async function createAlimFisi(g: AlimGirdi): Promise<{ ok: boolean; hata?
   // ── Avans mahsup kontrolü ──
   if (g.avansMahsupId && g.avansMahsupTutar && g.avansMahsupTutar > 0) {
     const avans = await prisma.avans.findFirst({ where: { id: g.avansMahsupId, cariId: g.cariId, cari: { firmaId: firma.id } } });
-    if (!avans || avans.durum !== "ACIK") return { ok: false, hata: "Avans bulunamadı, kapalı veya seçilen üreticiye ait değil" };
+    if (!avans || avans.durum !== "ACIK") return { ok: false, hata: "Avans bulunamadı, kapalı veya seçilen müstahsile ait değil" };
     if (g.avansMahsupTutar > Number(avans.kalanTl)) return { ok: false, hata: "Mahsup tutarı avans bakiyesinden büyük olamaz" };
     if (tutar !== null && g.avansMahsupTutar > tutar) return { ok: false, hata: "Mahsup tutarı fiş tutarından büyük olamaz" };
   }
@@ -76,7 +76,7 @@ export async function createAlimFisi(g: AlimGirdi): Promise<{ ok: boolean; hata?
 
         if (g.avansMahsupId && g.avansMahsupTutar && g.avansMahsupTutar > 0) {
           const avans = await tx.avans.findFirst({ where: { id: g.avansMahsupId, cariId: g.cariId, durum: "ACIK", cari: { firmaId: firma.id } } });
-          if (!avans) throw new Error("Avans bulunamadı, kapalı veya seçilen üreticiye ait değil");
+          if (!avans) throw new Error("Avans bulunamadı, kapalı veya seçilen müstahsile ait değil");
           if (g.avansMahsupTutar > Number(avans.kalanTl)) throw new Error("Mahsup tutarı avans bakiyesinden büyük olamaz");
         }
 
@@ -163,7 +163,7 @@ async function createOnayliHareketler(
       data: { avansId: g.avansMahsupId, hedefTipi: "ALIM", hedefId: fis.id, tutarTl: g.avansMahsupTutar },
     });
     const avans = await tx.avans.findFirst({ where: { id: g.avansMahsupId, cariId: fis.cariId, durum: "ACIK" } });
-    if (!avans) throw new Error("Mahsup avansı bulunamadı veya üretici eşleşmiyor");
+    if (!avans) throw new Error("Mahsup avansı bulunamadı veya müstahsil eşleşmiyor");
     const yeniKalan = Number(avans.kalanTl) - g.avansMahsupTutar;
     await tx.avans.update({
       where: { id: avans.id },

@@ -420,7 +420,7 @@ function KullaniciSekme({ kullanicilar, kullaniciSayisi }: { kullanicilar: Kulla
 function SistemSekme(props: Props) {
   return (
     <div className="space-y-1.5">
-      <Satir ikon={Users} baslik="Cari Kartı" deger={String(props.cariSayisi)} alt="üretici / tüccar / fabrika" />
+      <Satir ikon={Users} baslik="Cari Kartı" deger={String(props.cariSayisi)} alt="müstahsil / tüccar / fabrika" />
       <Satir ikon={ShieldAlert} baslik="Kasa / Banka Hesabı" deger={String(props.hesap)} alt="aktif hesap sayısı" />
       <Satir ikon={Database} baslik="Depo" deger={String(props.depo)} alt="aktif depo sayısı" />
     </div>

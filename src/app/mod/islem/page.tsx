@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
  * tamamlandı), teslim, tahsilat, kendi kasa yönetimi ve SMS bildirimleri.
  *
  * Modül ayrımı gereği bu ekranda yalnızca işleme modülünün kendi menüleri
- * listelenir; alım modülüne geçiş kenar çubuğunun altındaki butondadır.
+ * listelenir; modül değişimi Ayarlar → Modül sekmesinden yapılır (mobilde alt
+ * menüdeki **Ayarlar** ikonu).
  */
 export default async function FindikIslemModulPage() {
   const actor = await requirePagePermission("HIZMET", "GORUNTULE");

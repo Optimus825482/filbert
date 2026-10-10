@@ -27,7 +27,7 @@ export async function createAvans(g: AvansGirdi): Promise<{ ok: boolean; hata?: 
   const actor = await requirePermission("AVANS", "OLUSTUR");
   if (!(["NAKIT", "AYNI", "FINDIK_KARSILIGI"] as const).includes(g.tur)) return { ok: false, hata: "Geçersiz avans tipi" };
   if (!(["TL", "USD", "EUR", "XAU"] as const).includes(g.bakiyeTuru)) return { ok: false, hata: "Geçersiz para birimi" };
-  if (!g.cariId) return { ok: false, hata: "Üretici seçilmedi" };
+  if (!g.cariId) return { ok: false, hata: "Müstahsil seçilmedi" };
   if (!gecerliSayi(g.tutarTl, 0.001, TUTAR_MAKS)) return { ok: false, hata: "Geçerli bir tutar girilmeli" };
   if (g.bakiyeTuru !== "TL" && !gecerliSayi(g.tutarDoviz, 0.001, TUTAR_MAKS)) {
     return { ok: false, hata: "Döviz/altın avansında döviz tutarı girilmeli" };
@@ -43,7 +43,7 @@ export async function createAvans(g: AvansGirdi): Promise<{ ok: boolean; hata?: 
     g.depoId ? prisma.depo.findFirst({ where: { id: g.depoId, firmaId: actor.firmaId, aktif: true } }) : null,
     prisma.sezon.findFirst({ where: { firmaId: actor.firmaId, aktif: true } }),
   ]);
-  if (!cari) return { ok: false, hata: "Üretici bulunamadı veya pasif" };
+  if (!cari) return { ok: false, hata: "Müstahsil bulunamadı veya pasif" };
   if (g.hesapId && !hesap) return { ok: false, hata: "Kasa/banka hesabı bulunamadı veya pasif" };
   if (g.depoId && !depo) return { ok: false, hata: "Depo bulunamadı veya pasif" };
   if (g.tur === "NAKIT" && hesap && hesap.bakiyeTuru !== g.bakiyeTuru) return { ok: false, hata: `Hesap para birimi ${hesap.bakiyeTuru}; avans para birimi ${g.bakiyeTuru} olmalı` };

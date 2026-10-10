@@ -1,6 +1,6 @@
 "use server";
 
-// Emanet: muhasebeleştir (hesap gör — manuel fiyatla satın alma) ve üreticiye iade.
+// Emanet: muhasebeleştir (hesap gör — manuel fiyatla satın alma) ve müstahsile iade.
 import { prisma } from "@/lib/db";
 import { tutarHesapla } from "@/lib/hesap";
 import { requirePermission } from "@/lib/rbac/guard";
@@ -83,7 +83,7 @@ export async function muhasebelestirEmanet(g: EmanetMuhasebeleistirGirdi): Promi
   }
 }
 
-// ── Emanet iade (üreticiye geri verilir, kg borcu azalır, stoktan EMANET düşer) ──
+// ── Emanet iade (müstahsile geri verilir, kg borcu azalır, stoktan EMANET düşer) ──
 
 export interface EmanetIadeGirdi {
   emanetId: string;

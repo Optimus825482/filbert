@@ -8,14 +8,14 @@ export default async function CariLandingPage() {
   const actor = await requirePagePermission("CARI", "GORUNTULE");
   return (
     <ModulListe
-      baslik="Müşteri Yönetimi"
+      baslik="Cari Yönetimi"
       alt="Cari Hesaplar · Tahsilat · Avans · Satış"
       geri="/"
       maddeler={[
         {
           href: "/cari/hesaplar",
           baslik: "Cari Hesaplar",
-          alt: "Üretici, tüccar ve fabrika kartları · çoklu bakiye ve hareket geçmişi.",
+          alt: "Müstahsil, tüccar ve fabrika kartları · çoklu bakiye ve hareket geçmişi.",
           ikon: Users,
           renk: "bg-sky-600",
         },
@@ -29,7 +29,7 @@ export default async function CariLandingPage() {
         {
           href: "/avans",
           baslik: "Avans İşlemleri",
-          alt: "Üreticiye nakit/ayni/fındık karşılığı avans, Ziraat faiz maliyeti.",
+          alt: "Müstahsile nakit/ayni/fındık karşılığı avans, Ziraat faiz maliyeti.",
           ikon: PiggyBank,
           renk: "bg-violet-600",
         },

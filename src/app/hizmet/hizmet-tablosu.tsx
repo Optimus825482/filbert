@@ -49,7 +49,7 @@ export interface HizmetSatir {
   paketleme: boolean;
   paketTipi?: string | null;
   paketAdedi?: number | null;
-  cariId?: string | null;
+  musteriId?: string | null;
   odemeDurumu?: string | null;
   odemeYontemi?: string | null;
   kasaHesapId?: string | null;

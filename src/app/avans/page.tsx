@@ -18,7 +18,7 @@ export default async function AvansPage() {
 
   return (
     <div>
-      <PageBaslik baslik="Avans İşlemleri" alt="Üretici avansları" geri="/cari" />
+      <PageBaslik baslik="Avans İşlemleri" alt="Müstahsil avansları" geri="/cari" />
 
       {olusturmaYetkisi && <AvansForm
         cariler={cariler.map((c) => ({ id: c.id, ad: c.ad }))}

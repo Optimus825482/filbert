@@ -10,7 +10,8 @@ import type { ModulId } from "@/lib/modul";
  * taşır; MasaustuNav yalnız md+ ekranlarda, BottomNav yalnız md altında görünür.
  *
  * Aktif modül sunucuda (istek yolu → çerez → kullanıcı varsayılanı) belirlenir ve
- * menüler yalnızca o modülün ekranlarını listeler.
+ * menüler yalnızca o modülün ekranlarını listeler. Mobil alt (sticky) menü de
+ * modüle duyarlıdır: ögeleri `@/lib/modul` içindeki `ALT_MENU_OGELERI` belirler.
  */
 export function MobileShell({
   children,
@@ -36,7 +37,7 @@ export function MobileShell({
           <div className="mx-auto w-full max-w-3xl md:max-w-6xl">{children}</div>
         </main>
       </div>
-      <BottomNav izinliRotalar={izinliRotalar} />
+      <BottomNav izinliRotalar={izinliRotalar} aktifModul={aktifModul} />
     </>
   );
 }

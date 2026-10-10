@@ -75,13 +75,13 @@ export function alimModulu(sayaclar: AlimModulSayaclari): Modul {
         href: "/cari/hesaplar",
         etiket: "Cari Hesaplar",
         ikon: "cari",
-        dekont: "Üretici, tüccar, fabrika — çoklu bakiye.",
+        dekont: "Müstahsil, tüccar, fabrika — çoklu bakiye.",
       },
       {
         href: "/satis",
         etiket: "Satış",
         ikon: "satis",
-        dekont: "Müşteriye satış fişi.",
+        dekont: "Fabrika/tüccara satış fişi.",
       },
     ],
   };
@@ -145,7 +145,7 @@ export function finansModulu(): Modul {
       { href: "/kasa", etiket: "Kasa", ikon: "kasa", dekont: "Tahsilat ve ödeme sonrası bakiye." },
       { href: "/banka", etiket: "Banka", ikon: "banka", dekont: "Havale ve EFT hareketleri." },
       { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
-      { href: "/finans/odeme", etiket: "Ödeme", ikon: "odeme", dekont: "Üretici/tüccar/fabrika ödemeleri." },
+      { href: "/finans/odeme", etiket: "Ödeme", ikon: "odeme", dekont: "Müstahsil/tüccar/fabrika ödemeleri." },
       { href: "/masraf", etiket: "Masraf", ikon: "masraf", dekont: "Nakliye, kantar, hamaliye." },
       { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Nakit/ayni/fındık karşılığı avans." },
     ],
@@ -155,12 +155,12 @@ export function finansModulu(): Modul {
 export function musteriModulu(): Modul {
   return {
     id: "musteri",
-    etiket: "Müşteri İşlemleri",
+    etiket: "Cari İşlemleri",
     altModuller: [
-      { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: "cari", dekont: "Üretici, tüccar, fabrika — çoklu bakiye." },
+      { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: "cari", dekont: "Müstahsil, tüccar, fabrika — çoklu bakiye." },
       { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
-      { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Üretici avansı." },
-      { href: "/satis", etiket: "Satış", ikon: "satis", dekont: "Müşteriye satış fişi." },
+      { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Müstahsil avansı." },
+      { href: "/satis", etiket: "Satış", ikon: "satis", dekont: "Fabrika/tüccara satış fişi." },
     ],
   };
 }

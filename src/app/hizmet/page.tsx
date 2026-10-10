@@ -100,7 +100,7 @@ export default async function HizmetPage({
     paketleme: k.paketleme,
     paketTipi: k.paketTipi,
     paketAdedi: k.paketAdedi,
-    cariId: k.cariId,
+    musteriId: k.musteriId,
     odemeDurumu: k.odemeDurumu,
     odemeYontemi: k.odemeYontemi,
     kasaHesapId: k.kasaHesapId,

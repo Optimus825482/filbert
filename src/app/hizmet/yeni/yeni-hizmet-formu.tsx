@@ -36,22 +36,18 @@ export interface MusteriOneri {
   id?: string;
   ad: string;
   telefon: string;
-  tur?: string;
-  kaynak?: "CARI" | "GECMIS";
 }
 
 interface Props {
   hizmetTipleri: HizmetTipiSecenek[];
-  cariler?: Array<{ id: string; ad: string; telefon: string; tur: string }>;
-  musteriOnerileri?: MusteriOneri[];
+  musteriler?: Array<{ id: string; ad: string; telefon: string }>;
   smsAktif: boolean;
   otomatikGirisSms: boolean;
 }
 
 export function YeniHizmetFormu({
   hizmetTipleri,
-  cariler = [],
-  musteriOnerileri = [],
+  musteriler = [],
   smsAktif,
   otomatikGirisSms,
 }: Props) {
@@ -59,25 +55,13 @@ export function YeniHizmetFormu({
   const [isPending, startTransition] = useTransition();
 
   // Form State
-  const [seciliCariId, setSeciliCariId] = useState("");
+  const [seciliMusteriId, setSeciliMusteriId] = useState("");
   const [musteriAdi, setMusteriAdi] = useState("");
   const [telefon, setTelefon] = useState("");
   const [aramaOdak, setAramaOdak] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Tüm müşteri önerilerini birleştir
-  const tumOneriler: MusteriOneri[] = useMemo(() => {
-    if (musteriOnerileri.length > 0) return musteriOnerileri;
-    return cariler.map((c) => ({
-      id: c.id,
-      ad: c.ad,
-      telefon: c.telefon,
-      tur: c.tur,
-      kaynak: "CARI" as const,
-    }));
-  }, [musteriOnerileri, cariler]);
-
-  // Canlı müşteri önerisi — daha önce gelen müşteriler arasından ilk 4 harf
+  // Canlı müşteri önerisi — kayıtlı müşteriler arasından ilk 4 harf
   // girildiğinde en yakın 5 kaydı (ad soyad + telefon) sıralı önerir.
   const filtrelenmisOneriler = useMemo(() => {
     const q = musteriAdi.trim().toLocaleLowerCase("tr-TR");
@@ -86,7 +70,7 @@ export function YeniHizmetFormu({
     const telAramasi = qRakam.length >= 3;
     if (!adAramasi && !telAramasi) return [];
 
-    return tumOneriler
+    return musteriler
       .map((m) => {
         const ad = m.ad.toLocaleLowerCase("tr-TR");
         const kelimeler = ad.split(/\s+/);
@@ -111,7 +95,7 @@ export function YeniHizmetFormu({
       )
       .slice(0, ONERI_LIMIT)
       .map((satir) => satir.musteri);
-  }, [musteriAdi, tumOneriler]);
+  }, [musteriAdi, musteriler]);
 
   // Tıklama dışı algılama (Açılır listeyi kapatmak için)
   useEffect(() => {
@@ -127,7 +111,7 @@ export function YeniHizmetFormu({
   function handleMusteriSec(m: MusteriOneri) {
     setMusteriAdi(m.ad);
     setTelefon(m.telefon || "");
-    setSeciliCariId(m.id || "");
+    setSeciliMusteriId(m.id || "");
     setAramaOdak(false);
     toast.info(`${m.ad} seçildi, telefon numarası otomatik dolduruldu.`);
   }
@@ -244,7 +228,7 @@ export function YeniHizmetFormu({
         paketleme,
         paketTipi: paketleme ? paketTipi : undefined,
         paketAdedi: paketleme && paketAdedi ? parseInt(paketAdedi, 10) : undefined,
-        cariId: seciliCariId || undefined,
+        musteriId: seciliMusteriId || undefined,
         hizmetTipiId: seciliTipId || undefined,
         birimFiyatManuel: birimFiyat,
         toplamTutarManuel: toplamTutar,
@@ -291,16 +275,16 @@ export function YeniHizmetFormu({
       <div className="space-y-6 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-5 shadow-xl">
         {/* ─── 1. Müşteri Bilgileri & Cari Rehberi ─── */}
         <div className="space-y-3">
-          {cariler.length > 0 && (
+          {musteriler.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-2.5">
-              <span className="text-xs font-bold text-sky-200">Rehberden Seç:</span>
+              <span className="text-xs font-bold text-sky-200">Müşteri Rehberi:</span>
               <select
-                value={seciliCariId}
+                value={seciliMusteriId}
                 onChange={(e) => {
-                  const cid = e.target.value;
-                  setSeciliCariId(cid);
-                  if (cid) {
-                    const bul = cariler.find((c) => c.id === cid);
+                  const mid = e.target.value;
+                  setSeciliMusteriId(mid);
+                  if (mid) {
+                    const bul = musteriler.find((m) => m.id === mid);
                     if (bul) {
                       setMusteriAdi(bul.ad);
                       if (bul.telefon) setTelefon(bul.telefon);
@@ -309,18 +293,18 @@ export function YeniHizmetFormu({
                 }}
                 className="flex-1 rounded-lg border border-white/10 bg-[#081226] px-3 py-1.5 text-xs font-semibold text-white focus:border-[#f5c518] focus:outline-none"
               >
-                <option value="">-- Kayıtlı Müşteri / Üretici Seçiniz (İsteğe Bağlı) --</option>
-                {cariler.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.ad} {c.telefon ? `(${c.telefon})` : ""} [{c.tur}]
+                <option value="">-- Kayıtlı Müşteri Seçiniz (İsteğe Bağlı) --</option>
+                {musteriler.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.ad} {m.telefon ? `(${m.telefon})` : ""}
                   </option>
                 ))}
               </select>
-              {seciliCariId && (
+              {seciliMusteriId && (
                 <button
                   type="button"
                   onClick={() => {
-                    setSeciliCariId("");
+                    setSeciliMusteriId("");
                   }}
                   className="rounded-lg border border-white/10 px-2 py-1 text-[11px] font-bold text-sky-300 hover:bg-white/5"
                 >
@@ -337,7 +321,7 @@ export function YeniHizmetFormu({
                 <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-200">
                   <User className="h-3.5 w-3.5 text-[#f5c518]" /> Müşteri Adı Soyadı *
                 </label>
-                {seciliCariId && (
+                {seciliMusteriId && (
                   <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-400 border border-emerald-500/20">
                     <CheckCircle2 className="h-3 w-3" /> Rehber Kayıtlı
                   </span>
@@ -353,7 +337,7 @@ export function YeniHizmetFormu({
                 onChange={(e) => {
                   setMusteriAdi(e.target.value);
                   setAramaOdak(true);
-                  if (seciliCariId) setSeciliCariId("");
+                  if (seciliMusteriId) setSeciliMusteriId("");
                 }}
                 className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
               />
@@ -389,18 +373,8 @@ export function YeniHizmetFormu({
                         </div>
                       </div>
                       <div className="text-right">
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-bold border ${
-                            m.kaynak === "CARI"
-                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                              : "bg-sky-500/20 text-sky-200 border-sky-500/40"
-                          }`}
-                        >
-                          {m.kaynak === "CARI"
-                            ? m.tur === "URETICI"
-                              ? "Müstahsil"
-                              : "Cari Kart"
-                            : "Önceki Hizmet"}
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                          Müşteri Rehberi
                         </span>
                       </div>
                     </button>

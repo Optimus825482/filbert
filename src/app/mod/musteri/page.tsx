@@ -9,19 +9,19 @@ export default async function MusteriModulPage() {
   const modüller: Modul[] = [
     {
       id: "musteri",
-      etiket: "Müşteri İşlemleri",
+      etiket: "Cari İşlemleri",
       altModuller: [
-        { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: "cari", dekont: "Üretici, tüccar, fabrika — çoklu bakiye." },
+        { href: "/cari/hesaplar", etiket: "Cari Hesaplar", ikon: "cari", dekont: "Müstahsil, tüccar, fabrika — çoklu bakiye." },
         { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
         { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Nakit/ayni/fındık karşılığı avans." },
-        { href: "/satis", etiket: "Satış", ikon: "satis", dekont: "Müşteriye satış fişi." },
+        { href: "/satis", etiket: "Satış", ikon: "satis", dekont: "Fabrika/tüccara satış fişi." },
       ],
     },
     {
       id: "findik",
       etiket: "Fındık İşlemleri",
       altModuller: [
-        { href: "/alim/yeni", etiket: "Yeni Alım Fişi", ikon: "alim-yeni", dekont: "Müşteri, miktar, fiyat, kalite." },
+        { href: "/alim/yeni", etiket: "Yeni Alım Fişi", ikon: "alim-yeni", dekont: "Müstahsil, miktar, fiyat, kalite." },
         { href: "/alim", etiket: "Alım Yönetimi", ikon: "alim-liste", dekont: "Fiş listesi, randıman, emanet." },
         { href: "/randiman", etiket: "Randıman Takibi", ikon: "randiman", dekont: "Bekleyen + tamamlanan randımanlar." },
         { href: "/virman", etiket: "Virman", ikon: "virman", dekont: "Depolar arası aktarım." },
@@ -36,7 +36,7 @@ export default async function MusteriModulPage() {
         { href: "/kasa", etiket: "Kasa", ikon: "kasa", dekont: "Tahsilat ve ödeme sonrası bakiye." },
         { href: "/banka", etiket: "Banka", ikon: "banka", dekont: "Havale ve EFT hareketleri." },
         { href: "/tahsilat", etiket: "Tahsilat", ikon: "tahsilat", dekont: "Cari hesaptan tahsilat." },
-        { href: "/finans/odeme", etiket: "Ödeme", ikon: "odeme", dekont: "Üretici/tüccar/fabrika ödemeleri." },
+        { href: "/finans/odeme", etiket: "Ödeme", ikon: "odeme", dekont: "Müstahsil/tüccar/fabrika ödemeleri." },
         { href: "/masraf", etiket: "Masraf", ikon: "masraf", dekont: "Nakliye, kantar, hamaliye." },
         { href: "/avans", etiket: "Avans", ikon: "avans", dekont: "Nakit/ayni/fındık karşılığı avans." },
       ],

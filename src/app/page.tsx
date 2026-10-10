@@ -70,7 +70,7 @@ export default async function AnaSayfa() {
     bekleyenler.push({ href: "/finans-taslaklari", ikon: BellRing, etiket: "İnceleme bekleyen sesli taslak", rozet: `${bekleyenFinansTaslagi} kayıt` });
   }
   if (izinler.emanet && ozet.emanetKgBorcumuz > 0) {
-    bekleyenler.push({ href: "/emanet", ikon: PackageOpen, etiket: "Üreticilere emanet borcu", rozet: kg(ozet.emanetKgBorcumuz) });
+    bekleyenler.push({ href: "/emanet", ikon: PackageOpen, etiket: "Müstahsillere emanet borcu", rozet: kg(ozet.emanetKgBorcumuz) });
   }
   return (
     <>
@@ -115,7 +115,7 @@ export default async function AnaSayfa() {
           {izinler.alim && <Metrik baslik="BUGÜNKÜ ALIM" deger={kg(ozet.bugunAlimKg)} alt={`${ozet.bugunFisAdet} fiş`} href="/alim" />}
           {izinler.randiman && <Metrik baslik="RANDIMAN BEKLEYEN" deger={String(bekleyenRandiman)} alt={bekleyenRandiman > 0 ? "giriş bekliyor" : "bekleyen yok"} vurgu={bekleyenRandiman > 0} href="/randiman" />}
           {izinler.stok && <Metrik baslik="STOK (KENDİ)" deger={kg(ozet.stokKendi)} alt={izinler.emanet ? `Emanette ${kg(ozet.stokEmanet)}` : undefined} href="/stok" />}
-          {izinler.emanet && <Metrik baslik="EMANET BORCUMUZ" deger={kg(ozet.emanetKgBorcumuz)} alt="üreticilere kg olarak" vurgu={ozet.emanetKgBorcumuz > 0} href="/emanet" />}
+          {izinler.emanet && <Metrik baslik="EMANET BORCUMUZ" deger={kg(ozet.emanetKgBorcumuz)} alt="müstahsillere kg olarak" vurgu={ozet.emanetKgBorcumuz > 0} href="/emanet" />}
         </section>
 
         {/* ── Alım trendi + bekleyen işler ── */}
@@ -196,7 +196,7 @@ export default async function AnaSayfa() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--surface-border)] text-left text-[10px] uppercase tracking-wider text-sky-500">
-                  <th className="px-4 py-2.5 font-bold">Fiş / Üretici</th>
+                  <th className="px-4 py-2.5 font-bold">Fiş / Müstahsil</th>
                   <th className="px-3 py-2.5 font-bold">Tarih</th>
                   <th className="px-3 py-2.5 font-bold text-right">Net kg</th>
                   <th className="px-3 py-2.5 font-bold text-right">Randıman</th>

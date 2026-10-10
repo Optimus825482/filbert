@@ -32,7 +32,7 @@ export function EmanetYonet({ emanetId, cariAd, kalanKg }: { emanetId: string; c
 
   return <Dialog open={acik} onOpenChange={setAcik}>
     <DialogTrigger asChild><button type="button" className="saha-btn bg-slate-700 px-3 text-sm text-white"><RotateCcw className="h-4 w-4" /> İade</button></DialogTrigger>
-    <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Emanet İade — {cariAd}</DialogTitle><DialogDescription>İade edilen miktar emanet stokundan ve üreticinin kg alacağından düşülür.</DialogDescription></DialogHeader>
+    <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Emanet İade — {cariAd}</DialogTitle><DialogDescription>İade edilen miktar emanet stokundan ve müstahsilin kg alacağından düşülür.</DialogDescription></DialogHeader>
       <div className="space-y-3"><div className="space-y-1.5"><Label>İade miktarı (kg) — kalan: {kalanKg.toLocaleString("tr-TR")}</Label><Input inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} className="saha-input" /></div><div className="space-y-1.5"><Label>Açıklama (isteğe bağlı)</Label><Input value={aciklama} onChange={(e) => setAciklama(e.target.value)} className="saha-input" /></div><button type="button" disabled={pending || sayiCevir(kg) <= 0 || sayiCevir(kg) > kalanKg} onClick={iadeEt} className="saha-btn w-full bg-slate-700 text-white">{pending ? "İşleniyor..." : "İadeyi Kaydet"}</button></div>
     </DialogContent>
   </Dialog>;

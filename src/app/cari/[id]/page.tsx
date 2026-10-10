@@ -36,7 +36,7 @@ export default async function CariDetayPage({ params }: { params: Promise<{ id: 
 
   return (
     <div>
-      <div className="no-print"><PageBaslik baslik={cari.ad} alt={(cari.tur === "URETICI" ? "Üretici" : cari.tur === "TUCCAR" ? "Tüccar" : "Fabrika") + " · " + (cari.bolge ?? "—")} geri="/cari/hesaplar" /></div>
+      <div className="no-print"><PageBaslik baslik={cari.ad} alt={(cari.tur === "URETICI" ? "Müstahsil" : cari.tur === "TUCCAR" ? "Tüccar" : "Fabrika") + " · " + (cari.bolge ?? "—")} geri="/cari/hesaplar" /></div>
 
       <div className="no-print mb-4 flex flex-wrap gap-2">
         {Object.entries(bakiyeler).map(([tur, tutar]) => <BakiyeRozet key={tur} tur={tur} tutar={tutar ?? 0} />)}

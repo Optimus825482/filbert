@@ -8,7 +8,7 @@ import { CariBosDurum, CariDuzenleButonu, YeniCariButonu } from "@/components/ca
 
 export const dynamic = "force-dynamic";
 
-const TUR_ETIKET: Record<string, string> = { URETICI: "Üretici", TUCCAR: "Tüccar", FABRIKA: "Fabrika" };
+const TUR_ETIKET: Record<string, string> = { URETICI: "Müstahsil", TUCCAR: "Tüccar", FABRIKA: "Fabrika" };
 
 export default async function CariHesaplarPage({ searchParams }: { searchParams: Promise<{ q?: string; tur?: string }> }) {
   const actor = await requirePagePermission("CARI", "GORUNTULE");
@@ -30,7 +30,7 @@ export default async function CariHesaplarPage({ searchParams }: { searchParams:
       {/* Masaüstü başlık */}
       <div className="mb-4 hidden md:block">
         <h1 className="text-xl font-extrabold tracking-tight">Cari Hesaplar</h1>
-        <p className="text-sm text-sky-100">Üretici, tüccar ve fabrika kartları · çoklu bakiye</p>
+        <p className="text-sm text-sky-100">Müstahsil, tüccar ve fabrika kartları · çoklu bakiye</p>
       </div>
 
       <div className="mb-3 flex gap-2">

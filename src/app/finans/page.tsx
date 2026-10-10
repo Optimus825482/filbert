@@ -36,7 +36,7 @@ export default async function FinansYonetimiPage() {
         {
           href: "/finans/odeme",
           baslik: "Ödemeler",
-          alt: "Üretici/tüccar/fabrika ödemeleri.",
+          alt: "Müstahsil/tüccar/fabrika ödemeleri.",
           ikon: ArrowDownUp,
           renk: "bg-orange-500",
         },

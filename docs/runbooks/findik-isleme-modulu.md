@@ -15,7 +15,10 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 ögelerini ve fonksiyonlarını** gösterir:
 
 - **Fındık Alım Modülü** (`/mod/alim`) — alım fişi, randıman, emanet, virman,
-  sevkiyat, cari, finans ve raporlar.
+  sevkiyat, cari, finans ve raporlar. Fındık alınan kişiler bu modülde **müstahsil**
+  olarak anılır (`CariKart`, `tur = URETICI`); kenar çubuğundaki ilgili grup
+  başlığı bu nedenle "MÜŞTERİ" değil **"CARİ"**'dir ve yalnızca müstahsil, tüccar,
+  fabrika kartlarını listeler.
 - **Fındık İşleme Modülü** (`/mod/islem`) — talep kaydı, kuyruk, aşama takibi,
   teslim/tahsilat, raporlar ve **kendine ait kasa yönetimi**.
 
@@ -35,9 +38,18 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 - **Masaüstü:** Sol menüde modül değiştirme düğmesi **yoktur**; menünün altında
   yalnızca **Ayarlar** bağlantısı bulunur. Modül değişimi **Ayarlar → Modül**
   sekmesinden yapılır.
-- **Mobil:** Alt (sticky) menünün en sağındaki **Ayarlar** ikonu Ayarlar ekranını
-  açar; **Modül** sekmesinden aktif modül değiştirilir. Böylece mobilde de
-  modül değişimi mümkündür.
+- **Mobil:** Alt (sticky) menü **modüle göre** değişir; en sağındaki **Ayarlar**
+  ikonu Ayarlar ekranını açar ve **Modül** sekmesinden aktif modül değiştirilir.
+  Böylece mobilde de modül değişimi mümkündür.
+  - **Alım modülü:** Ana Sayfa (`/`), Ara (`/arama`), **Sesli modu aç**
+    (`/sesli-not`, ortada vurgulu), Ayarlar (`/ayarlar`).
+  - **İşleme modülü:** Pano (`/`), Talep Kuyruğu (`/hizmet`), **Yeni Talep**
+    (`/hizmet/yeni`, ortada vurgulu), İşleme Kasası (`/hizmet/kasa`),
+    Ayarlar (`/ayarlar`).
+  - **İşleme modülünde eller serbest (sesli not) ögesi yoktur**; sesli akış
+    yalnızca alım modülüne aittir.
+  - Tek kaynak: `src/lib/modul.ts` → `ALT_MENU_OGELERI` / `altMenuOgeleri()`;
+    çizim: `src/components/bottom-nav.tsx`.
 
 **Varsayılan modül (girişte açılacak modül):**
 
@@ -92,10 +104,20 @@ Her aşamaya geçişte zaman damgası yazılır (`kirimAt`, `kavurmaAt`, `paketl
 `/hizmet/yeni` ekranı müşteri adı, telefon, fındık miktarı (kg), yapılacak işler
 (Kırma / Kavurma / Vakumlu Paketleme) ve varsa detay/not alanlarını içerir.
 
-Müşteri adı alanına **ilk 4 harf** yazıldığında, daha önce gelen müşteriler
-(cari kartlar + geçmiş talepler) arasından **en yakın 5 kayıt** ad-soyad ve telefon
-numarasıyla önerilir. Öneri seçildiğinde ad, telefon ve varsa cari bağlantısı
-otomatik doldurulur (`src/app/hizmet/yeni/yeni-hizmet-formu.tsx`).
+Müşteri adı alanına **ilk 4 harf** yazıldığında, kayıtlı **Fındık İşleme müşteri
+rehberi** (`Musteri` tablosu) içinden **en yakın 5 kayıt** ad-soyad ve telefon
+numarasıyla önerilir. Öneri seçildiğinde ad ve telefon otomatik doldurulur, kayıtlı
+müşteri kimliği (`musteriId`) talebe bağlanır
+(`src/app/hizmet/yeni/yeni-hizmet-formu.tsx`).
+
+**Müşteri / müstahsil ayrımı (ayrı tablolar):** Fındık İşleme modülünün müşterileri
+ayrı bir `Musteri` tablosunda tutulur. Fındık **alınan** kişiler ise müşteri değil
+**müstahsil** kabul edilir ve alım/tedarik tarafının `CariKart` tablosunda
+(`URETICI` / `TUCCAR` / `FABRIKA`) kalır. İki kayıt kümesi birbirine karışmaz:
+talebe kayıtlı müşteri seçilmezse ad + telefon eşleşen müşteri rehberde aranır, yoksa
+kendiliğinden açılır (`src/lib/musteri.ts` → `musteriBulVeyaOlustur`). Alım carileri
+işleme önerilerinde **hiç görünmez**; `getHizmetFormSecenekleri()` ve
+`/hizmet/yeni` yalnızca `prisma.musteri` okur.
 
 Kayıt tamamlandığında müşteriye **"talebiniz alınmıştır"** SMS'i gönderilir
 (`otomatikGirisSms` açıkken otomatik, formdaki onay kutusuyla manuel).
@@ -291,6 +313,7 @@ pnpm test                 # birim testleri (tsx --test)
                           #   ESC/POS: test/yazici-escpos.test.ts
                           #   Bluetooth/BLE raster: test/yazici-nimbot.test.ts
                           #   Modül ayrımı/menü daraltma: test/modul.test.ts
+                          #   Müşteri/müstahsil ayrımı: test/musteri-ayrim.test.ts
 pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
 pnpm build
 ```
@@ -332,9 +355,10 @@ verilmediğinde atlanır. İki yol vardır:
 
 ### Test artıklarını temizleme
 
-`e2e/findik-isleme.spec.ts` paylaşılan veritabanına talep kaydı ve bu talebe bağlı
-tahsilat `FinansHareket` satırı yazar. Doğrulama bittikten sonra artıkları önce
-kuru çalıştırmayla listeleyin, sonra silin:
+`e2e/findik-isleme.spec.ts` paylaşılan veritabanına talep kaydı (`HizmetIslemi`), bu
+talebe bağlı tahsilat `FinansHareket` satırı, işleme müşteri rehberi kaydı
+(`Musteri`) ve alım müstahsili (`CariKart`) yazar. Doğrulama bittikten sonra
+artıkları önce kuru çalıştırmayla listeleyin, sonra silin:
 
 ```powershell
 pnpm e2e:temizle                # yalnızca neyin silineceğini listeler
@@ -352,7 +376,10 @@ ekranındaki yazıcı hedefi (Bluetooth dahil) bölümü, `/mod/islem` modül sa
 Modül ayrımı için ayrıca: menü daraltma (her modülde yalnızca kendi grupları),
 panonun modüle göre ayrılması (işleme ve alım panoları karışmaz), modül geçişinin
 kenar çubuğunda menü öğesi olarak **yer almadığı**, Ayarlar → Modül sekmesi ve
-giriş varsayılan modülü yönlendirmesi doğrulanır.
+giriş varsayılan modülü yönlendirmesi doğrulanır. Mobil sticky alt menünün modüle
+göre ayrıldığı (alım: Ana Sayfa / Ara / Sesli modu aç / Ayarlar; işleme: Pano /
+Talep Kuyruğu / Yeni Talep / İşleme Kasası / Ayarlar) ve **işleme modülünde eller
+serbest (sesli not) ögesinin bulunmadığı** da doğrulanır.
 
 Web Bluetooth'un kendisi (yazıcı eşleştirme ve fiziksel baskı) tarayıcı izni ve donanım
 gerektirdiğinden e2e'de taklit edilir. Gerçek baskı **yazıcının bağlı olduğu makinede**
@@ -370,6 +397,10 @@ yazıcıyı seçin ve çıktıyı kontrol edin.
   saklar; `src/lib/findik-isleme.ts` çözümleme/birleştirme yardımcılarını içerir.
   ESC/POS yazıcı hedefi ve Bluetooth baskı yoğunluğu (`bluetoothYogunluk`) da aynı
   blokta (`yazici`) tutulur, ek migration gerekmez.
+- İşleme müşterileri `Musteri` tablosuna taşınmıştır; `HizmetIslemi.cariId` kaldırılıp
+  yerine `musteriId` (`onDelete: SetNull`) gelmiştir. Migration mevcut hizmet
+  kayıtlarındaki ad + telefonları `Musteri` rehberine taşır ve talepleri bu rehbere
+  bağlar (`prisma/migrations/20261010180000_findik_isleme_musteri_tablosu`).
 - `FirmaModulu` enum'u (`ALIM` | `ISLEME`) modül ayrımını taşır:
   `Kullanici.varsayilanModul` kullanıcının girişte açılacak modülünü,
   `KasaHesap.modul` hesabın hangi modüle ait olduğunu belirtir; varsayılan `ALIM`'dır

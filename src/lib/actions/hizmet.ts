@@ -22,6 +22,7 @@ import {
   type YaziciHedefTipi,
 } from "@/lib/findik-isleme";
 import { Prisma, type HizmetDurumu } from "@/generated/prisma/client";
+import { musteriBulVeyaOlustur } from "@/lib/musteri";
 
 export interface HizmetKaydiGirdi {
   musteriAdi: string;
@@ -32,7 +33,7 @@ export interface HizmetKaydiGirdi {
   paketleme?: boolean;
   paketTipi?: string;
   paketAdedi?: number;
-  cariId?: string;
+  musteriId?: string;
   hizmetTipiId?: string;
   birimFiyatManuel?: number;
   toplamTutarManuel?: number;
@@ -103,6 +104,11 @@ export async function createHizmetKaydi(
 
     // Atomik Sıra Numarası Üretimi (0001 ile başlayan 4 rakamlı sıra numarası)
     const kayit = await prisma.$transaction(async (tx) => {
+      // Müşteri rehberi bağlantısı: seçili müşteri yoksa ad + telefondan bulunur/oluşturulur.
+      const musteriId =
+        g.musteriId?.trim() ||
+        (await musteriBulVeyaOlustur(tx, firma.id, g.musteriAdi, g.telefon));
+
       // HizmetSiraSayaci kaydını atomik olarak arttır
       const sayac = await tx.hizmetSiraSayaci.upsert({
         where: { firmaId: firma.id },
@@ -126,7 +132,7 @@ export async function createHizmetKaydi(
           paketleme,
           paketTipi: g.paketTipi?.trim() || null,
           paketAdedi: g.paketAdedi && g.paketAdedi > 0 ? Number(g.paketAdedi) : null,
-          cariId: g.cariId?.trim() || null,
+          musteriId,
           hizmetTipiId: g.hizmetTipiId ?? null,
           hizmetTipiAdi,
           birimFiyat,
@@ -548,7 +554,7 @@ export async function hizmetTahsilatKaydet(g: HizmetTahsilatGirdi): Promise<Sonu
           data: {
             tip: "TAHSILAT",
             firmaId: actor.firmaId,
-            cariId: kayit.cariId ?? null,
+            cariId: null,
             hesapId: g.kasaHesapId!,
             bakiyeTuru: "TL",
             tutar: tahsilTutar,
@@ -600,10 +606,10 @@ export async function hizmetTahsilatKaydet(g: HizmetTahsilatGirdi): Promise<Sonu
 export async function getHizmetFormSecenekleri() {
   try {
     const firma = await getCurrentFirma();
-    const [cariler, kasalar] = await Promise.all([
-      prisma.cariKart.findMany({
+    const [musteriler, kasalar] = await Promise.all([
+      prisma.musteri.findMany({
         where: { firmaId: firma.id, aktif: true },
-        select: { id: true, ad: true, telefon: true, tur: true },
+        select: { id: true, ad: true, telefon: true },
         orderBy: { ad: "asc" },
         take: 300,
       }),
@@ -615,11 +621,10 @@ export async function getHizmetFormSecenekleri() {
     ]);
 
     return {
-      cariler: cariler.map((c) => ({
-        id: c.id,
-        ad: c.ad,
-        telefon: c.telefon || "",
-        tur: c.tur,
+      musteriler: musteriler.map((m) => ({
+        id: m.id,
+        ad: m.ad,
+        telefon: m.telefon || "",
       })),
       kasalar: kasalar.map((k) => ({
         id: k.id,
@@ -628,7 +633,7 @@ export async function getHizmetFormSecenekleri() {
       })),
     };
   } catch {
-    return { cariler: [], kasalar: [] };
+    return { musteriler: [], kasalar: [] };
   }
 }
 

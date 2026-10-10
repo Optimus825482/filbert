@@ -5,6 +5,7 @@ import {
   MODULLER,
   NAV_GRUPLARI,
   aktifModulBelirle,
+  altMenuOgeleri,
   dbModulKodu,
   dbModuluCoz,
   modulAnaRota,
@@ -71,12 +72,12 @@ test("kenar çubuğu grupları modüllere göre ayrılır", () => {
   assert.equal(navGrubuGorunur("FINDIK İŞLEME", "islem"), true);
   assert.equal(navGrubuGorunur("FINDIK ALIM", "islem"), false);
   assert.equal(navGrubuGorunur("FİNANS YÖNETİMİ", "islem"), false);
-  assert.equal(navGrubuGorunur("MÜŞTERİ", "islem"), false);
+  assert.equal(navGrubuGorunur("CARİ", "islem"), false);
   assert.equal(navGrubuGorunur("RAPORLAR", "islem"), false);
   // Alım modülü: işleme grubu görünmez.
   assert.equal(navGrubuGorunur("FINDIK ALIM", "alim"), true);
   assert.equal(navGrubuGorunur("FİNANS YÖNETİMİ", "alim"), true);
-  assert.equal(navGrubuGorunur("MÜŞTERİ", "alim"), true);
+  assert.equal(navGrubuGorunur("CARİ", "alim"), true);
   assert.equal(navGrubuGorunur("RAPORLAR", "alim"), true);
   assert.equal(navGrubuGorunur("FINDIK İŞLEME", "alim"), false);
   // Modül bilinmiyorsa (eski oturum) menüler daraltılmaz.
@@ -107,4 +108,34 @@ test("modül tanımları geçiş etiketi ve karşı modülü tutarlı taşır", 
   assert.equal(MODULLER.islem.izinModulu, "HIZMET");
   assert.equal(MODULLER.alim.gecEtiketi, "Fındık Alım Modülüne Geç");
   assert.equal(MODULLER.islem.gecEtiketi, "Fındık İşleme Modülüne Geç");
+});
+test("mobil alt menü modüle göre ayrılır: işlemede eller serbest ögesi yoktur", () => {
+  const alim = altMenuOgeleri("alim");
+  // Alım modülü eller serbest (sesli not) kısayolunu korur ve yalnızca tek
+  // vurgulu (yükseltilmiş) birincil eylem taşır.
+  assert.ok(alim.some((oge) => oge.href === "/sesli-not"));
+  assert.equal(alim.filter((oge) => oge.vurgulu).length, 1);
+
+  const islem = altMenuOgeleri("islem");
+  // Fındık İşleme modülünde eller serbest ögesi bulunmaz.
+  assert.equal(islem.some((oge) => oge.href === "/sesli-not"), false);
+  assert.equal(islem.some((oge) => oge.ikon === "mikrofon"), false);
+  // Modüle ait olmayan alım ekranları da alt menüye sızmaz.
+  assert.equal(islem.some((oge) => oge.href === "/arama"), false);
+  assert.deepEqual(
+    islem.map((oge) => oge.href),
+    ["/", "/hizmet", "/hizmet/yeni", "/hizmet/kasa", "/ayarlar"],
+  );
+  // Birincil eylem yeni talep kaydıdır.
+  const vurgulu = islem.filter((oge) => oge.vurgulu);
+  assert.equal(vurgulu.length, 1);
+  assert.equal(vurgulu[0]?.href, "/hizmet/yeni");
+
+  // Ayarlar her iki modülde de en sonda durur; modül değişimi oradan yapılır.
+  assert.equal(alim.at(-1)?.href, "/ayarlar");
+  assert.equal(islem.at(-1)?.href, "/ayarlar");
+
+  // Modül bilinmiyorsa alım menüsüne düşülür.
+  assert.deepEqual(altMenuOgeleri(null), alim);
+  assert.deepEqual(altMenuOgeleri(undefined), alim);
 });

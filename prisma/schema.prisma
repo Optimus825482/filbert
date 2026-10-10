@@ -226,6 +226,7 @@ model Firma {
   finansHareketleri     FinansHareket[]
   masrafTurleri         MasrafTuru[]
   hizmetIslemleri       HizmetIslemi[]
+  hizmetMusterileri     Musteri[]
   hizmetTipleri         HizmetTipi[]
   smsAyari              SmsAyari?
   hizmetSiraSayaci      HizmetSiraSayaci?
@@ -428,7 +429,6 @@ model CariKart {
   satisler         Satis[]
   sevkiyatlar      Sevkiyat[]
   masraflar        Masraf[]
-  hizmetIslemleri  HizmetIslemi[]
 
   @@index([firmaId, tur])
   @@index([firmaId, ad])
@@ -878,9 +878,10 @@ model HizmetIslemi {
   paketTipi  String? // "1_KG", "500_GR", "250_GR", "OZEL"
   paketAdedi Int? // Örn: 50 adet
 
-  // Cari / Rehber Bağlantısı (Opsiyonel)
-  cariId String?
-  cari   CariKart? @relation(fields: [cariId], references: [id], onDelete: SetNull)
+  // Müşteri bağlantısı: yalnızca fındık işleme müşteri rehberine (Musteri) bağlanır.
+  // Alım/tedarik tarafındaki CariKart (müstahsil/tüccar/fabrika) kayıtları bu modülde kullanılmaz.
+  musteriId String?
+  musteri   Musteri? @relation(fields: [musteriId], references: [id], onDelete: SetNull)
 
   hizmetTipiId  String?
   hizmetTipi    HizmetTipi?  @relation(fields: [hizmetTipiId], references: [id], onDelete: SetNull)
@@ -924,7 +925,30 @@ model HizmetIslemi {
   @@index([firmaId, odemeDurumu])
   @@index([firmaId, createdAt])
   @@index([firmaId, telefon])
-  @@index([firmaId, cariId])
+  @@index([firmaId, musteriId])
+}
+
+// Fındık İşleme modülünün müşteri rehberi. Yalnızca kırma/kavurma/paketleme
+// hizmeti alan müşterileri tutar; alım/tedarik tarafındaki CariKart
+// (müstahsil, tüccar, fabrika) kayıtlarıyla karışmaz.
+model Musteri {
+  id        String   @id @default(uuid())
+  firmaId   String
+  firma     Firma    @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  ad        String
+  telefon   String?
+  tckn      String?
+  adres     String?
+  notAlani  String?
+  favori    Boolean  @default(false)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hizmetIslemleri HizmetIslemi[]
+
+  @@index([firmaId, ad])
+  @@index([firmaId, telefon])
 }
 
 model HizmetTipi {

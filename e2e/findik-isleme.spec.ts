@@ -298,4 +298,49 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await page.waitForURL(/\/mod\/alim$/);
     await expect(page.getByRole("heading", { name: "Fındık Alım Modülü" })).toBeVisible();
   });
+  test("mobil alt menü modüle göre ayrılır: işlemede eller serbest yok", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // Fındık İşleme: alt menü yalnızca işleme akışını taşır, eller serbest yok.
+    await page.goto("/mod/islem");
+    const alt = page.locator("nav.guvenli-alt");
+    await expect(alt.getByRole("link", { name: "Pano" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Talep Kuyruğu" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Yeni Talep" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "İşleme Kasası" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Ayarlar", exact: true })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Sesli modu aç" })).toHaveCount(0);
+    await expect(alt.getByRole("link", { name: "Ara", exact: true })).toHaveCount(0);
+
+    // Kısayol gerçekten çalışır: yeni talep kaydı ekranı açılır.
+    await alt.getByRole("link", { name: "Yeni Talep" }).click();
+    await page.waitForURL(/\/hizmet\/yeni$/);
+    await expect(page.getByRole("heading", { name: "Yeni Hizmet Kaydı" })).toBeVisible();
+
+    // Fındık Alım: işleme ögeleri alt menüde görünmez.
+    await page.goto("/mod/alim");
+    await expect(alt.getByRole("link", { name: "Yeni Talep" })).toHaveCount(0);
+    await expect(alt.getByRole("link", { name: "İşleme Kasası" })).toHaveCount(0);
+    await expect(alt.getByRole("link", { name: "Ana Sayfa" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Ayarlar", exact: true })).toBeVisible();
+  });
+
+  test("alım müstahsili işleme müşteri önerilerinde görünmez (ayrı tablolar)", async ({ page }) => {
+    const mustahsilAdi = `${onEk} Mustahsil`;
+
+    // Alım modülünde hızlı müstahsil kaydı açılır (CariKart · URETICI).
+    await page.goto("/alim/yeni");
+    const hizliKayitGirdisi = page.getByPlaceholder("Müstahsil adı ve soyadı");
+    await hizliKayitGirdisi.fill(mustahsilAdi);
+    await page.getByRole("button", { name: "Kaydet", exact: true }).click();
+    // Kayıt tamamlanınca hızlı kayıt kartı kapanır ve müstahsil fişe seçilir.
+    await expect(hizliKayitGirdisi).toHaveCount(0);
+
+    // İşleme tarafında aynı ön ekle arandığında müstahsil önerilmez; yalnızca
+    // işleme müşteri rehberindeki kayıtlar önerilir.
+    await page.goto("/hizmet/yeni");
+    await page.getByPlaceholder(/ilk 4 harfi/).fill(onEk);
+    await expect(page.locator("button", { hasText: `${onEk} Musteri` })).toBeVisible();
+    await expect(page.locator("button", { hasText: mustahsilAdi })).toHaveCount(0);
+  });
 });

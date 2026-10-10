@@ -427,8 +427,17 @@ test("masaüstü ve mobil menüler yalnız sunucunun izin verdiği rotaları sun
   assert.match(masaustu, /grup\.ogeler\.filter\(\(oge\) => izinliRotalar\.includes\(oge\.href\)\)/);
   assert.match(masaustu, /izinliRotalar\.includes\("\/ayarlar"\)/);
   assert.doesNotMatch(masaustu, /href: "\/pos"/);
-  assert.match(mobil, /izinli\("\/sesli-not"\)/);
-  assert.match(mobil, /izinli\("\/ayarlar"\)/);
+  // Mobil alt menü de sunucunun verdiği izinli rota listesiyle süzülür.
+  assert.match(mobil, /altMenuOgeleri\(aktifModul\)\.filter\(\(oge\) => izinliRotalar\.includes\(oge\.href\)\)/);
+  // Eller serbest (sesli not) yalnızca alım modülünün alt menüsünde tanımlıdır;
+  // işleme modülünde bulunmaz, Ayarlar ise her iki modülde de yer alır.
+  const modul = readFileSync(path.resolve("src/lib/modul.ts"), "utf8");
+  const alimBlogu = modul.slice(modul.indexOf("  alim: ["), modul.indexOf("  islem: ["));
+  const islemBlogu = modul.slice(modul.indexOf("  islem: ["), modul.indexOf("};", modul.indexOf("  islem: [")));
+  assert.match(alimBlogu, /"\/sesli-not"/);
+  assert.doesNotMatch(islemBlogu, /"\/sesli-not"/);
+  assert.doesNotMatch(islemBlogu, /"mikrofon"/);
+  assert.match(islemBlogu, /"\/ayarlar"/);
 });
 
 test("gösterge paneli hızlı erişimleri de işlem bazlı izne göre filtreler", () => {

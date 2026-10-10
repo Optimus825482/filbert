@@ -26,7 +26,7 @@ export type CariSatir = {
 
 type FormDurumu = CariGirdi;
 const BOS_FORM: FormDurumu = { ad: "", tur: "URETICI", tckn: "", vergiNo: "", telefon: "", bolge: "", notAlani: "", favori: false };
-const TUR_ETIKETLERI = { URETICI: "Üretici", TUCCAR: "Tüccar", FABRIKA: "Fabrika" } as const;
+const TUR_ETIKETLERI = { URETICI: "Müstahsil", TUCCAR: "Tüccar", FABRIKA: "Fabrika" } as const;
 
 function formdan(kayit?: CariSatir): FormDurumu {
   if (!kayit) return BOS_FORM;
@@ -227,5 +227,5 @@ export function CariDuzenleButonu({ kayit, yetkili }: { kayit: CariSatir; yetkil
 }
 
 export function CariBosDurum({ yetkili }: { yetkili: boolean }) {
-  return <div className="rounded-xl border border-dashed border-slate-600 p-6 text-center"><UserRound className="mx-auto size-7 text-emerald-200" /><p className="mt-2 font-extrabold text-white">Henüz cari kart yok</p><p className="mt-1 text-sm font-semibold text-sky-100">{yetkili ? "İlk üretici, tüccar veya fabrika kartını ekleyerek başlayın." : "Cari kayıt ekleme yetkiniz bulunmuyor."}</p></div>;
+  return <div className="rounded-xl border border-dashed border-slate-600 p-6 text-center"><UserRound className="mx-auto size-7 text-emerald-200" /><p className="mt-2 font-extrabold text-white">Henüz cari kart yok</p><p className="mt-1 text-sm font-semibold text-sky-100">{yetkili ? "İlk müstahsil, tüccar veya fabrika kartını ekleyerek başlayın." : "Cari kayıt ekleme yetkiniz bulunmuyor."}</p></div>;
 }

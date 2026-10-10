@@ -118,7 +118,7 @@ export function AramaIcerik({
 
       {cariAramaYetkisi && metin.length >= 2 && cariler.length > 0 && (
         <section className="space-y-2">
-          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">MÜŞTERİLER</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">CARİLER</div>
           <div className="space-y-1.5">
             {cariler.map((c) => (
               <Link
@@ -132,7 +132,7 @@ export function AramaIcerik({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-[var(--app-fg)]">{c.ad}</div>
                   <div className="text-xs text-muted-foreground">
-                    {c.tur === "URETICI" ? "Üretici" : c.tur === "TUCCAR" ? "Tüccar" : "Fabrika"}
+                    {c.tur === "URETICI" ? "Müstahsil" : c.tur === "TUCCAR" ? "Tüccar" : "Fabrika"}
                     {c.bolge ? ` · ${c.bolge}` : ""}
                   </div>
                 </div>

@@ -131,7 +131,7 @@ export function FinansForm({
           <SelectContent>
             {filtrelenmisCariler.map((c) => (
               <SelectItem key={c.id} value={c.id}>
-                {c.ad} <span className="text-muted-foreground">· {c.tur === "URETICI" ? "Üretici" : c.tur === "TUCCAR" ? "Tüccar" : "Fabrika"}</span>
+                {c.ad} <span className="text-muted-foreground">· {c.tur === "URETICI" ? "Müstahsil" : c.tur === "TUCCAR" ? "Tüccar" : "Fabrika"}</span>
               </SelectItem>
             ))}
           </SelectContent>
