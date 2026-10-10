@@ -164,12 +164,12 @@ export default async function HizmetRaporlariPage() {
         </div>
       </section>
 
-      {/* ─── Hazır · Teslim Alınmayanlar ─── */}
+      {/* ─── Teslimat · Hazırlananlar ─── */}
       <section className="rounded-2xl border border-purple-500/30 bg-purple-950/20 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-extrabold text-white">
             <PackageCheck className="h-4 w-4 text-purple-300" />
-            Hazır · Teslim Alınmayanlar
+            Teslimat · Hazırlananlar
             <span className="rounded-full bg-purple-500/25 px-2 py-0.5 font-mono text-xs text-purple-200">
               {teslimBekleyenler.length}
             </span>
@@ -180,7 +180,7 @@ export default async function HizmetRaporlariPage() {
               <b className="text-amber-300">{bildirimBekleyenler.length}</b>
             </span>
             <a
-              href="/api/hizmet/raporlar/csv?liste=hazir"
+              href="/api/hizmet/raporlar/csv?liste=teslimat"
               className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-sky-200 hover:bg-white/10 hover:text-white"
             >
               <Download className="h-3 w-3" /> CSV
@@ -243,7 +243,7 @@ export default async function HizmetRaporlariPage() {
           <Link href="/hizmet" className="font-bold text-[#f5c518] underline">
             Talep Listesi
           </Link>{" "}
-          ekranındaki <b>&quot;Hazır · Teslim Alınmayan&quot;</b> hızlı listesini kullanın; kayıtları
+          ekranındaki <b>&quot;Teslimat · Hazırlanan&quot;</b> hızlı listesini kullanın; kayıtları
           seçip <b>&quot;Seçilenlere SMS Gönder&quot;</b> ile toplu bildirim yapabilirsiniz.
         </div>
       </section>

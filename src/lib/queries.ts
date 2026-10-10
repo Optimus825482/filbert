@@ -690,15 +690,21 @@ export async function getGunlukRapor(tarih: Date) {
  * Fındık İşleme Modülü menü ve pano sayaçları.
  * Aşama durumları tek `groupBy` ile sayılır; pano KPI'ları için bugün
  * tamamlanan, teslim bekleyen, tahsilat bekleyen ve bildirim bekleyen
- * sayımları da aynı turda döner.
+ * sayımları da aynı turda döner. Talep adedinin yanında kilogram toplamı
+ * gösterilebilsin diye durum bazlı `_sum.kilo` de aynı turda okunur.
  */
 export const islemeSayaclari = cache(async (fid: string) => {
   const { baslangic: bugunBaslangic } = istanbulGunAraligi();
-  const [gruplar, smsBekleyen, bugunTamamlanan, tahsilatBekleyen] = await Promise.all([
+  const [gruplar, kilolar, smsBekleyen, bugunTamamlanan, tahsilatBekleyen] = await Promise.all([
     prisma.hizmetIslemi.groupBy({
       by: ["durum"],
       where: { firmaId: fid },
       _count: { _all: true },
+    }),
+    prisma.hizmetIslemi.groupBy({
+      by: ["durum"],
+      where: { firmaId: fid },
+      _sum: { kilo: true },
     }),
     prisma.hizmetIslemi.count({
       where: { firmaId: fid, durum: "TAMAMLANDI", tamamlandiSmsGonderildi: false },
@@ -716,11 +722,21 @@ export const islemeSayaclari = cache(async (fid: string) => {
       .filter((grup) => durumlar.includes(grup.durum))
       .reduce((toplam, grup) => toplam + grup._count._all, 0);
 
+  /** Durum grubundaki talep kilogramlarının toplamı. */
+  const sayKg = (durumlar: readonly string[]) =>
+    kilolar
+      .filter((grup) => durumlar.includes(grup.durum))
+      .reduce((toplam, grup) => toplam + n(grup._sum.kilo), 0);
+
   return {
     bekleyenTalep: say(["SIRAYA_ALINDI"]),
+    /** İşleme alınmayı bekleyen taleplerin toplam kilogramı. */
+    bekleyenKg: sayKg(["SIRAYA_ALINDI"]),
     uretimdeTalep: say(["KIRIM", "KAVURMA", "PAKETLEME"]),
+    uretimdeKg: sayKg(["KIRIM", "KAVURMA", "PAKETLEME"]),
     hazirBekleyen: say(["TAMAMLANDI"]),
     teslimBekleyen: say(["TAMAMLANDI"]),
+    teslimBekleyenKg: sayKg(["TAMAMLANDI"]),
     teslimEdilen: say(["TESLIM_EDILDI"]),
     iptalTalep: say(["IPTAL"]),
     smsBekleyen,

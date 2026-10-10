@@ -130,7 +130,7 @@ export const NAV_GRUPLARI: Readonly<Record<string, ModulId | null>> = {
 /**
  * Mobil alt (sticky) menü ögeleri. Her modül yalnızca kendi işlevlerini listeler:
  * Fındık İşleme modülünde **eller serbest (sesli not / mikrofon) ögesi yoktur**;
- * yerine işleme akışının günlük adımları (yeni talep, kuyruk, işleme kasası) gelir.
+ * yerine işleme akışının günlük adımları (yeni talep, kuyruk, teslimat, kasa) gelir.
  *
  * İkonlar burada yalnızca anahtar olarak tutulur; React bileşenine eşlemesi
  * `src/components/bottom-nav.tsx` içinde yapılır. Böylece bu dosya saf kalır ve
@@ -164,7 +164,7 @@ export const ALT_MENU_OGELERI: Readonly<Record<ModulId, readonly AltMenuOgesi[]>
     { href: "/", etiket: "Pano", ikon: "ana" },
     { href: "/hizmet", etiket: "Talep Kuyruğu", ikon: "kuyruk" },
     { href: "/hizmet/yeni", etiket: "Yeni Talep", ikon: "yeni-talep", vurgulu: true },
-    { href: "/hizmet/kasa", etiket: "İşleme Kasası", ikon: "isleme-kasasi" },
+    { href: "/hizmet/kasa", etiket: "Kasa", ikon: "isleme-kasasi" },
     { href: "/ayarlar", etiket: "Ayarlar", ikon: "ayarlar" },
   ],
 };

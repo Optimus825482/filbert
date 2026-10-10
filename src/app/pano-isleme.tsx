@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight, BellRing, Boxes, CheckCircle2, ChevronRight, ClipboardList, Flame,
   HandCoins, MessageSquareWarning, PackageOpen, PackageSearch, Plus, Scissors,
-  Timer, type LucideIcon,
+  Timer, Truck, Wallet, type LucideIcon,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getSonGunlerHizmet, islemeSayaclari, n } from "@/lib/queries";
@@ -97,7 +97,7 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
 
   const yapilacaklar: { href: string; ikon: LucideIcon; etiket: string; rozet: string }[] = [];
   if (sayaclar.hazirBekleyen > 0) {
-    yapilacaklar.push({ href: "/hizmet?liste=hazir", ikon: PackageOpen, etiket: "Hazır ama teslim alınmayan", rozet: `${sayaclar.hazirBekleyen} talep` });
+    yapilacaklar.push({ href: "/hizmet?liste=teslimat", ikon: Truck, etiket: "Teslimatı bekleyen hazır talep", rozet: `${sayaclar.hazirBekleyen} talep` });
   }
   if (sayaclar.smsBekleyen > 0) {
     yapilacaklar.push({ href: "/hizmet?liste=sms", ikon: BellRing, etiket: "Tamamlandı bildirimi gönderilmedi", rozet: `${sayaclar.smsBekleyen} talep` });
@@ -113,11 +113,11 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
         <div className="grid grid-cols-2 gap-3">
           {olusturabilir && <MobilKutu href="/hizmet/yeni" etiket={"Yeni\nTalep"} ikon={Plus} />}
           <MobilKutu href="/hizmet" etiket={"Talep\nKuyruğu"} ikon={PackageSearch} badge={uretimdeToplam} />
-          <MobilKutu href="/hizmet/kasa" etiket={"İşleme\nKasası"} ikon={PackageOpen} />
-          <MobilKutu href="/hizmet/raporlar" etiket={"Durum\nRaporları"} ikon={Boxes} />
+          <MobilKutu href="/hizmet?liste=teslimat" etiket={"Teslimat"} ikon={Truck} />
+          <MobilKutu href="/hizmet/kasa" etiket={"Kasa"} ikon={Wallet} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <MobilKpi etiket="Bekleyen" deger={sayaclar.bekleyenTalep} renk="#38bdf8" />
+          <MobilKpi etiket="Bekleyen" deger={sayaclar.bekleyenTalep} ek={kg(sayaclar.bekleyenKg)} renk="#38bdf8" />
           <MobilKpi etiket="Bugün tamamlanan" deger={sayaclar.bugunTamamlanan} renk="#34d399" />
           <MobilKpi etiket="Teslim bekleyen" deger={sayaclar.teslimBekleyen} renk="#a78bfa" />
           <MobilKpi etiket="Mesaj gönderilmedi" deger={sayaclar.smsBekleyen} renk="#fb923c" />
@@ -151,17 +151,18 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
             <span className="flex items-center gap-2 rounded-xl border border-[#f5c518]/25 bg-[#f5c518]/10 px-3 py-2 text-[11px] font-extrabold tracking-wide text-[#f5c518]">
               <PackageSearch className="h-4 w-4" /> Fındık İşleme Modülü
             </span>
-            {olusturabilir && <HizliButon href="/hizmet/yeni" ikon={Plus} etiket="Yeni İşleme Talebi" birincil />}
+            {olusturabilir && <HizliButon href="/hizmet/yeni" ikon={Plus} etiket="Yeni Talep" birincil />}
             <HizliButon href="/hizmet" ikon={PackageSearch} etiket="Talep Kuyruğu" />
-            <HizliButon href="/hizmet/kasa" ikon={PackageOpen} etiket="İşleme Kasası" />
+            <HizliButon href="/hizmet?liste=teslimat" ikon={Truck} etiket="Teslimat" />
+            <HizliButon href="/hizmet/kasa" ikon={Wallet} etiket="Kasa" />
           </div>
         </section>
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 md:col-span-12">
-          <Kpi baslik="Bekleyen talep" deger={sayaclar.bekleyenTalep} toplam={dagilim.toplam} alt="işleme alınmayı bekliyor" ikon={ClipboardList} renk="#38bdf8" href="/hizmet" />
+          <Kpi baslik="Bekleyen talep" deger={sayaclar.bekleyenTalep} ek={kg(sayaclar.bekleyenKg)} toplam={dagilim.toplam} alt="işleme alınmayı bekliyor" ikon={ClipboardList} renk="#38bdf8" href="/hizmet?liste=kuyruk" />
           <Kpi baslik="Üretimde" deger={sayaclar.uretimdeTalep} toplam={dagilim.toplam} alt="kırım · kavurma · paketleme" ikon={Boxes} renk="#f5c518" href="/hizmet" />
           <Kpi baslik="Bugün tamamlanan" deger={sayaclar.bugunTamamlanan} toplam={dagilim.toplam} alt="bugün tamamlandı işaretlendi" ikon={CheckCircle2} renk="#34d399" href="/hizmet/raporlar" />
-          <Kpi baslik="Teslim edilmeyi bekleyen" deger={sayaclar.teslimBekleyen} toplam={dagilim.toplam} alt="hazır, müşteri almadı" ikon={PackageOpen} renk="#a78bfa" href="/hizmet?liste=hazir" />
+          <Kpi baslik="Teslim edilmeyi bekleyen" deger={sayaclar.teslimBekleyen} toplam={dagilim.toplam} alt="hazır, müşteri almadı" ikon={PackageOpen} renk="#a78bfa" href="/hizmet?liste=teslimat" />
           <Kpi baslik="Mesaj gönderilmeyen" deger={sayaclar.smsBekleyen} toplam={sayaclar.teslimBekleyen} alt="tamamlandı bildirimi bekliyor" ikon={MessageSquareWarning} renk="#fb923c" href="/hizmet?liste=sms" />
           <Kpi baslik="Tahsilat bekleyen" deger={sayaclar.tahsilatBekleyen} toplam={sayaclar.teslimEdilen} alt="teslim edildi, ödeme yok" ikon={HandCoins} renk="#f87171" href="/hizmet/raporlar" />
         </section>
@@ -183,7 +184,7 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
           <div className={PANEL_BASLIK}>
             <div>
               <h2 className="text-sm font-extrabold tracking-tight text-white">Fındık işleme kuyruğu</h2>
-              <p className="mt-0.5 text-xs font-semibold text-sky-100">Üretimde {uretimdeToplam} talep</p>
+              <p className="mt-0.5 text-xs font-semibold text-sky-100">Üretimde {uretimdeToplam} talep · {kg(sayaclar.uretimdeKg)}</p>
             </div>
             <Link href="/hizmet" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
               Kuyruğa git <ArrowRight className="h-3.5 w-3.5" />
@@ -283,8 +284,8 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
 
         <section className={`md:col-span-12 lg:col-span-5 ${PANEL}`}>
           <div className={PANEL_BASLIK}>
-            <h2 className="text-sm font-extrabold tracking-tight text-white">Hazır · teslim alınmayanlar</h2>
-            <Link href="/hizmet?liste=hazir" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
+            <h2 className="text-sm font-extrabold tracking-tight text-white">Teslimat · hazırlananlar</h2>
+            <Link href="/hizmet?liste=teslimat" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
               Tümü <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -387,10 +388,12 @@ function MobilKutu({ href, etiket, ikon: Ikon, badge }: { href: string; etiket: 
 
 // ─── Pano KPI kartı (masaüstü) ─────────────────────────────
 function Kpi({
-  baslik, deger, toplam, alt, ikon: Ikon, renk, href,
+  baslik, deger, ek, toplam, alt, ikon: Ikon, renk, href,
 }: {
   baslik: string;
   deger: number;
+  /** Adedin yanında gösterilen ikincil değer (örn. toplam kg). */
+  ek?: string;
   toplam: number;
   alt: string;
   ikon: LucideIcon;
@@ -407,7 +410,10 @@ function Kpi({
         <span className="min-w-0 text-[10px] font-extrabold uppercase leading-tight tracking-[0.1em] text-sky-500">{baslik}</span>
         <Ikon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: renk }} />
       </div>
-      <div className="text-3xl font-extrabold leading-none tabular-nums tracking-tight text-white">{deger}</div>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-3xl font-extrabold leading-none tabular-nums tracking-tight text-white">{deger}</span>
+        {ek && <span className="text-xs font-bold tabular-nums text-sky-100">{ek}</span>}
+      </div>
       <div className="mt-auto space-y-1.5">
         <div
           className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-border)]"
@@ -422,14 +428,17 @@ function Kpi({
 }
 
 // ─── Mobil KPI hücresi ─────────────────────────────────────
-function MobilKpi({ etiket, deger, renk }: { etiket: string; deger: number; renk: string }) {
+function MobilKpi({ etiket, deger, ek, renk }: { etiket: string; deger: number; ek?: string; renk: string }) {
   return (
     <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] px-3 py-2.5">
       <div className="flex items-center gap-2">
         <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: renk }} />
         <span className="min-w-0 truncate text-[10px] font-extrabold uppercase tracking-wider text-sky-100">{etiket}</span>
       </div>
-      <div className="mt-1 text-2xl font-extrabold leading-none tabular-nums text-white">{deger}</div>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
+        <span className="text-2xl font-extrabold leading-none tabular-nums text-white">{deger}</span>
+        {ek && <span className="text-[11px] font-bold tabular-nums text-sky-100">{ek}</span>}
+      </div>
     </div>
   );
 }

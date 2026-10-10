@@ -25,10 +25,11 @@ function sayi(deger: unknown): string {
 
 /**
  * Fındık İşleme Modülü — durum bazlı talep raporu (CSV).
- *   ?durum=KIRIM     → tek aşama
- *   ?liste=hazir     → işi bitmiş, teslim alınmamış talepler
- *   ?liste=sms       → tamamlandı bildirimi gönderilmemiş talepler
- *   ?liste=tahsilat  → teslim edilmiş, tahsilatı bekleyen talepler
+ *   ?durum=KIRIM      → tek aşama
+ *   ?liste=teslimat   → hazırlanmış, teslim alınmamış talepler (eski ad: hazir)
+ *   ?liste=kuyruk     → henüz işleme alınmamış bekleyen talepler
+ *   ?liste=sms        → tamamlandı bildirimi gönderilmemiş talepler
+ *   ?liste=tahsilat   → teslim edilmiş, tahsilatı bekleyen talepler
  */
 export async function GET(request: Request) {
   try {
@@ -41,9 +42,12 @@ export async function GET(request: Request) {
     const where: Prisma.HizmetIslemiWhereInput = { firmaId: firma.id };
     let dosyaEtiketi = "tum-talepler";
 
-    if (liste === "hazir") {
+    if (liste === "teslimat" || liste === "hazir") {
       where.durum = "TAMAMLANDI";
-      dosyaEtiketi = "hazir-teslim-alinmayanlar";
+      dosyaEtiketi = "teslimat-hazirlananlar";
+    } else if (liste === "kuyruk") {
+      where.durum = "SIRAYA_ALINDI";
+      dosyaEtiketi = "talep-kuyrugu";
     } else if (liste === "sms") {
       where.durum = "TAMAMLANDI";
       where.tamamlandiSmsGonderildi = false;

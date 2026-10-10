@@ -41,7 +41,7 @@ const GRUPLAR: NavGrup[] = [
     ogeler: [
       { href: "/hizmet/yeni", etiket: "Yeni Talep Kaydı", ikon: ShoppingBasket },
       { href: "/hizmet", etiket: "Talep Kuyruğu", ikon: PackageCheck },
-      { href: "/hizmet/kasa", etiket: "İşleme Kasası", ikon: Wallet },
+      { href: "/hizmet/kasa", etiket: "Kasa", ikon: Wallet },
       { href: "/hizmet/raporlar", etiket: "Durum Raporları", ikon: FileBarChart },
       { href: "/hizmet/ayarlar", etiket: "İşleme Ayarları", ikon: Settings },
     ],

@@ -18,6 +18,8 @@ import {
   Banknote,
   Check,
   Download,
+  Clock,
+  Truck,
 } from "lucide-react";
 import {
   updateHizmetDurumu,
@@ -82,6 +84,13 @@ export interface HizmetSatir {
   tarihSaatStr: string;
 }
 
+/**
+ * Talep listesindeki tek dokunuşla açılan hızlı listeler. İşleme akışını
+ * izler: **Talep Kuyruğu** (bekleyen) → **Hazırlanıyor** (kırım/kavurma/
+ * paketleme) → **Teslimat** (hazır, müşteri henüz almamış).
+ */
+export type HizliFiltre = "HEPSI" | "KUYRUK" | "HAZIRLANIYOR" | "TESLIM_ALINMADI" | "SMS_BEKLEYEN";
+
 interface Props {
   kayitlar: HizmetSatir[];
   smsAktif: boolean;
@@ -90,7 +99,7 @@ interface Props {
   /** Fındık işleme modülü varsayılan kasası (Ayarlar → Fındık İşleme). */
   varsayilanKasaId?: string | null;
   /** Modül menüsünden gelen hızlı liste başlangıcı. */
-  baslangicHizliFiltre?: "HEPSI" | "TESLIM_ALINMADI" | "SMS_BEKLEYEN";
+  baslangicHizliFiltre?: HizliFiltre;
 }
 
 export function HizmetTablosu({
@@ -107,11 +116,9 @@ export function HizmetTablosu({
   // Arama & Filtre State
   const [arama, setArama] = useState("");
   const [durumFiltresi, setDurumFiltresi] = useState<string>("HEPSI");
-  // Hazır ama teslim alınmayanlar ve bildirimi gönderilmemiş tamamlananlar
-  // için tek dokunuşla açılan hızlı listeler.
-  const [hizliFiltre, setHizliFiltre] = useState<"HEPSI" | "TESLIM_ALINMADI" | "SMS_BEKLEYEN">(
-    baslangicHizliFiltre
-  );
+  // Talep kuyruğu, hazırlananlar, hazır ama teslim alınmayanlar ve bildirimi
+  // gönderilmemiş tamamlananlar için tek dokunuşla açılan hızlı listeler.
+  const [hizliFiltre, setHizliFiltre] = useState<HizliFiltre>(baslangicHizliFiltre);
 
   // Toplu Seçim State
   const [seciliIds, setSeciliIds] = useState<string[]>([]);
@@ -185,7 +192,13 @@ export function HizmetTablosu({
 
   // Filtrelenmiş Liste
   const filtrelenmis = kayitlar.filter((k) => {
-    if (hizliFiltre === "TESLIM_ALINMADI") {
+    if (hizliFiltre === "KUYRUK") {
+      // Talep Kuyruğu: henüz işleme alınmamış, bekleyen talepler.
+      if (k.durum !== "SIRAYA_ALINDI") return false;
+    } else if (hizliFiltre === "HAZIRLANIYOR") {
+      // İşleme alınmış talepler: kırım, kavurma veya paketleme aşamasında.
+      if (!["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)) return false;
+    } else if (hizliFiltre === "TESLIM_ALINMADI") {
       // İşi bitmiş (TAMAMLANDI) ama müşteri henüz teslim almamış talepler.
       if (k.durum !== "TAMAMLANDI") return false;
     } else if (hizliFiltre === "SMS_BEKLEYEN") {
@@ -331,7 +344,11 @@ export function HizmetTablosu({
     });
   }
 
-  // Hızlı liste sayaçları — bildirim bekleyen ve teslim alınmayan talepler.
+  // Hızlı liste sayaçları — kuyruk, hazırlananlar, teslimat ve bildirim.
+  const kuyrukAdet = kayitlar.filter((k) => k.durum === "SIRAYA_ALINDI").length;
+  const hazirlananAdet = kayitlar.filter((k) =>
+    ["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)
+  ).length;
   const teslimAlinmayanAdet = kayitlar.filter((k) => k.durum === "TAMAMLANDI").length;
   const smsBekleyenAdet = kayitlar.filter(
     (k) => k.durum === "TAMAMLANDI" && !k.tamamlandiSmsGonderildi
@@ -405,8 +422,36 @@ export function HizmetTablosu({
         </Link>
       </div>
 
-      {/* ─── Hızlı Listeler: teslim alınmayanlar & bildirimi bekleyenler ─── */}
+      {/* ─── Hızlı Listeler: kuyruk → hazırlanıyor → teslimat ─── */}
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setHizliFiltre((o) => (o === "KUYRUK" ? "HEPSI" : "KUYRUK"))}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+            hizliFiltre === "KUYRUK"
+              ? "border-sky-400/50 bg-sky-500/25 text-white"
+              : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+          }`}
+        >
+          <Clock className="h-3.5 w-3.5 text-sky-300" />
+          Talep Kuyruğu · Bekleyen
+          <span className="rounded-full bg-black/30 px-1.5 font-mono">{kuyrukAdet}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setHizliFiltre((o) => (o === "HAZIRLANIYOR" ? "HEPSI" : "HAZIRLANIYOR"))}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+            hizliFiltre === "HAZIRLANIYOR"
+              ? "border-amber-400/50 bg-amber-500/25 text-white"
+              : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+          }`}
+        >
+          <Play className="h-3.5 w-3.5 text-amber-300" />
+          Hazırlanıyor
+          <span className="rounded-full bg-black/30 px-1.5 font-mono">{hazirlananAdet}</span>
+        </button>
+
         <button
           type="button"
           onClick={() =>
@@ -418,8 +463,8 @@ export function HizmetTablosu({
               : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
           }`}
         >
-          <CheckCircle2 className="h-3.5 w-3.5 text-purple-300" />
-          Hazır · Teslim Alınmayan
+          <Truck className="h-3.5 w-3.5 text-purple-300" />
+          Teslimat · Hazırlanan
           <span className="rounded-full bg-black/30 px-1.5 font-mono">{teslimAlinmayanAdet}</span>
         </button>
 
@@ -441,7 +486,8 @@ export function HizmetTablosu({
 
         {hizliFiltre !== "HEPSI" && (
           <span className="text-[11px] font-semibold text-sky-300">
-            Hızlı liste açık — &quot;Seçilenlere SMS Gönder&quot; ile toplu bildirim yapabilirsiniz.
+            Hızlı liste açık — kayıtları seçip toplu durum güncelleyebilir veya &quot;Seçilenlere SMS
+            Gönder&quot; ile bildirim yapabilirsiniz.
           </span>
         )}
       </div>
@@ -451,6 +497,9 @@ export function HizmetTablosu({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/30 bg-sky-950/80 p-3 shadow-lg backdrop-blur">
           <div className="text-xs font-bold text-sky-200">
             <span className="font-mono text-sm text-[#f5c518]">{seciliIds.length}</span> kayıt seçildi
+            <span className="ml-2 hidden font-semibold text-sky-300 sm:inline">
+              Akış: Talep Kuyruğu → Hazırlanıyor → Tamamlandı → Teslimat
+            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -458,8 +507,9 @@ export function HizmetTablosu({
               type="button"
               onClick={() => handleTopluDurum("KIRIM")}
               className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-500/30"
+              title="Seçili talepleri işleme alır: kırım aşamasına geçer (hazırlanıyor)."
             >
-              <Play className="h-3.5 w-3.5" /> Kırıma Al
+              <Play className="h-3.5 w-3.5" /> Hazırlanıyor Yap
             </button>
 
             <button

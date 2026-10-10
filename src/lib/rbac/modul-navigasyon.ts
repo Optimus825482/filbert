@@ -42,7 +42,7 @@ export function modulleriIzinlereGoreFiltrele<Tile extends { href: string }, Gru
 ): Grup[] {
   return moduller
     .map((modul) => ({ ...modul, altModuller: modul.altModuller.filter((tile) => {
-      // Sorgu parametreli kısayollar (örn. /hizmet?liste=hazir) yol üzerinden
+      // Sorgu parametreli kısayollar (örn. /hizmet?liste=teslimat) yol üzerinden
       // yetkilendirilir.
       const izin = ROTA_IZINLERI[tile.href.split("?")[0]];
       return !izin || izinVar(actor, izin[0], izin[1]);

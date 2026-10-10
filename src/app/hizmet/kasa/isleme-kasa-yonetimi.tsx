@@ -99,7 +99,7 @@ export function IslemeKasaYonetimi({
       ? await islemeKasasiGuncelle(duzenlenen.id, girdi)
       : await islemeKasasiOlustur(girdi);
     if (sonuc.ok) {
-      toast.success(duzenlenen ? "İşleme kasası güncellendi" : "İşleme kasası eklendi");
+      toast.success(duzenlenen ? "Kasa güncellendi" : "Kasa eklendi");
       setHesapFormuAcik(false);
       setDuzenlenen(null);
       router.refresh();
@@ -138,7 +138,7 @@ export function IslemeKasaYonetimi({
     <div>
       <TanimBaslik
         ikon={Wallet}
-        baslik="İşleme Kasası Hesapları"
+        baslik="Kasa Hesapları"
         adet={hesaplar.length}
         onYeni={olusturYetkisi ? () => formuAc() : undefined}
       />
@@ -154,7 +154,7 @@ export function IslemeKasaYonetimi({
       )}
 
       {hesaplar.length === 0 ? (
-        <BosDurum mesaj="Henüz işleme kasası tanımlı değil — sağ üstten ekleyin" />
+        <BosDurum mesaj="Henüz kasa hesabı tanımlı değil — sağ üstten ekleyin" />
       ) : (
         <div className="space-y-1.5">
           {hesaplar.map((hesap) => {
@@ -195,7 +195,7 @@ export function IslemeKasaYonetimi({
       <Dialog open={hesapFormuAcik} onOpenChange={setHesapFormuAcik}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{duzenlenen ? "İşleme Kasası Düzenle" : "Yeni İşleme Kasası"}</DialogTitle>
+            <DialogTitle>{duzenlenen ? "Kasayı Düzenle" : "Yeni Kasa"}</DialogTitle>
             <DialogDescription>
               Yalnızca işleme modülünde görünür. İşleme taleplerinin tahsilatı bu kasaya işlenir.
             </DialogDescription>
@@ -206,7 +206,7 @@ export function IslemeKasaYonetimi({
               <Input
                 value={ad}
                 onChange={(e) => setAd(e.target.value)}
-                placeholder="ör: İşleme Kasası / Kırma Kasa"
+                placeholder="ör: Kasa / Kırma Kasa"
                 className="saha-input"
               />
             </div>

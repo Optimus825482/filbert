@@ -95,6 +95,13 @@ test("işleme modülü yalnızca işleme ekranlarını, alım modülü işleme e
   const islemeKasasi = isleme.altModuller.find((t) => t.href === "/hizmet/kasa");
   assert.ok(islemeKasasi, "işleme kasası menüde olmalı");
   assert.equal(islemeKasasi?.ikon, "isleme-kasa");
+  // İşleme modülünün kasası yalnızca "Kasa" olarak adlandırılır.
+  assert.equal(islemeKasasi?.etiket, "Kasa");
+
+  // Teslimat listesi hazırlanan talepleri gösterir.
+  const teslimat = isleme.altModuller.find((t) => t.href === "/hizmet?liste=teslimat");
+  assert.ok(teslimat, "teslimat listesi menüde olmalı");
+  assert.equal(teslimat?.etiket, "Teslimat · Hazırlananlar");
 
   const alim = alimModulu({ bekleyenRandiman: 0 });
   assert.equal(alim.id, "alim");
@@ -126,6 +133,8 @@ test("mobil alt menü modüle göre ayrılır: işlemede eller serbest ögesi yo
     islem.map((oge) => oge.href),
     ["/", "/hizmet", "/hizmet/yeni", "/hizmet/kasa", "/ayarlar"],
   );
+  // Mobil alt menüdeki kasa kısayolu "Kasa" etiketiyle görünür.
+  assert.equal(islem.find((oge) => oge.href === "/hizmet/kasa")?.etiket, "Kasa");
   // Birincil eylem yeni talep kaydıdır.
   const vurgulu = islem.filter((oge) => oge.vurgulu);
   assert.equal(vurgulu.length, 1);

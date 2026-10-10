@@ -61,9 +61,9 @@ export default async function IslemeKasaPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-white">Fındık İşleme Kasası</h1>
+          <h1 className="text-xl font-extrabold tracking-tight text-white">Kasa</h1>
           <p className="mt-0.5 text-xs font-semibold text-sky-200">
-            Kırma / kavurma / paketleme hizmetinin kasa yönetimi
+            Fındık işleme modülünün kasası · kırma / kavurma / paketleme tahsilatları
           </p>
         </div>
         <Link
@@ -79,7 +79,7 @@ export default async function IslemeKasaPage() {
           <Wallet className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="tr-muted">İşleme kasası bakiyesi</div>
+          <div className="tr-muted">Kasa bakiyesi</div>
           {toplamlar.size === 0 ? (
             <div className="tr-value text-emerald-300">—</div>
           ) : (
@@ -148,7 +148,7 @@ export default async function IslemeKasaPage() {
 
       <p className="text-[11px] font-semibold text-sky-200">
         Bu kasalar alım modülünün <Link href="/kasa" className="font-extrabold text-[#f5c518]">Kasa</Link> ekranında da
-        görüntülenir. İşleme taleplerinden alınan tahsilatlar İşleme Ayarları&apos;nda seçilen kasaya işlenir.
+        görüntülenir. İşleme taleplerinden alınan tahsilatlar İşleme Ayarları&apos;nda seçilen bu kasaya işlenir.
       </p>
     </div>
   );

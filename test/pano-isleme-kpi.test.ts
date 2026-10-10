@@ -81,12 +81,42 @@ test("pano KPI'ları bekleyen, bugün tamamlanan, teslim ve mesaj bekleyenleri g
   assert.match(sayfa, /aria-label=/);
 });
 
+test("pano hızlı menüleri talep kuyruğu, teslimat ve kasa akışını gösterir", () => {
+  const sayfa = oku("src/app/pano-isleme.tsx");
+
+  // Panodaki hızlı menüler işleme akışını izler.
+  assert.match(sayfa, /etiket="Yeni Talep" birincil/);
+  assert.match(sayfa, /etiket="Talep Kuyruğu"/);
+  assert.match(sayfa, /href="\/hizmet\?liste=teslimat" ikon=\{Truck\} etiket="Teslimat"/);
+  assert.match(sayfa, /href="\/hizmet\/kasa" ikon=\{Wallet\} etiket="Kasa"/);
+  // İşleme kasası artık yalnızca "Kasa" olarak adlandırılır.
+  assert.doesNotMatch(sayfa, /İşleme Kasası/);
+
+  // Teslimat listesi bölümü hazırlananları listeler.
+  assert.match(sayfa, /Teslimat · hazırlananlar/);
+  assert.match(sayfa, /href="\/hizmet\?liste=teslimat"/);
+});
+
+test("pano bekleyen talebin adediyle birlikte toplam kilogramı gösterir", () => {
+  const sayfa = oku("src/app/pano-isleme.tsx");
+  // Masaüstü KPI ve mobil hücre bekleyen adedinin yanında kg toplamını taşır.
+  assert.match(sayfa, /baslik="Bekleyen talep" deger=\{sayaclar\.bekleyenTalep\} ek=\{kg\(sayaclar\.bekleyenKg\)\}/);
+  assert.match(sayfa, /<MobilKpi etiket="Bekleyen" deger=\{sayaclar\.bekleyenTalep\} ek=\{kg\(sayaclar\.bekleyenKg\)\}/);
+  // Üretim kuyruğu paneli de adet ile birlikte kg yazar.
+  assert.match(sayfa, /Üretimde \{uretimdeToplam\} talep · \{kg\(sayaclar\.uretimdeKg\)\}/);
+});
+
 test("pano sayaçları sorgusu KPI alanlarını tek turda döner", () => {
   const sorgular = oku("src/lib/queries.ts");
 
   assert.match(sorgular, /bugunTamamlanan/);
   assert.match(sorgular, /teslimBekleyen/);
   assert.match(sorgular, /tahsilatBekleyen/);
+  // Kilogram toplamları durum bazlı \_sum ile aynı turda okunur.
+  assert.match(sorgular, /const sayKg = \(durumlar: readonly string\[\]\) =>/);
+  assert.match(sorgular, /bekleyenKg: sayKg\(\["SIRAYA_ALINDI"\]\)/);
+  assert.match(sorgular, /uretimdeKg: sayKg\(\["KIRIM", "KAVURMA", "PAKETLEME"\]\)/);
+  assert.match(sorgular, /_sum: \{ kilo: true \}/);
   assert.match(sorgular, /durumDagilimi: Object\.fromEntries/);
   assert.match(sorgular, /tamamlandiAt: \{ gte: bugunBaslangic \}/);
 

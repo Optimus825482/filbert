@@ -204,17 +204,18 @@ export function IslemeAyarFormu({
       {/* ─── Tahsilat Kasası ─── */}
       <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-4 shadow-xl">
         <div className="flex items-center gap-2 text-sm font-extrabold text-white">
-          <Wallet className="h-4 w-4 text-[#f5c518]" /> Fındık İşleme Kasası
+          <Wallet className="h-4 w-4 text-[#f5c518]" /> Kasa
         </div>
         <p className="mt-1 text-xs text-sky-200">
           Müşteri fındığını teslim almaya geldiğinde yapılan tahsilat varsayılan olarak bu kasaya
-          işlenir. İşleme kasasını <Link href="/hizmet/kasa" className="font-extrabold text-[#f5c518]">İşleme Kasası</Link>{" "}
-          ekranından yönetebilirsiniz.
+          işlenir. İşleme modülünün kasasını{" "}
+          <Link href="/hizmet/kasa" className="font-extrabold text-[#f5c518]">Kasa</Link> ekranından
+          yönetebilirsiniz.
         </p>
         <div className="mt-3">
           {kasalar.length === 0 ? (
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
-              Tanımlı aktif kasa bulunamadı. İşleme Kasası ekranından (veya Ayarlar → Kasa/Banka
+              Tanımlı aktif kasa bulunamadı. Kasa ekranından (veya Ayarlar → Kasa/Banka
               bölümünden) bir kasa ekleyin.
             </div>
           ) : (
@@ -225,7 +226,7 @@ export function IslemeAyarFormu({
             >
               <option value="">-- Varsayılan kasa seçilmedi --</option>
               {islemeKasalari.length > 0 && (
-                <optgroup label="İşleme kasası">
+                <optgroup label="İşleme modülü kasası">
                   {islemeKasalari.map((kasa) => (
                     <option key={kasa.id} value={kasa.id}>
                       {kasa.ad} ({kasa.tip})

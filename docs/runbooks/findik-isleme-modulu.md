@@ -29,11 +29,15 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 - **İşleme panosu:** yalnızca kırma/kavurma/paketleme talepleri. Üstte altı KPI kartı
   (Bekleyen talep, Üretimde, Bugün tamamlanan, Teslim edilmeyi bekleyen, Mesaj
   gönderilmeyen, Tahsilat bekleyen) her biri ikon, renk ve orana göre dolan ilerleme
-  çubuğuyla gösterilir. Bunun yanında **talep durum dağılımı** halka (donut) grafiği,
-  kuyruk aşama dağılımı, **son 7 gün · işleme hareketi** için iki mini çubuk grafik
-  (gelen talep · kg ve tamamlanan talep · adet), teslim alınmayan hazır talepler ve son
-  talepler yer alır. Mobilde aynı KPI'lar dört hücreli ızgaraya sığdırılır ve durum
-  dağılımı donut'u "BUGÜN" kutusunun altında gösterilir.
+  çubuğuyla gösterilir. **Bekleyen talep** kartı adedin yanı sıra bekleyen fındığın
+  **toplam kilogramını** yazar; üretim kuyruğu paneli de "Üretimde N talep · X kg"
+  biçiminde kg toplamını taşır. Bunun yanında **talep durum dağılımı** halka (donut)
+  grafiği, kuyruk aşama dağılımı, **son 7 gün · işleme hareketi** için iki mini çubuk
+  grafik (gelen talep · kg ve tamamlanan talep · adet), **Teslimat · hazırlananlar**
+  listesi ve son talepler yer alır. Mobilde aynı KPI'lar dört hücreli ızgaraya
+  sığdırılır ve durum dağılımı donut'u "BUGÜN" kutusunun altında gösterilir.
+- **İşleme panosu hızlı menüleri:** **Yeni Talep** (`/hizmet/yeni`), **Talep Kuyruğu**
+  (`/hizmet`), **Teslimat** (`/hizmet?liste=teslimat`) ve **Kasa** (`/hizmet/kasa`).
 - **Alım panosu:** yalnızca alım akışıdır (alım fişi, randıman, emanet, depo, sevkiyat).
   İşleme metrikleri, "Fındık İşleme Talebi" kısayolu ve işleme bekleyen satırı burada
   **yer almaz**.
@@ -49,7 +53,7 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
   - **Alım modülü:** Ana Sayfa (`/`), Ara (`/arama`), **Sesli modu aç**
     (`/sesli-not`, ortada vurgulu), Ayarlar (`/ayarlar`).
   - **İşleme modülü:** Pano (`/`), Talep Kuyruğu (`/hizmet`), **Yeni Talep**
-    (`/hizmet/yeni`, ortada vurgulu), İşleme Kasası (`/hizmet/kasa`),
+    (`/hizmet/yeni`, ortada vurgulu), Kasa (`/hizmet/kasa`),
     Ayarlar (`/ayarlar`).
   - **İşleme modülünde eller serbest (sesli not) ögesi yoktur**; sesli akış
     yalnızca alım modülüne aittir.
@@ -74,8 +78,8 @@ Uygulama iki bağımsız modüle ayrılmıştır ve her modül **yalnızca kendi
 
 ### Kasa ayrımı
 
-- **İşleme Kasası** yalnızca Fındık İşleme modülünde yönetilir: **İşleme Kasası**
-  ekranı (`/hizmet/kasa`). Hesap açma/kapatma ve hareket girişi buradadır; hareketler
+- **Kasa** yalnızca Fındık İşleme modülünde yönetilir: **Kasa** ekranı
+  (`/hizmet/kasa`). Hesap açma/kapatma ve hareket girişi buradadır; hareketler
   `FinansHareket` olarak yazılır (cari bağlantısı yoktur).
 - Alım modülündeki `/kasa` ekranı yalnızca `modul = ALIM` hesaplarını listeler;
   işleme kasası hesapları burada **salt görüntü** olarak ayrı bir bölümde gösterilir
@@ -99,6 +103,10 @@ Her aşamaya geçişte zaman damgası yazılır (`kirimAt`, `kavurmaAt`, `paketl
 (✓ / ○) hangi işlemin tamamlandığını tek bakışta gösterir.
 
 - Durum değişimi: Talep Kuyruğu → satır içi **Durum** seçicisi veya toplu işlem çubuğu.
+- **Kuyruk akışı (hızlı listeler):** **Talep Kuyruğu · Bekleyen** listesinden kayıtlar
+  seçilip **Hazırlanıyor Yap** ile işleme alınır (kırım aşaması); **Hazırlanıyor**
+  listesinden seçilenler **Tamamlandı Yap** ile bitirilir; tamamlananlar
+  **Teslimat · Hazırlanan** listesinde teslim alınmayı bekler.
 - `TAMAMLANDI` seçildiğinde kullanıcıya **"SMS gönderilsin mi?"** onay penceresi çıkar;
   onaylanırsa tamamlandı bildirimi gider ve `tamamlandiSmsGonderildi` işaretlenir.
 - SMS gönderilmemiş tamamlanmış talepler ayrı listede toplanır
@@ -140,7 +148,7 @@ konsola yazılır; sayaçlar gerçek gönderim gibi işler.
 1. **Kayıt bildirimi** — talep alındığında.
 2. **Tamamlandı bildirimi** — iş bittiğinde ("teslim alabilirsiniz").
 3. **Teslim hatırlatma** — işi bitmiş ama müşterisi fındığını almamış talepler için;
-   Talep Listesi → **Hazır · Teslim Alınmayanlar** listesinden toplu SMS veya satır
+   Talep Listesi → **Teslimat · Hazırlananlar** listesinden toplu SMS veya satır
    içi yeniden gönderim ile iletilir.
 
 Gönderim sayısı kayıt bazında tutulur (`teslimSmsSayisi`, `teslimSmsAt`) ve talep
@@ -279,8 +287,8 @@ Müşteri fındığını almaya geldiğinde talep satırındaki tutar hücresind
 
 Tahsil edilmeyi bekleyen veya veresiye kalan teslimler raporlarda ayrı listelenir.
 
-Tahsilat kalemleri **Fındık İşleme Kasası**'na (`KasaHesap.modul = ISLEME`) yazılır ve
-bu hesaplar İşleme modülündeki **İşleme Kasası** ekranından (`/hizmet/kasa`) yönetilir.
+Tahsilat kalemleri işleme modülünün **Kasa**'sına (`KasaHesap.modul = ISLEME`) yazılır ve
+bu hesaplar İşleme modülündeki **Kasa** ekranından (`/hizmet/kasa`) yönetilir.
 Alım modülündeki `/kasa` ekranı bu hesapları **salt görüntü** olarak listeler
 (bkz. bölüm 1).
 
@@ -291,7 +299,7 @@ Alım modülündeki `/kasa` ekranı bu hesapları **salt görüntü** olarak lis
 - Durum dağılımı (talep adedi, miktar, tutar).
 - Ortalama aşama süreleri (talep→kırım, kırım→kavurma, kavurma→paketleme,
   talep→tamamlanma, tamamlanma→teslim).
-- **Hazır · Teslim Alınmayanlar** listesi ve bildirim gönderilmemiş kayıt sayısı.
+- **Teslimat · Hazırlananlar** listesi ve bildirim gönderilmemiş kayıt sayısı.
 - **Teslim Edildi · Tahsilat Bekliyor** listesi.
 - **3 günden fazla bekleyenler**.
 
@@ -301,7 +309,8 @@ CSV dışa aktarımı: `/api/hizmet/raporlar/csv`
 | --- | --- |
 | (boş) veya `?durum=HEPSI` | Tüm talepler |
 | `?durum=KIRIM` | Tek aşama |
-| `?liste=hazir` | İşi bitmiş, teslim alınmamışlar |
+| `?liste=teslimat` | Hazırlanmış, teslim alınmamışlar (eski ad: `hazir`) |
+| `?liste=kuyruk` | Henüz işleme alınmamış bekleyen talepler |
 | `?liste=sms` | Tamamlandı bildirimi gönderilmemişler |
 | `?liste=tahsilat` | Teslim edilmiş, tahsilatı bekleyenler |
 
@@ -375,7 +384,7 @@ Betik yalnızca `Z… Musteri` veya `E2eFindik…` ön ekli kayıtları hedefler
 hiçbir hizmet ya da finans kaydına dokunmaz.
 
 Kapsanan senaryolar: talep kaydı + ilk 4 harf önerisi, kırım/kavurma/paketleme aşama
-geçişleri, tamamlandı SMS onayı, `?liste=hazir` derin bağlantısı, teslim hatırlatma
+geçişleri, tamamlandı SMS onayı, `?liste=teslimat` derin bağlantısı, teslim hatırlatma
 SMS'i, QR etiket + yazıcı profili, doğrudan ESC/POS baskı kontrolü, Bluetooth önizleme
 ve baskı düğmeleri, tahsilat → `TESLIM_EDILDI`, durum raporları ve CSV, ayarlar
 ekranındaki yazıcı hedefi (Bluetooth dahil) bölümü, `/mod/islem` modül sayaçları.
@@ -384,7 +393,7 @@ panonun modüle göre ayrılması (işleme ve alım panoları karışmaz), modü
 kenar çubuğunda menü öğesi olarak **yer almadığı**, Ayarlar → Modül sekmesi ve
 giriş varsayılan modülü yönlendirmesi doğrulanır. Mobil sticky alt menünün modüle
 göre ayrıldığı (alım: Ana Sayfa / Ara / Sesli modu aç / Ayarlar; işleme: Pano /
-Talep Kuyruğu / Yeni Talep / İşleme Kasası / Ayarlar) ve **işleme modülünde eller
+Talep Kuyruğu / Yeni Talep / Kasa / Ayarlar) ve **işleme modülünde eller
 serbest (sesli not) ögesinin bulunmadığı** da doğrulanır.
 
 Web Bluetooth'un kendisi (yazıcı eşleştirme ve fiziksel baskı) tarayıcı izni ve donanım

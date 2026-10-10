@@ -15,7 +15,7 @@ const IKONLAR: Record<ModulId, typeof Package> = {
 
 const ACIKLAMALAR: Record<ModulId, string> = {
   alim: "Alım fişi, randıman, emanet, virman, sevk, finans, cari ve raporlar.",
-  islem: "Talep kaydı, kırım → kavurma → paketleme takibi, teslim, tahsilat, işleme kasası ve etiket.",
+  islem: "Talep kaydı, kırım → kavurma → paketleme takibi, teslim, tahsilat, kasa ve etiket.",
 };
 
 /**

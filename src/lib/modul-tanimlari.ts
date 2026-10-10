@@ -110,16 +110,16 @@ export function islemModulu(sayaclar: IslemeModulSayaclari): Modul {
       },
       {
         href: "/hizmet/kasa",
-        etiket: "İşleme Kasası",
+        etiket: "Kasa",
         ikon: "isleme-kasa",
         dekont: "İşleme modülünün kendi kasası: hesap tanımları, tahsilat ve ödeme hareketleri.",
       },
       {
-        href: "/hizmet?liste=hazir",
-        etiket: "Hazır · Teslim Alınmayanlar",
+        href: "/hizmet?liste=teslimat",
+        etiket: "Teslimat · Hazırlananlar",
         ikon: "isleme-hazir",
         badge: sayaclar.hazirBekleyen > 0 ? sayaclar.hazirBekleyen : undefined,
-        dekont: "İşi bitmiş, müşterisi henüz almamış talepler; yeniden bildirim ve toplu SMS.",
+        dekont: "Hazırlanmış, müşterisi henüz almamış talepler; yeniden bildirim ve toplu SMS.",
       },
       {
         href: "/hizmet/raporlar",
@@ -131,7 +131,7 @@ export function islemModulu(sayaclar: IslemeModulSayaclari): Modul {
         href: "/hizmet/ayarlar",
         etiket: "İşleme Ayarları",
         ikon: "isleme-ayar",
-        dekont: "Fındık işleme kasası, etiket yazıcı profili (Nimbot B1) ve SMS.",
+        dekont: "Kasa tanımı, etiket yazıcı profili (Nimbot B1) ve SMS.",
       },
     ],
   };

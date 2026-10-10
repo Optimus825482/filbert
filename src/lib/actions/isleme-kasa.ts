@@ -76,14 +76,14 @@ export async function islemeKasasiOlustur(g: IslemeKasaGirdi): Promise<Sonuc> {
         hedefTipi: "KasaHesap",
         hedefId: hesap.id,
         sonrakiVeri: { ad: hesap.ad, tip: hesap.tip, bakiyeTuru: hesap.bakiyeTuru, modul: hesap.modul },
-        aciklama: "İşleme kasası tanımlandı.",
+        aciklama: "Kasa tanımlandı.",
       },
     });
     yenile(["/hizmet/kasa", "/kasa", "/hizmet/ayarlar"]);
     return { ok: true };
   } catch (e) {
     console.error("islemeKasasiOlustur", e);
-    return { ok: false, hata: "İşleme kasası kaydedilemedi" };
+    return { ok: false, hata: "Kasa kaydedilemedi" };
   }
 }
 
@@ -94,7 +94,7 @@ export async function islemeKasasiGuncelle(id: string, g: IslemeKasaGirdi): Prom
   try {
     const actor = await requirePermission("HIZMET", "GUNCELLE");
     const onceki = await prisma.kasaHesap.findFirst({ where: { id, firmaId: actor.firmaId, modul: "ISLEME" } });
-    if (!onceki) return { ok: false, hata: "İşleme kasası bulunamadı" };
+    if (!onceki) return { ok: false, hata: "Kasa bulunamadı" };
     const sonraki = {
       ad: g.ad.trim(),
       tip: g.tip as HesapTip,
@@ -114,7 +114,7 @@ export async function islemeKasasiGuncelle(id: string, g: IslemeKasaGirdi): Prom
           hedefId: id,
           oncekiVeri: { ad: onceki.ad, tip: onceki.tip, bakiyeTuru: onceki.bakiyeTuru, bankaAdi: onceki.bankaAdi, iban: onceki.iban, aktif: onceki.aktif },
           sonrakiVeri: sonraki,
-          aciklama: "İşleme kasası güncellendi.",
+          aciklama: "Kasa güncellendi.",
         },
       });
     });
@@ -122,7 +122,7 @@ export async function islemeKasasiGuncelle(id: string, g: IslemeKasaGirdi): Prom
     return { ok: true };
   } catch (e) {
     console.error("islemeKasasiGuncelle", e);
-    return { ok: false, hata: "İşleme kasası güncellenemedi" };
+    return { ok: false, hata: "Kasa güncellenemedi" };
   }
 }
 
@@ -131,7 +131,7 @@ export async function islemeKasasiAktifToggle(id: string): Promise<Sonuc> {
   try {
     const actor = await requirePermission("HIZMET", "GUNCELLE");
     const hesap = await prisma.kasaHesap.findFirst({ where: { id, firmaId: actor.firmaId, modul: "ISLEME" } });
-    if (!hesap) return { ok: false, hata: "İşleme kasası bulunamadı" };
+    if (!hesap) return { ok: false, hata: "Kasa bulunamadı" };
     await prisma.$transaction(async (tx) => {
       await tx.kasaHesap.update({ where: { id }, data: { aktif: !hesap.aktif } });
       await tx.auditKaydi.create({
@@ -144,7 +144,7 @@ export async function islemeKasasiAktifToggle(id: string): Promise<Sonuc> {
           hedefId: id,
           oncekiVeri: { aktif: hesap.aktif },
           sonrakiVeri: { aktif: !hesap.aktif },
-          aciklama: "İşleme kasası durumu değiştirildi.",
+          aciklama: "Kasa durumu değiştirildi.",
         },
       });
     });
@@ -167,7 +167,7 @@ export async function islemeKasaHareketiKaydet(g: IslemeKasaHareketGirdi): Promi
   try {
     const actor = await requirePermission("HIZMET", "OLUSTUR");
     const hesap = await prisma.kasaHesap.findFirst({ where: { id: g.hesapId, firmaId: actor.firmaId, modul: "ISLEME" } });
-    if (!hesap) return { ok: false, hata: "İşleme kasası bulunamadı" };
+    if (!hesap) return { ok: false, hata: "Kasa bulunamadı" };
     if (!hesap.aktif) return { ok: false, hata: "Pasif kasaya hareket işlenemez" };
     await prisma.$transaction(async (tx) => {
       const hareket = await tx.finansHareket.create({
@@ -177,7 +177,7 @@ export async function islemeKasaHareketiKaydet(g: IslemeKasaHareketGirdi): Promi
           hesapId: hesap.id,
           bakiyeTuru: hesap.bakiyeTuru,
           tutar: g.tutar,
-          aciklama: metin(g.aciklama) ?? (g.tip === "TAHSILAT" ? "İşleme kasası tahsilatı" : "İşleme kasası ödemesi"),
+          aciklama: metin(g.aciklama) ?? (g.tip === "TAHSILAT" ? "Kasa tahsilatı" : "Kasa ödemesi"),
         },
       });
       await tx.auditKaydi.create({
@@ -189,7 +189,7 @@ export async function islemeKasaHareketiKaydet(g: IslemeKasaHareketGirdi): Promi
           hedefTipi: "FinansHareket",
           hedefId: hareket.id,
           sonrakiVeri: { tip: g.tip, hesapId: hesap.id, bakiyeTuru: hesap.bakiyeTuru, tutar: g.tutar, aciklama: metin(g.aciklama) },
-          aciklama: "İşleme kasası hareketi; ters kayıtla düzeltilebilir.",
+          aciklama: "Kasa hareketi; ters kayıtla düzeltilebilir.",
         },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

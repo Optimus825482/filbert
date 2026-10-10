@@ -5,7 +5,7 @@ import { requirePagePermission } from "@/lib/rbac/guard";
 import { tarihSaat, kg, paraTL } from "@/lib/format";
 import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
 import { getFindikIslemeAyarlari } from "@/lib/actions/hizmet";
-import { HizmetTablosu, type HizmetSatir } from "./hizmet-tablosu";
+import { HizmetTablosu, type HizliFiltre, type HizmetSatir } from "./hizmet-tablosu";
 import { Clock, Play, CheckCircle2, PackageCheck, Banknote, Scale } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +18,18 @@ export default async function HizmetPage({
   await requirePagePermission("HIZMET", "GORUNTULE");
   const firma = await getCurrentFirma();
   const { liste } = await searchParams;
-  const baslangicHizliFiltre =
-    liste === "hazir" ? "TESLIM_ALINMADI" : liste === "sms" ? "SMS_BEKLEYEN" : "HEPSI";
+  // Modül menüsünden gelen derin bağlantılar: talep kuyruğu, hazırlananlar,
+  // teslimat (hazır · teslim bekleyen) ve bildirimi gönderilmemişler.
+  const baslangicHizliFiltre: HizliFiltre =
+    liste === "kuyruk"
+      ? "KUYRUK"
+      : liste === "hazirlaniyor"
+        ? "HAZIRLANIYOR"
+        : liste === "teslimat" || liste === "hazir"
+          ? "TESLIM_ALINMADI"
+          : liste === "sms"
+            ? "SMS_BEKLEYEN"
+            : "HEPSI";
 
   const [kayitlar, smsAyari, kasalar, islemeAyarlari] = await Promise.all([
     prisma.hizmetIslemi.findMany({

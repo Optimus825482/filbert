@@ -366,7 +366,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
           />
           <p className="mt-1 text-[11px] text-sky-300">
             Bu şablon, tamamlandı bildirimi daha önce gönderilmiş fakat müşterisi fındığını teslim
-            almamış talepler için kullanılır (Talep Listesi → Hazır · Teslim Alınmayanlar → toplu
+            almamış talepler için kullanılır (Talep Listesi → Teslimat · Hazırlananlar → toplu
             SMS veya satır içi yeniden gönder).
           </p>
         </div>

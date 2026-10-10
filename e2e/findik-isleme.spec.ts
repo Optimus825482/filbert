@@ -119,7 +119,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     page,
   }) => {
     await page.goto("/hizmet?liste=hazir");
-    const hazirDugmesi = page.getByRole("button", { name: /Hazır · Teslim Alınmayan/ });
+    const hazirDugmesi = page.getByRole("button", { name: /Teslimat · Hazırlanan/ });
     await expect(hazirDugmesi).toHaveClass(/border-purple-400/);
 
     satir = page.locator("tr", { hasText: musteriAdi });
@@ -178,7 +178,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await page.goto("/hizmet/raporlar");
     await expect(page.getByRole("heading", { name: /Durum Raporları/ })).toBeVisible();
     await expect(page.getByText("Durum Dağılımı").first()).toBeVisible();
-    await expect(page.getByText("Hazır · Teslim Alınmayanlar").first()).toBeVisible();
+    await expect(page.getByText("Teslimat · Hazırlananlar").first()).toBeVisible();
     await expect(page.getByText("Teslim Edildi · Tahsilat Bekliyor").first()).toBeVisible();
 
     const csv = await page.request.get("/api/hizmet/raporlar/csv?durum=HEPSI");
@@ -222,7 +222,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await expect(page.getByRole("link", { name: /Yeni Talep Kaydı/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Talep Kuyruğu/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Durum Raporları/ }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /Hazır · Teslim Alınmayanlar/ }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Teslimat · Hazırlananlar/ }).first()).toBeVisible();
   });
 
   test("modül ayrımı: işleme ekranı yalnızca kendi menülerini listeler", async ({ page }) => {
@@ -231,7 +231,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
 
     const kenar = page.locator("aside");
     await expect(kenar.getByText("Fındık İşleme Modülü")).toBeVisible();
-    await expect(kenar.getByRole("link", { name: "İşleme Kasası" })).toBeVisible();
+    await expect(kenar.getByRole("link", { name: "Kasa", exact: true })).toBeVisible();
     // Alım modülünün menüleri işleme modülünde listelenmez.
     await expect(kenar.getByRole("link", { name: /Alım Yönetimi/ })).toHaveCount(0);
     await expect(kenar.getByRole("link", { name: /Randıman Takibi/ })).toHaveCount(0);
@@ -252,7 +252,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await expect(kenar.getByRole("button", { name: /Modülüne Geç/ })).toHaveCount(0);
     await expect(kenar.getByRole("link", { name: /Alım Yönetimi/ })).toBeVisible();
     // İşleme modülünün menüleri alım modülünde görünmez.
-    await expect(kenar.getByRole("link", { name: "İşleme Kasası" })).toHaveCount(0);
+    await expect(kenar.getByRole("link", { name: "Kasa", exact: true })).toHaveCount(0);
   });
 
   test("pano modüle göre ayrılır: işleme ve alım panoları karışmaz", async ({ page, context }) => {
@@ -307,7 +307,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     await expect(alt.getByRole("link", { name: "Pano" })).toBeVisible();
     await expect(alt.getByRole("link", { name: "Talep Kuyruğu" })).toBeVisible();
     await expect(alt.getByRole("link", { name: "Yeni Talep" })).toBeVisible();
-    await expect(alt.getByRole("link", { name: "İşleme Kasası" })).toBeVisible();
+    await expect(alt.getByRole("link", { name: "Kasa", exact: true })).toBeVisible();
     await expect(alt.getByRole("link", { name: "Ayarlar", exact: true })).toBeVisible();
     await expect(alt.getByRole("link", { name: "Sesli modu aç" })).toHaveCount(0);
     await expect(alt.getByRole("link", { name: "Ara", exact: true })).toHaveCount(0);
@@ -320,7 +320,7 @@ test.describe("Fındık İşleme Modülü — talep, aşama, bildirim ve teslim 
     // Fındık Alım: işleme ögeleri alt menüde görünmez.
     await page.goto("/mod/alim");
     await expect(alt.getByRole("link", { name: "Yeni Talep" })).toHaveCount(0);
-    await expect(alt.getByRole("link", { name: "İşleme Kasası" })).toHaveCount(0);
+    await expect(alt.getByRole("link", { name: "Kasa", exact: true })).toHaveCount(0);
     await expect(alt.getByRole("link", { name: "Ana Sayfa" })).toBeVisible();
     await expect(alt.getByRole("link", { name: "Ayarlar", exact: true })).toBeVisible();
   });
