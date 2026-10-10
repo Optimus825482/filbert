@@ -28,6 +28,7 @@ const ROTA_IZINLERI: Readonly<Record<string, Izin>> = {
   "/hizmet/raporlar": ["HIZMET", "GORUNTULE"],
   "/hizmet/ayarlar": ["HIZMET", "GORUNTULE"],
   "/hizmet/kasa": ["HIZMET", "GORUNTULE"],
+  "/hizmet/sms": ["HIZMET", "GORUNTULE"],
   "/mod/alim": ["ALIM", "GORUNTULE"],
   "/mod/findik": ["ALIM", "GORUNTULE"],
   "/mod/islem": ["HIZMET", "GORUNTULE"],

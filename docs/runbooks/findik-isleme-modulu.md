@@ -137,10 +137,45 @@ Kayıt tamamlandığında müşteriye **"talebiniz alınmıştır"** SMS'i gönd
 
 ## 4. SMS altyapısı ve şablonlar
 
-Sağlayıcı ayarları: **Ayarlar → SMS Ayarları** (`/ayarlar` → SMS sekmesi).
-Desteklenen sağlayıcılar: `NETGSM`, `ILETIMERKEZI`, `GENERIC_HTTP` ve simülasyon
-için `TEST`. SMS servisi kapalı veya `TEST` modundayken gönderim simüle edilir ve
-konsola yazılır; sayaçlar gerçek gönderim gibi işler.
+Sağlayıcı ayarları: **Ayarlar → SMS Ayarları** (`/ayarlar` → SMS sekmesi); ayar
+başlığındaki **SMS Merkezi** kısayolu izleme ekranını açar. Desteklenen sağlayıcılar:
+`NETGSM`, `ILETIMERKEZI`, `GENERIC_HTTP` ve simülasyon için `TEST`. SMS servisi
+kapalı veya `TEST` modundayken gönderim **simüle edilir** (dış sağlayıcıya istek
+gitmez, konsola yazılır) ve kayıt `SIMULASYON` durumuyla günlüğe düşer.
+
+### Netgsm (önerilen sağlayıcı)
+
+- REST v2 uçları: gönderim `POST /sms/rest/v2/send`, gönderim raporu
+  `POST /sms/rest/v2/report`, bakiye `/balance`. Kimlik doğrulama Basic auth
+  (kullanıcı adı/şifre).
+- Gönderim gövdesi: `{ msgheader, encoding, iysfilter:"0", appname, messages:[{ msg, no }] }`.
+  Numara **10 hane** (`5XXXXXXXXX`) olmalıdır; başında `0` veya `+90` bulunmamalıdır
+  (`netgsmNumara`).
+- **HTTP 200 dönse bile gerçek sonuç gövdedeki `code` alanındadır**: `00` başarı;
+  `20` metin/karakter, `30` kimlik veya IP kısıtı, `40` onaysız başlık, `50`/`51`
+  İYS, `70` parametre, `80` hız, `85` aynı numaraya 1 dakikada en fazla 20 görev,
+  `100`/`101` sistem hatası. Tam liste: `src/lib/sms/types.ts` →
+  `NETGSM_GONDERIM_HATALARI`.
+- Teslim raporu `jobs[].status`: `1` iletildi, `2` süresi doldu, `3` geçersiz
+  numara, `4` iletilemedi, `11`-`17` reddedildi / İYS hataları
+  (`NETGSM_TESLIM_DURUMLARI`).
+- **Kodlama** (`kodlama` alanı): `TR` Türkçe karakterleri korur (UCS-2, tek SMS
+  sınırı **65** karakter); `ASCII` ş/ğ/ı/ö/ü/ç harflerini sadeleştirir (GSM-7,
+  sınır **155** karakter) ve aynı metni daha az krediye böler. Karakter/kredi/parça
+  hesabı gönderim öncesi canlı sayılır (`smsParcaHesapla`) ve kayda `parcaSayisi`
+  olarak yazılır.
+- **Bakiye Sorgula** kalan kontörü, **Başlıkları Getir** onaylı gönderici
+  başlıklarını sağlayıcıdan okur.
+
+### Gönderim günlüğü
+
+Her gönderim (kayıt, tamamlandı, teslim hatırlatma, test ve elle gönderimler)
+`SmsKaydi` tablosuna yazılır: alıcı, mesaj, tip, sağlayıcı, durum, sağlayıcı iş
+kimliği, hata kodu/açıklaması, kredi (parça) sayısı, birim ve toplam maliyet, teslim
+kodu ve zamanı. Akış: kayıt **`KUYRUKTA`** açılır → sağlayıcı yanıtına göre
+`GONDERILDI` / `HATA` / `SIMULASYON` olur → teslim sorgusuyla `TESLIM_EDILDI`.
+Sağlayıcı hatası iş akışını durdurmaz; talep kaydı tamamlanır, hata günlüğe düşer
+(`src/lib/sms/sms-servisi.ts`).
 
 Üç şablon vardır (değişkenler: `{musteri_adi}`, `{sira_no}`, `{kilo}`,
 `{hizmetler}`, `{tutar}`, `{firma_adi}`):
@@ -152,7 +187,26 @@ konsola yazılır; sayaçlar gerçek gönderim gibi işler.
    içi yeniden gönderim ile iletilir.
 
 Gönderim sayısı kayıt bazında tutulur (`teslimSmsSayisi`, `teslimSmsAt`) ve talep
-satırında "N× teslim bildirimi" olarak görünür.
+satırında "N× teslim bildirimi" olarak görünür; her birinin tek tek gönderim ve teslim
+durumu **SMS Merkezi**'nden izlenir.
+
+### SMS Merkezi (`/hizmet/sms`)
+
+**Talep Kuyruğu / Pano → SMS Merkezi** bağıyla açılır (HIZMET/GORUNTULE). Gönderim
+akışı talep ekranlarında çalışır; bu ekran izleme içindir:
+
+- **KPI şeridi:** bugün gönderilen, bugün teslim edilen, bugün hatalı, bugün
+  harcanan kredi, teslim raporu bekleyen, toplam hatalı ve toplam kayıt.
+- **Sağlayıcı şeridi:** aktif sağlayıcı, gönderici başlığı, kodlama ve birim maliyet;
+  servis kapalı veya test modundaysa "simülasyon modu" uyarısı.
+- **Filtreler:** durum (`KUYRUKTA`/`GONDERILDI`/`TESLIM_EDILDI`/`HATA`/`SIMULASYON`),
+  tip (kayıt / tamamlandı / teslim hatırlatma / test / elle) ve ad–telefon–mesaj
+  araması.
+- **Satır eylemleri:** hatalı ya da simülasyon kayıtlarında **Yeniden gönder**;
+  üstteki **Teslim durumlarını sorgula** bekleyen kayıtlar için sağlayıcıdan teslim
+  raporunu çeker.
+- **Dışa aktarım:** `/api/hizmet/sms/csv`; filtreler korunur, TL maliyet sütunları
+  eklenir ve CSV formül enjeksiyonuna karşı kaçırılır.
 
 ## 5. Etiket (QR) ve Nimbot B1 yazıcı
 
@@ -318,6 +372,10 @@ CSV; sıra no, müşteri, telefon, kg, işlemler, durum, ödeme durumu, tutar, t
 edilen tutar, SMS durumları, hatırlatma/baskı sayaçları ve tüm aşama zaman damgalarını
 içerir. Formül enjeksiyonuna karşı hücreler kaçırılır.
 
+SMS gönderim günlüğü ayrı ekranda (**SMS Merkezi**, `/hizmet/sms`) listelenir ve
+`/api/hizmet/sms/csv?durum=HATA&tip=TAMAMLANDI&q=...` ile aynı filtrelerle dışa
+aktarılır (bkz. bölüm 4).
+
 ## 8. Doğrulama
 
 ```bash
@@ -329,6 +387,7 @@ pnpm test                 # birim testleri (tsx --test)
                           #   Modül ayrımı/menü daraltma: test/modul.test.ts
                           #   Müşteri/müstahsil ayrımı: test/musteri-ayrim.test.ts
                           #   Pano KPI + durum dağılımı grafiği: test/pano-isleme-kpi.test.ts
+                          #   SMS günlüğü, parça/kredi hesabı ve gönderim akışı: test/sms.test.ts
 pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
 pnpm build
 ```
@@ -420,3 +479,7 @@ yazıcıyı seçin ve çıktıyı kontrol edin.
   `Kullanici.varsayilanModul` kullanıcının girişte açılacak modülünü,
   `KasaHesap.modul` hesabın hangi modüle ait olduğunu belirtir; varsayılan `ALIM`'dır
   (`prisma/migrations/20261010160000_modul_ayrimi_kasa_ve_varsayilan`).
+- Her SMS gönderimi `SmsKaydi` tablosuna yazılır (durum, sağlayıcı iş kimliği, hata
+  kodu, kredi/parça sayısı, birim ve toplam maliyet, teslim kodu/zamanı); `SmsAyari`'na
+  `birimMaliyetKurus`, `kodlama` ve `appname` alanları eklenmiştir
+  (`prisma/migrations/20261010193000_sms_gonderim_kayitlari`).

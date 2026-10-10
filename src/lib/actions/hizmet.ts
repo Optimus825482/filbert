@@ -163,7 +163,12 @@ export async function createHizmetKaydi(
           firma_adi: firma.unvan,
         });
 
-        const sonuc = await smsGonder(firma.id, kayit.telefon, mesajMetni);
+        const sonuc = await smsGonder(firma.id, kayit.telefon, mesajMetni, {
+          tip: "KAYIT",
+          hizmetIslemiId: kayit.id,
+          musteriAdi: kayit.musteriAdi,
+          kullaniciId: actor.id,
+        });
         if (sonuc.basarili) {
           smsGitti = true;
           await prisma.hizmetIslemi.update({
@@ -255,7 +260,12 @@ export async function updateHizmetDurumu(
         firma_adi: firma.unvan,
       });
 
-      const smsSonuc = await smsGonder(actor.firmaId, kayit.telefon, mesaj);
+      const smsSonuc = await smsGonder(actor.firmaId, kayit.telefon, mesaj, {
+        tip: "TAMAMLANDI",
+        hizmetIslemiId: kayit.id,
+        musteriAdi: kayit.musteriAdi,
+        kullaniciId: actor.id,
+      });
       if (smsSonuc.basarili) {
         smsGitti = true;
         updateData.tamamlandiSmsGonderildi = true;
@@ -322,7 +332,12 @@ export async function topluHizmetDurumuGuncelle(
             tutar: String(k.toplamTutar),
             firma_adi: firma.unvan,
           });
-          const res = await smsGonder(actor.firmaId, k.telefon, mesaj);
+          const res = await smsGonder(actor.firmaId, k.telefon, mesaj, {
+            tip: "TAMAMLANDI",
+            hizmetIslemiId: k.id,
+            musteriAdi: k.musteriAdi,
+            kullaniciId: actor.id,
+          });
           if (res.basarili) {
             smsGonderilenAdet += 1;
             await prisma.hizmetIslemi.update({
@@ -370,10 +385,10 @@ export async function topluSmsGonder(
     for (const k of kayitlar) {
       try {
         // Tamamlandı bildirimi daha önce gitmişse teslim hatırlatma şablonu kullanılır.
-        const sablonSecili =
-          k.durum === "TAMAMLANDI" && k.tamamlandiSmsGonderildi
-            ? smsAyari.teslimHatirlatmaSablonu
-            : smsAyari.tamamlandiSablonu;
+        const hatirlatmaMi = k.durum === "TAMAMLANDI" && k.tamamlandiSmsGonderildi;
+        const sablonSecili = hatirlatmaMi
+          ? smsAyari.teslimHatirlatmaSablonu
+          : smsAyari.tamamlandiSablonu;
         const mesaj = sablonDoldur(sablonSecili, {
           musteri_adi: k.musteriAdi,
           telefon: k.telefon,
@@ -384,7 +399,12 @@ export async function topluSmsGonder(
           firma_adi: firma.unvan,
         });
 
-        const sonuc = await smsGonder(actor.firmaId, k.telefon, mesaj);
+        const sonuc = await smsGonder(actor.firmaId, k.telefon, mesaj, {
+          tip: hatirlatmaMi ? "TESLIM_HATIRLATMA" : "TAMAMLANDI",
+          hizmetIslemiId: k.id,
+          musteriAdi: k.musteriAdi,
+          kullaniciId: actor.id,
+        });
         if (sonuc.basarili) {
           basariliAdet += 1;
           await prisma.hizmetIslemi.update({
@@ -460,7 +480,12 @@ export async function hizmetSmsTekrarGonder(
       firma_adi: firma.unvan,
     });
 
-    const sonuc = await smsGonder(actor.firmaId, kayit.telefon, mesaj);
+    const sonuc = await smsGonder(actor.firmaId, kayit.telefon, mesaj, {
+      tip,
+      hizmetIslemiId: kayit.id,
+      musteriAdi: kayit.musteriAdi,
+      kullaniciId: actor.id,
+    });
     if (!sonuc.basarili) {
       return { ok: false, hata: sonuc.hata || "SMS gönderilemedi" };
     }

@@ -695,7 +695,8 @@ export async function getGunlukRapor(tarih: Date) {
  */
 export const islemeSayaclari = cache(async (fid: string) => {
   const { baslangic: bugunBaslangic } = istanbulGunAraligi();
-  const [gruplar, kilolar, smsBekleyen, bugunTamamlanan, tahsilatBekleyen] = await Promise.all([
+  const [gruplar, kilolar, smsBekleyen, bugunTamamlanan, tahsilatBekleyen, smsBugun, smsToplam] =
+    await Promise.all([
     prisma.hizmetIslemi.groupBy({
       by: ["durum"],
       where: { firmaId: fid },
@@ -715,7 +716,27 @@ export const islemeSayaclari = cache(async (fid: string) => {
     prisma.hizmetIslemi.count({
       where: { firmaId: fid, durum: "TESLIM_EDILDI", odemeDurumu: { not: "ODENDI" } },
     }),
+    // SMS günlüğü: bugünkü gönderim/teslim/hata adetleri ve rapor bekleyenler.
+    prisma.smsKaydi.groupBy({
+      by: ["durum"],
+      where: { firmaId: fid, createdAt: { gte: bugunBaslangic } },
+      _count: { _all: true },
+    }),
+    prisma.smsKaydi.groupBy({
+      by: ["durum"],
+      where: { firmaId: fid },
+      _count: { _all: true },
+    }),
   ]);
+
+  /** SMS grubundaki durum adetlerinin toplamı. */
+  const saySms = (
+    gruplar: { durum: string; _count: { _all: number } }[],
+    hedefler: readonly string[]
+  ) =>
+    gruplar
+      .filter((grup) => hedefler.includes(grup.durum))
+      .reduce((toplam, grup) => toplam + grup._count._all, 0);
 
   const say = (durumlar: readonly string[]) =>
     gruplar
@@ -742,6 +763,14 @@ export const islemeSayaclari = cache(async (fid: string) => {
     smsBekleyen,
     bugunTamamlanan,
     tahsilatBekleyen,
+    /** SMS entegrasyonunun canlı durumu: pano şeridi ve SMS Merkezi özeti. */
+    sms: {
+      bugunGonderilen: saySms(smsBugun, ["GONDERILDI", "TESLIM_EDILDI", "SIMULASYON"]),
+      bugunTeslim: saySms(smsBugun, ["TESLIM_EDILDI"]),
+      bugunHatali: saySms(smsBugun, ["HATA"]),
+      raporBekleyen: saySms(smsToplam, ["GONDERILDI"]),
+      hataliToplam: saySms(smsToplam, ["HATA"]),
+    },
     /** Donut grafiği için durum → adet eşlemesi. */
     durumDagilimi: Object.fromEntries(gruplar.map((grup) => [grup.durum, grup._count._all])),
   };

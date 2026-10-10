@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   ShoppingBasket, ClipboardList, Calculator, ArrowLeftRight, Truck, PackageOpen,
   Wallet, Banknote, HandCoins, ArrowDownUp, Receipt, PiggyBank,
-  Users, FileText, Warehouse, FileBarChart, TrendingUp, Settings, Home,
+  Users, FileText, Warehouse, FileBarChart, TrendingUp, Settings, Home, MessageSquare,
   ChevronRight,
   Package,
   PackageCheck,
@@ -43,6 +43,7 @@ const GRUPLAR: NavGrup[] = [
       { href: "/hizmet", etiket: "Talep Kuyruğu", ikon: PackageCheck },
       { href: "/hizmet/kasa", etiket: "Kasa", ikon: Wallet },
       { href: "/hizmet/raporlar", etiket: "Durum Raporları", ikon: FileBarChart },
+      { href: "/hizmet/sms", etiket: "SMS Merkezi", ikon: MessageSquare },
       { href: "/hizmet/ayarlar", etiket: "İşleme Ayarları", ikon: Settings },
     ],
   },

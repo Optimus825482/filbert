@@ -20,6 +20,8 @@ const korunanEkranlar = [
   ["src/app/mod/rapor/page.tsx", 'requirePagePermission("RAPORLAR", "GORUNTULE")'],
   ["src/app/arama/layout.tsx", 'requirePagePermission("DASHBOARD", "GORUNTULE")'],
   ["src/app/api/cari-ara/route.ts", 'requirePermission("CARI", "GORUNTULE")'],
+  ["src/app/hizmet/sms/page.tsx", 'requirePagePermission("HIZMET", "GORUNTULE")'],
+  ["src/app/api/hizmet/sms/csv/route.ts", 'requirePermission("HIZMET", "GORUNTULE")'],
 ] as const;
 
 test("hassas ikincil ekranlar uygun sayfa izni olmadan veri sorgulamaz", () => {

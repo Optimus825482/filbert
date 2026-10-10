@@ -167,6 +167,36 @@ export async function PanoIsleme({ actor }: { actor: Aktor }) {
           <Kpi baslik="Tahsilat bekleyen" deger={sayaclar.tahsilatBekleyen} toplam={sayaclar.teslimEdilen} alt="teslim edildi, ödeme yok" ikon={HandCoins} renk="#f87171" href="/hizmet/raporlar" />
         </section>
 
+        <section className={`md:col-span-12 ${PANEL}`}>
+          <div className={PANEL_BASLIK}>
+            <div>
+              <h2 className="text-sm font-extrabold tracking-tight text-white">SMS bildirimleri</h2>
+              <p className="mt-0.5 text-xs font-semibold text-sky-100">
+                Bugün {sayaclar.sms.bugunGonderilen} gönderim · {sayaclar.sms.bugunTeslim} teslim ·{" "}
+                {sayaclar.sms.bugunHatali} hata
+              </p>
+            </div>
+            <Link href="/hizmet/sms" className="flex items-center gap-1 text-xs font-bold text-[#f5c518]">
+              SMS Merkezi <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+            {[
+              { etiket: "Bugün gönderilen", deger: sayaclar.sms.bugunGonderilen, renk: "#38bdf8" },
+              { etiket: "Bugün teslim edilen", deger: sayaclar.sms.bugunTeslim, renk: "#34d399" },
+              { etiket: "Bugün hatalı", deger: sayaclar.sms.bugunHatali, renk: "#f87171" },
+              { etiket: "Teslim raporu bekleyen", deger: sayaclar.sms.raporBekleyen, renk: "#a78bfa" },
+            ].map((olcu) => (
+              <div key={olcu.etiket} className="rounded-xl border border-[var(--surface-border)] bg-black/10 px-3 py-2">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-sky-300">{olcu.etiket}</div>
+                <div className="mt-0.5 text-xl font-black" style={{ color: olcu.renk }}>
+                  {olcu.deger}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className={`md:col-span-12 lg:col-span-4 ${PANEL}`}>
           <div className={PANEL_BASLIK}>
             <div>

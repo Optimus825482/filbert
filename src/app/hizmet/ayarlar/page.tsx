@@ -5,7 +5,7 @@ import { requirePagePermission } from "@/lib/rbac/guard";
 import { getFirmaSmsAyarlari } from "@/lib/sms/sms-servisi";
 import { findikIslemeAyarlariniCoz } from "@/lib/findik-isleme";
 import { windowsYazicilariniListele } from "@/lib/yazici/gonder";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
 import { IslemeAyarFormu } from "./isleme-ayar-formu";
 
 export const dynamic = "force-dynamic";
@@ -35,12 +35,20 @@ export default async function HizmetAyarlarPage() {
             Tahsilat kasası, etiket yazıcı profili ve SMS bildirim yapılandırması
           </p>
         </div>
-        <Link
-          href="/hizmet"
-          className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Talep Listesi
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/hizmet/sms"
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white"
+          >
+            <MessageSquare className="h-3.5 w-3.5" /> SMS Merkezi
+          </Link>
+          <Link
+            href="/hizmet"
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Talep Listesi
+          </Link>
+        </div>
       </div>
 
       <IslemeAyarFormu

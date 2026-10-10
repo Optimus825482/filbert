@@ -230,6 +230,7 @@ model Firma {
   hizmetTipleri         HizmetTipi[]
   smsAyari              SmsAyari?
   hizmetSiraSayaci      HizmetSiraSayaci?
+  smsKayitlari          SmsKaydi[]
 
   @@unique([vergiNo])
 }
@@ -299,6 +300,7 @@ model Kullanici {
   sesliNotlar      SesliNot[]
   finansTaslaklari FinansTaslagi[] @relation("FinansTaslagiOlusturan")
   hizmetIslemleri  HizmetIslemi[]  @relation("HizmetOlusturan")
+  smsKayitlari     SmsKaydi[]      @relation("SmsKaydiOlusturan")
 
   @@index([firmaId, aktif])
 }
@@ -920,6 +922,8 @@ model HizmetIslemi {
   createdAt               DateTime   @default(now())
   updatedAt               DateTime   @updatedAt
 
+  smsKayitlari SmsKaydi[]
+
   @@unique([firmaId, siraNo])
   @@index([firmaId, durum])
   @@index([firmaId, odemeDurumu])
@@ -984,8 +988,58 @@ model SmsAyari {
   tamamlandiSablonu       String?  @db.Text
   teslimHatirlatmaSablonu String?  @db.Text
   otomatikGirisSms        Boolean  @default(true)
+
+  // Sağlayıcı bazlı ek alanlar:
+  //   birimMaliyetKurus — SMS başına tahmini maliyet (kuruş, vergiler dahil)
+  //   kodlama            — "TR" (Türkçe karakter, UCS-2) veya "ASCII" (GSM-7)
+  //   appname            — Netgsm uygulama adı; gönderimler bu etiketle izlenir
+  birimMaliyetKurus      Int?
+  kodlama                 String   @default("TR")
+  appname                 String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+// Fındık İşleme modülünün SMS gönderim günlüğü. Her gönderim denemesi
+// (şablonlu bildirim, toplu gönderim, tekrar gönderim, test) burada saklanır;
+// böylece "hangi mesaj kime gitti, sağlayıcı ne döndü, teslim edildi mi"
+// sorusu FİLBERT içinden yanıtlanır. Kayıtlar silinmez, durum güncellenir.
+model SmsKaydi {
+  id             String      @id @default(uuid())
+  firmaId        String
+  firma          Firma       @relation(fields: [firmaId], references: [id], onDelete: Cascade)
+  // Talebe bağlı bildirimler; talep silinirse günlük kaydı korunur.
+  hizmetIslemiId String?
+  hizmetIslemi   HizmetIslemi? @relation(fields: [hizmetIslemiId], references: [id], onDelete: SetNull)
+  musteriAdi     String?
+  telefon        String
+  mesaj          String      @db.Text
+  // KAYIT | TAMAMLANDI | TESLIM_HATIRLATMA | TEST | MANUEL
+  tip            String      @default("BILGILENDIRME")
+  saglayici      String      @default("TEST")
+  // KUYRUKTA | GONDERILDI | TESLIM_EDILDI | HATA | SIMULASYON
+  durum          String      @default("KUYRUKTA")
+  // Sağlayıcının döndürdüğü görev kimliği (Netgsm jobid/bulkid, İletiMerkezi order id).
+  saglayiciIsId  String?
+  hataKodu       String?
+  hataAciklama   String?
+  kodlama        String      @default("TR")
+  parcaSayisi    Int         @default(1)
+  // Gönderim anındaki birim maliyet (kuruş); sonradan ayar değişse bile tutar sabit kalır.
+  birimMaliyetKurus Int?
+  // Sağlayıcı teslim raporundaki durum kodu (Netgsm: 0 bekliyor, 1 iletildi, 2 süresi doldu ...).
+  saglayiciDurumKodu Int?
+  teslimAt       DateTime?
+  denemeAdedi    Int         @default(0)
+  olusturanKullaniciId String?
+  olusturanKullanici   Kullanici? @relation("SmsKaydiOlusturan", fields: [olusturanKullaniciId], references: [id], onDelete: SetNull)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([firmaId, createdAt])
+  @@index([firmaId, durum])
+  @@index([firmaId, hizmetIslemiId])
+  @@index([saglayiciIsId])
 }
 
 model HizmetSiraSayaci {

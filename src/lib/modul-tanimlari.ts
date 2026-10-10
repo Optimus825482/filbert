@@ -122,6 +122,13 @@ export function islemModulu(sayaclar: IslemeModulSayaclari): Modul {
         dekont: "Hazırlanmış, müşterisi henüz almamış talepler; yeniden bildirim ve toplu SMS.",
       },
       {
+        href: "/hizmet/sms",
+        etiket: "SMS Merkezi",
+        ikon: "isleme-rapor",
+        badge: sayaclar.smsBekleyen > 0 ? sayaclar.smsBekleyen : undefined,
+        dekont: "Gönderilen bildirimlerin gönderim ve teslim durumu; yeniden gönderim ve dışa aktarma.",
+      },
+      {
         href: "/hizmet/raporlar",
         etiket: "Durum Raporları",
         ikon: "isleme-rapor",

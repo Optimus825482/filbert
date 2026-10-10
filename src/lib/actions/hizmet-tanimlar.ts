@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import { getCurrentFirma } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac/guard";
 import { revalidatePath } from "next/cache";
-import { smsGonder } from "@/lib/sms/sms-servisi";
-import type { SmsSaglayici } from "@/lib/sms/types";
+import { getFirmaSmsAyarlari, netgsmBakiyeSorgula, netgsmBasliklariGetir, smsGonder } from "@/lib/sms/sms-servisi";
+import type { SmsKodlama, SmsSaglayici } from "@/lib/sms/types";
 
 type Sonuc = { ok: boolean; hata?: string };
 
@@ -146,6 +146,10 @@ export interface SmsAyariGirdi {
   tamamlandiSablonu: string;
   teslimHatirlatmaSablonu: string;
   otomatikGirisSms: boolean;
+  /** SMS başına tahmini maliyet (kuruş). */
+  birimMaliyetKurus?: number | null;
+  kodlama?: SmsKodlama;
+  appname?: string;
 }
 
 export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
@@ -167,6 +171,12 @@ export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
         tamamlandiSablonu: g.tamamlandiSablonu.trim(),
         teslimHatirlatmaSablonu: g.teslimHatirlatmaSablonu.trim(),
         otomatikGirisSms: g.otomatikGirisSms,
+        birimMaliyetKurus:
+          g.birimMaliyetKurus === null || g.birimMaliyetKurus === undefined
+            ? null
+            : Math.max(Math.round(g.birimMaliyetKurus), 0),
+        kodlama: g.kodlama === "ASCII" ? "ASCII" : "TR",
+        appname: g.appname?.trim() || null,
       },
       update: {
         aktif: g.aktif,
@@ -179,6 +189,12 @@ export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
         tamamlandiSablonu: g.tamamlandiSablonu.trim(),
         teslimHatirlatmaSablonu: g.teslimHatirlatmaSablonu.trim(),
         otomatikGirisSms: g.otomatikGirisSms,
+        birimMaliyetKurus:
+          g.birimMaliyetKurus === null || g.birimMaliyetKurus === undefined
+            ? null
+            : Math.max(Math.round(g.birimMaliyetKurus), 0),
+        kodlama: g.kodlama === "ASCII" ? "ASCII" : "TR",
+        appname: g.appname?.trim() || null,
       },
     });
 
@@ -202,7 +218,9 @@ export async function updateSmsAyarlari(g: SmsAyariGirdi): Promise<Sonuc> {
   }
 }
 
-export async function testSmsGonder(aliciTelefon: string): Promise<Sonuc & { mesajId?: string }> {
+export async function testSmsGonder(
+  aliciTelefon: string
+): Promise<Sonuc & { mesajId?: string; simulasyon?: boolean; parcaSayisi?: number }> {
   if (!aliciTelefon?.trim()) return { ok: false, hata: "Telefon numarası girilmedi" };
 
   try {
@@ -212,15 +230,64 @@ export async function testSmsGonder(aliciTelefon: string): Promise<Sonuc & { mes
     const sonuc = await smsGonder(
       actor.firmaId,
       aliciTelefon.trim(),
-      `Filbert SMS Entegrasyon Testi: SMS ayarlarınız başarıyla yapılandırılmıştır. (${firma.unvan})`
+      `Filbert SMS Entegrasyon Testi: SMS ayarlarınız başarıyla yapılandırılmıştır. (${firma.unvan})`,
+      { tip: "TEST", kullaniciId: actor.id }
     );
 
     if (sonuc.basarili) {
-      return { ok: true, mesajId: sonuc.mesajId };
+      return {
+        ok: true,
+        mesajId: sonuc.mesajId,
+        simulasyon: sonuc.simulasyon,
+        parcaSayisi: sonuc.parcaSayisi,
+      };
     }
     return { ok: false, hata: sonuc.hata || "SMS gönderilemedi" };
   } catch (e) {
     console.error("testSmsGonder", e);
     return { ok: false, hata: "Test SMS gönderilirken hata oluştu" };
+  }
+}
+
+/**
+ * Sağlayıcı bakiyesini okur (Netgsm). SMS Merkezi'nde kredi bitmeden fark
+ * edilebilsin diye ayar ekranından elle tetiklenir.
+ */
+export async function smsBakiyeSorgula(): Promise<
+  Sonuc & { bakiye?: string; paketler?: { ad: string; adet: number }[] }
+> {
+  try {
+    const actor = await requirePermission("AYARLAR", "GORUNTULE");
+    const ayarlar = await getFirmaSmsAyarlari(actor.firmaId);
+
+    if (ayarlar.saglayici !== "NETGSM") {
+      return { ok: false, hata: "Bakiye sorgusu yalnızca Netgsm sağlayıcısı için desteklenir" };
+    }
+
+    const sonuc = await netgsmBakiyeSorgula(ayarlar);
+    if (!sonuc.basarili) return { ok: false, hata: sonuc.hata || "Bakiye okunamadı" };
+    return { ok: true, bakiye: sonuc.bakiye, paketler: sonuc.paketler };
+  } catch (e) {
+    console.error("smsBakiyeSorgula", e);
+    return { ok: false, hata: "Bakiye sorgulanamadı" };
+  }
+}
+
+/** Aboneliğe tanımlı onaylı gönderici başlıklarını listeler (Netgsm). */
+export async function smsBasliklariniGetir(): Promise<Sonuc & { basliklar?: string[] }> {
+  try {
+    const actor = await requirePermission("AYARLAR", "GORUNTULE");
+    const ayarlar = await getFirmaSmsAyarlari(actor.firmaId);
+
+    if (ayarlar.saglayici !== "NETGSM") {
+      return { ok: false, hata: "Başlık listesi yalnızca Netgsm sağlayıcısı için desteklenir" };
+    }
+
+    const sonuc = await netgsmBasliklariGetir(ayarlar);
+    if (!sonuc.basarili) return { ok: false, hata: sonuc.hata || "Başlıklar okunamadı" };
+    return { ok: true, basliklar: sonuc.basliklar };
+  } catch (e) {
+    console.error("smsBasliklariniGetir", e);
+    return { ok: false, hata: "Başlıklar sorgulanamadı" };
   }
 }

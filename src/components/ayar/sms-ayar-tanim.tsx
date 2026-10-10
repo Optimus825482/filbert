@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { MessageSquare, Send, Save } from "lucide-react";
-import { updateSmsAyarlari, testSmsGonder } from "@/lib/actions/hizmet-tanimlar";
-import type { SmsSaglayici } from "@/lib/sms/types";
+import { AlertTriangle, ArrowUpRight, Coins, MessageSquare, Save, Send, Wallet } from "lucide-react";
+import { smsBakiyeSorgula, testSmsGonder, updateSmsAyarlari } from "@/lib/actions/hizmet-tanimlar";
+import { SMS_SAGLAYICI_ETIKETLERI, type SmsKodlama, type SmsSaglayici } from "@/lib/sms/types";
+import { smsParcaHesapla } from "@/lib/sms/utils";
 import {
   VARSAYILAN_KAYIT_SABLONU,
   VARSAYILAN_TAMAMLANDI_SABLONU,
@@ -23,8 +25,16 @@ interface Props {
     tamamlandiSablonu: string;
     teslimHatirlatmaSablonu: string;
     otomatikGirisSms: boolean;
+    birimMaliyetKurus?: number | null;
+    kodlama?: string;
+    appname?: string;
   };
   guncelleYetkisi: boolean;
+}
+
+/** Kuruş tutarını okunabilir TL metnine çevirir. */
+function kurusYaz(kurus: number): string {
+  return `${(kurus / 100).toFixed(2).replace(".", ",")} TL`;
 }
 
 export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
@@ -39,6 +49,15 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
   const [kullaniciAdi, setKullaniciAdi] = useState(ayarlar.kullaniciAdi || "");
   const [sifre, setSifre] = useState(ayarlar.sifre || "");
   const [baslik, setBaslik] = useState(ayarlar.baslik || "");
+  const [appname, setAppname] = useState(ayarlar.appname || "");
+  const [birimMaliyet, setBirimMaliyet] = useState(
+    ayarlar.birimMaliyetKurus === null || ayarlar.birimMaliyetKurus === undefined
+      ? ""
+      : String(ayarlar.birimMaliyetKurus)
+  );
+  const [kodlama, setKodlama] = useState<SmsKodlama>(
+    ayarlar.kodlama === "ASCII" ? "ASCII" : "TR"
+  );
   const [kayitSablonu, setKayitSablonu] = useState(
     ayarlar.kayitSablonu || VARSAYILAN_KAYIT_SABLONU
   );
@@ -50,14 +69,17 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
   );
   const [otomatikGirisSms, setOtomatikGirisSms] = useState(ayarlar.otomatikGirisSms);
 
-  // Test SMS State
+  // Test / bakiye durumları
   const [testTel, setTestTel] = useState("");
   const [testPending, setTestPending] = useState(false);
+  const [bakiye, setBakiye] = useState<{ metin: string; paketler?: { ad: string; adet: number }[] } | null>(null);
+  const [bakiyePending, setBakiyePending] = useState(false);
 
-  function degiskenEkle(
-    sablonTipi: "KAYIT" | "TAMAMLANDI" | "HATIRLATMA",
-    degisken: string
-  ) {
+  const birimMaliyetKurus =
+    birimMaliyet.trim() === "" ? null : Math.max(Math.round(Number(birimMaliyet)), 0);
+  const maliyetGecerli = birimMaliyetKurus !== null && Number.isFinite(birimMaliyetKurus);
+
+  function degiskenEkle(sablonTipi: "KAYIT" | "TAMAMLANDI" | "HATIRLATMA", degisken: string) {
     if (sablonTipi === "KAYIT") {
       setKayitSablonu((onceki) => onceki + ` {${degisken}}`);
     } else if (sablonTipi === "HATIRLATMA") {
@@ -76,6 +98,9 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
         kullaniciAdi: kullaniciAdi.trim() || undefined,
         sifre: sifre.trim() || undefined,
         baslik: baslik.trim() || undefined,
+        appname: appname.trim() || undefined,
+        birimMaliyetKurus: maliyetGecerli ? birimMaliyetKurus : null,
+        kodlama,
         kayitSablonu,
         tamamlandiSablonu,
         teslimHatirlatmaSablonu,
@@ -100,7 +125,13 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
     try {
       const res = await testSmsGonder(testTel.trim());
       if (res.ok) {
-        toast.success(`Test SMS'i iletildi! (${res.mesajId || "Başarılı"})`);
+        const ekler = [
+          res.parcaSayisi ? `${res.parcaSayisi} SMS kredisi` : null,
+          res.simulasyon ? "simülasyon (kredi harcanmadı)" : null,
+        ].filter(Boolean);
+        toast.success(
+          `Test SMS'i iletildi.${ekler.length ? ` (${ekler.join(" · ")})` : ""} Kaydı SMS Merkezi'nde görebilirsiniz.`
+        );
       } else {
         toast.error(res.hata || "Test SMS gönderilemedi");
       }
@@ -108,6 +139,26 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
       toast.error("Bağlantı hatası");
     } finally {
       setTestPending(false);
+    }
+  }
+
+  async function handleBakiyeSorgula() {
+    setBakiyePending(true);
+    try {
+      const res = await smsBakiyeSorgula();
+      if (!res.ok) {
+        toast.error(res.hata || "Bakiye sorgulanamadı");
+        return;
+      }
+      setBakiye({
+        metin: res.bakiye ? `${res.bakiye} kredi` : "Paket bilgisi okundu",
+        paketler: res.paketler,
+      });
+      toast.success("Bakiye güncellendi.");
+    } catch {
+      toast.error("Bağlantı hatası");
+    } finally {
+      setBakiyePending(false);
     }
   }
 
@@ -120,11 +171,37 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
     { anahtar: "firma_adi", aciklama: "Firma Ünvanı" },
   ];
 
+  const sablonSayaci = (mesaj: string) => {
+    const bilgi = smsParcaHesapla(mesaj, kodlama);
+    const tutar = maliyetGecerli ? bilgi.parcaSayisi * (birimMaliyetKurus ?? 0) : null;
+    return (
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-sky-300">
+        <span>{bilgi.karakterSayisi} karakter</span>
+        <span>·</span>
+        <span className={bilgi.parcaSayisi > 1 ? "font-bold text-amber-300" : ""}>
+          {bilgi.parcaSayisi} SMS kredisi
+        </span>
+        <span>·</span>
+        <span>{bilgi.unicode ? "UCS-2 (Türkçe karakter)" : "GSM-7"}</span>
+        {tutar !== null && (
+          <>
+            <span>·</span>
+            <span>tahmini {kurusYaz(tutar)}</span>
+          </>
+        )}
+        <span>·</span>
+        <span>
+          parça başına {bilgi.sinir} karakter, {bilgi.kalan} karakter boş
+        </span>
+      </p>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* ─── Genel Durum & Sağlayıcı ─── */}
       <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] p-5 shadow-sm">
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-4">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-[#f5c518]" />
             <div>
@@ -135,22 +212,31 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-bold text-white">
-            <span>SMS Servisi:</span>
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${
-                aktif ? "bg-emerald-500/20 text-emerald-400" : "bg-neutral-800 text-sky-200"
-              }`}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/hizmet/sms"
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white"
             >
-              {aktif ? "Aktif" : "Pasif"}
-            </span>
-            <input
-              type="checkbox"
-              checked={aktif}
-              onChange={(e) => setAktif(e.target.checked)}
-              className="h-4 w-4 rounded accent-[#f5c518]"
-            />
-          </label>
+              SMS Merkezi
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-bold text-white">
+              <span>SMS Servisi:</span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${
+                  aktif ? "bg-emerald-500/20 text-emerald-400" : "bg-neutral-800 text-sky-200"
+                }`}
+              >
+                {aktif ? "Aktif" : "Pasif"}
+              </span>
+              <input
+                type="checkbox"
+                checked={aktif}
+                onChange={(e) => setAktif(e.target.checked)}
+                className="h-4 w-4 rounded accent-[#f5c518]"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -163,10 +249,10 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
               className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-semibold text-white focus:border-[#f5c518] focus:outline-none"
             >
               <option value="NETGSM" className="bg-[#081226] text-white">
-                Netgsm (XML / HTTP GET)
+                Netgsm (REST v2 — önerilen)
               </option>
               <option value="ILETIMERKEZI" className="bg-[#081226] text-white">
-                İletiMerkezi (JSON REST API)
+                İleti Merkezi (JSON REST API)
               </option>
               <option value="GENERIC_HTTP" className="bg-[#081226] text-white">
                 Özel Webhook / Generic HTTP POST
@@ -175,6 +261,9 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
                 Test / Simülasyon Modu (Kredi Harcamaz)
               </option>
             </select>
+            <p className="mt-1 text-[11px] text-sky-300">
+              Seçili sağlayıcı: {SMS_SAGLAYICI_ETIKETLERI[saglayici] ?? saglayici}
+            </p>
           </div>
 
           {/* Gönderici Başlığı (Originator) */}
@@ -189,6 +278,9 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
               onChange={(e) => setBaslik(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-bold text-white uppercase placeholder-white/30 focus:border-[#f5c518] focus:outline-none"
             />
+            <p className="mt-1 text-[11px] text-sky-300">
+              Sağlayıcı panelinde onaylı olmalıdır; onaysız başlıkla gönderim reddedilir.
+            </p>
           </div>
 
           {/* Kullanıcı Adı / API Key */}
@@ -217,6 +309,59 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             />
           </div>
 
+          {/* Uygulama adı */}
+          <div>
+            <label className="mb-1 block text-xs font-bold text-sky-200">
+              Uygulama Adı (sağlayıcı etiketi)
+            </label>
+            <input
+              type="text"
+              placeholder="filbert"
+              value={appname}
+              onChange={(e) => setAppname(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[#f5c518] focus:outline-none"
+            />
+          </div>
+
+          {/* Kodlama */}
+          <div>
+            <label className="mb-1 block text-xs font-bold text-sky-200">Mesaj Kodlaması</label>
+            <select
+              value={kodlama}
+              onChange={(e) => setKodlama(e.target.value as SmsKodlama)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm font-semibold text-white focus:border-[#f5c518] focus:outline-none"
+            >
+              <option value="TR" className="bg-[#081226] text-white">
+                TR — Türkçe karakterler korunur (UCS-2, parça başına 65 karakter)
+              </option>
+              <option value="ASCII" className="bg-[#081226] text-white">
+                ASCII — ş/ğ/ı/ö/ü/ç sadeleşir (GSM-7, parça başına 155 karakter)
+              </option>
+            </select>
+            <p className="mt-1 text-[11px] text-sky-300">
+              ASCII seçildiğinde aynı metin daha az krediye bölünür; harfler sadeleşir.
+            </p>
+          </div>
+
+          {/* Birim maliyet */}
+          <div>
+            <label className="mb-1 block text-xs font-bold text-sky-200">
+              SMS Başına Maliyet (kuruş)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Örn: 42"
+              value={birimMaliyet}
+              onChange={(e) => setBirimMaliyet(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-white placeholder-white/30 focus:border-[#f5c518] focus:outline-none"
+            />
+            <p className="mt-1 text-[11px] text-sky-300">
+              Şablon maliyet tahmini ve SMS Merkezi raporları bu değeri kullanır.
+            </p>
+          </div>
+
           {/* Generic API URL (opsiyonel) */}
           {saglayici === "GENERIC_HTTP" && (
             <div className="sm:col-span-2">
@@ -232,6 +377,21 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
           )}
         </div>
 
+        {saglayici === "NETGSM" && (
+          <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-amber-100">
+            <div className="mb-1 flex items-center gap-1.5 font-bold text-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Netgsm kurulum notları
+            </div>
+            <ul className="list-inside list-disc space-y-0.5">
+              <li>Kullanıcı adı olarak Netgsm abone numaranızı, şifre olarak API alt kullanıcı şifresini girin.</li>
+              <li>API erişimi IP ile kısıtlıysa sunucunun çıkış IP&apos;sini Netgsm panelinde yetkili listesine ekleyin.</li>
+              <li>Gönderici başlığı Netgsm panelinde onaylı olmalıdır (ücretsiz başlık tahsisi).</li>
+              <li>Bildirim mesajları ticari ileti sayılmadığı için İYS onayı aranmaz.</li>
+            </ul>
+          </div>
+        )}
+
         {/* Otomatik Kayıt SMS Toggle */}
         <div className="mt-4 border-t border-white/5 pt-3">
           <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-sky-200">
@@ -241,7 +401,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
               onChange={(e) => setOtomatikGirisSms(e.target.checked)}
               className="h-4 w-4 rounded accent-[#f5c518]"
             />
-            <span>Yeni sipariş oluşturulduğunda otomatik sıra numarası SMS&apos;i gönder</span>
+            <span>Yeni talep oluşturulduğunda &quot;talebiniz alınmıştır&quot; SMS&apos;i otomatik gönderilsin</span>
           </label>
         </div>
       </div>
@@ -273,11 +433,11 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
           </div>
         </div>
 
-        {/* 1. Kayıt / Sıraya Alındı Şablonu */}
+        {/* 1. Kayıt Şablonu */}
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="text-xs font-bold text-sky-200">
-              1. Kayıt Bildirim Şablonu (Sıraya Alındı)
+              1. Talep Alındı Şablonu (Kayıt)
             </label>
             <div className="flex gap-1">
               <button
@@ -302,6 +462,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             onChange={(e) => setKayitSablonu(e.target.value)}
             className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:border-[#f5c518] focus:outline-none"
           />
+          {sablonSayaci(kayitSablonu)}
         </div>
 
         {/* 2. Tamamlandı / Hazır Şablonu */}
@@ -333,6 +494,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             onChange={(e) => setTamamlandiSablonu(e.target.value)}
             className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:border-[#f5c518] focus:outline-none"
           />
+          {sablonSayaci(tamamlandiSablonu)}
         </div>
 
         {/* 3. Teslim Hatırlatma Şablonu */}
@@ -364,6 +526,7 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             onChange={(e) => setTeslimHatirlatmaSablonu(e.target.value)}
             className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:border-[#f5c518] focus:outline-none"
           />
+          {sablonSayaci(teslimHatirlatmaSablonu)}
           <p className="mt-1 text-[11px] text-sky-300">
             Bu şablon, tamamlandı bildirimi daha önce gönderilmiş fakat müşterisi fındığını teslim
             almamış talepler için kullanılır (Talep Listesi → Teslimat · Hazırlananlar → toplu
@@ -387,13 +550,15 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
         )}
       </div>
 
-      {/* ─── Test SMS Gönderimi ─── */}
+      {/* ─── Test ve Bakiye ─── */}
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-sky-200">
           Entegrasyon Testi
         </h4>
         <p className="mt-0.5 text-xs text-sky-300">
           Ayarları test etmek için bir telefon numarası girip test SMS&apos;i gönderebilirsiniz.
+          Servis pasifken veya test modunda gönderim simüle edilir ve kaydı SMS Merkezi&apos;nde
+          görünür.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
@@ -412,7 +577,30 @@ export function SmsAyarTanim({ ayarlar, guncelleYetkisi }: Props) {
             <Send className="h-3.5 w-3.5" />
             {testPending ? "Gönderiliyor..." : "Test SMS Gönder"}
           </button>
+          <button
+            type="button"
+            disabled={bakiyePending || saglayici !== "NETGSM"}
+            onClick={handleBakiyeSorgula}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-4 py-2 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50"
+          >
+            <Coins className="h-3.5 w-3.5" />
+            {bakiyePending ? "Sorgulanıyor..." : "Bakiye Sorgula"}
+          </button>
         </div>
+
+        {bakiye && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-100">
+            <span className="flex items-center gap-1.5 font-bold">
+              <Wallet className="h-3.5 w-3.5" />
+              {bakiye.metin}
+            </span>
+            {bakiye.paketler?.map((paket) => (
+              <span key={paket.ad} className="text-emerald-200/80">
+                {paket.ad}: {paket.adet}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

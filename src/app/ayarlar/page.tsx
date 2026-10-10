@@ -183,6 +183,9 @@ export default async function AyarlarPage() {
             tamamlandiSablonu: "",
             teslimHatirlatmaSablonu: "",
             otomatikGirisSms: true,
+            birimMaliyetKurus: null,
+            kodlama: "TR",
+            appname: "",
           }
         }
       />

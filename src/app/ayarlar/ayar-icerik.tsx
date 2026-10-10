@@ -78,6 +78,9 @@ interface Props {
     tamamlandiSablonu: string;
     teslimHatirlatmaSablonu: string;
     otomatikGirisSms: boolean;
+    birimMaliyetKurus?: number | null;
+    kodlama?: string;
+    appname?: string;
   };
 }
 
