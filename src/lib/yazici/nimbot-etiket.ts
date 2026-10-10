@@ -43,7 +43,7 @@ export type NimbotSatirRolu = "baslik" | "buyuk" | "vurgu" | "normal" | "kucuk";
  * (bkz. `nimbotTuvale` ölçekleme ve güvenlik payı).
  */
 export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
-  baslik: 20,
+  baslik: 25,
   buyuk: 26,
   vurgu: 18,
   normal: 16,
@@ -59,6 +59,8 @@ export interface NimbotMetinSatiri {
   sagMetin?: string;
   /** Sağdaki metnin rolü (varsayılan: "kucuk"). */
   sagRol?: NimbotSatirRolu;
+  /** true ise satır akışta değil, etiketin en altına yaslanarak çizilir. */
+  dibe?: boolean;
 }
 
 /** Alt alta yazılan işlem satırları bloğu (kırma / kavurma / paketleme). */
@@ -122,9 +124,10 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
   }
   satirlar.push({ tip: "islem", islemler });
 
+  // Not satırı işlemlerin hemen ardından değil, etiketin en altına yaslanır.
   const not = veri.notlar?.trim();
   if (not) {
-    satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "sol" });
+    satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "sol", dibe: true });
   }
 
   return satirlar;

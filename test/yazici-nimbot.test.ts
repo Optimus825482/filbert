@@ -13,6 +13,7 @@ import {
 import {
   NIMBOT_ALT_EMNIYETI,
   NIMBOT_BASLIK_NOKTASI,
+  NIMBOT_ROL_PUNTOSU,
   NIMBOT_UST_BOSLUGU,
   esikliNoktaKaynagi,
   nimbotEtiketIcerigi,
@@ -137,6 +138,28 @@ test("Kopya bilgisi ve not yalnızca gerektiğinde eklenir", () => {
   }).map((s) => s.metin);
   assert.ok(coklu.includes("Kopya 2/3"));
   assert.ok(coklu.includes("NOT: Çuvallar ayrı teslim edilecek"));
+});
+
+test("Başlık puntosu büyütüldü, diğer rollerden ayrışır", () => {
+  assert.equal(NIMBOT_ROL_PUNTOSU.baslik, 25);
+  // Başlık, müşteri satırından (vurgu) ve işlem satırlarından (normal) büyük kalmalı.
+  assert.ok(NIMBOT_ROL_PUNTOSU.baslik > NIMBOT_ROL_PUNTOSU.vurgu);
+  assert.ok(NIMBOT_ROL_PUNTOSU.baslik > NIMBOT_ROL_PUNTOSU.normal);
+});
+
+test("NOT satırı planın sonunda ve etiketin dibine yaslanmış olarak üretilir", () => {
+  const veri: EtiketVerisi = { ...ORNEK, notlar: "Çuvallar ayrı teslim edilecek" };
+  const plan = nimbotEtiketIcerigi(veri);
+  const son = plan[plan.length - 1];
+  assert.equal(son.tip, "metin");
+  assert.ok(son.tip === "metin" && son.metin === "NOT: Çuvallar ayrı teslim edilecek");
+  // Dipteki satır işaretlenir; çizim akışı bunu etiketin altına yerleştirir.
+  assert.equal(son.tip === "metin" && son.dibe, true);
+  // Diğer satırlar akışta kalır; dibe işareti yalnızca nota aittir.
+  assert.equal(
+    plan.filter((s) => s.tip === "metin" && s.dibe).length,
+    1
+  );
 });
 
 test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {

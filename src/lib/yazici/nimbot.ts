@@ -256,7 +256,12 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       };
     });
 
-  const topla = (parcalar: CizimParcasi[]) => parcalar.reduce((t, p) => t + p.yukseklik, 0);
+  const dibeMi = (parca: CizimParcasi) => parca.satir.tip === "metin" && Boolean(parca.satir.dibe);
+  const akisToplami = (parcalar: CizimParcasi[]) =>
+    parcalar.reduce((t, p) => t + (dibeMi(p) ? 0 : p.yukseklik), 0);
+  const dipToplami = (parcalar: CizimParcasi[]) =>
+    parcalar.reduce((t, p) => t + (dibeMi(p) ? p.yukseklik : 0), 0);
+  const topla = (parcalar: CizimParcasi[]) => akisToplami(parcalar) + dipToplami(parcalar);
 
   // Sığdıran en büyük ölçeği ikili aramayla bul.
   if (topla(planla(NIMBOT_OLCEK_MIN)) > govdeAlani) {
@@ -277,7 +282,9 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const plan = planla(katSayi);
 
   // İçerik, yazıcının basmaya başladığı satırdan itibaren üstten hizalı çizilir.
-  let y = ustBosluk;
+  // "dibe" işaretli satırlar (NOT) etiketin en altına yaslanır.
+  let akisY = ustBosluk;
+  let dipY = tuval.height - kenar - dipToplami(plan);
   for (const parca of plan) {
     ctx.font = yaziTipi(parca.punto);
     ctx.fillStyle = "#000000";
@@ -285,13 +292,15 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
     if (parca.satir.tip === "islem") {
       for (const grup of parca.islemSatirlari) {
         for (const metin of grup) {
-          ctx.fillText(metin, kenar, Math.round(y));
-          y += parca.satirYuksekligi;
+          ctx.fillText(metin, kenar, Math.round(akisY));
+          akisY += parca.satirYuksekligi;
         }
       }
       continue;
     }
 
+    const dibe = dibeMi(parca);
+    const ust = dibe ? dipY : akisY;
     const hizala = parca.satir.hizala ?? "sol";
     parca.satirlar.forEach((metin, sira) => {
       const genislik = ctx.measureText(metin).width;
@@ -301,20 +310,21 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
           : hizala === "sag"
             ? kenar + icGenislik - genislik
             : kenar;
-      ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(y + sira * parca.satirYuksekligi));
+      ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(ust + sira * parca.satirYuksekligi));
     });
     if (parca.satir.sagMetin) {
       const sagPunto = nimbotPunto(parca.satir.sagRol ?? "kucuk", olcu.olcek * katSayi);
       ctx.font = yaziTipi(sagPunto);
       const genislik = ctx.measureText(parca.satir.sagMetin).width;
-      const sagY = y + Math.round((parca.satirYuksekligi - sagPunto * 1.22) / 2);
+      const sagY = ust + Math.round((parca.satirYuksekligi - sagPunto * 1.22) / 2);
       ctx.fillText(
         parca.satir.sagMetin,
         Math.round(kenar + icGenislik - genislik),
-        Math.round(Math.max(y, sagY))
+        Math.round(Math.max(ust, sagY))
       );
     }
-    y += parca.yukseklik;
+    if (dibe) dipY += parca.yukseklik;
+    else akisY += parca.yukseklik;
   }
 
   return tuval;
