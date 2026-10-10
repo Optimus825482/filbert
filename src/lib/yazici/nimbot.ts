@@ -47,6 +47,7 @@ import {
   NIMBOT_UST_BOSLUGU,
   nimbotOlcusu,
   nimbotPunto,
+  nimbotSablonu,
   type NimbotSatiri,
 } from "@/lib/yazici/nimbot-etiket";
 
@@ -192,8 +193,14 @@ interface CizimParcasi {
   islemSatirlari: string[][];
 }
 
-/** Etiket ölçeklemesinin alt ve üst sınırı (taşmayı önlemek / boşluğu doldurmak). */
+/** Etiket ölçeklemesinin alt sınırı (taşmayı önlemek için küçültme sınırı). */
 export const NIMBOT_OLCEK_MIN = 0.55;
+/**
+ * Ölçek büyütmesinin üst sınırı.
+ *
+ * Şablonlar kendi `olcekMax` değerini taşır (bkz. `nimbotSablonu`); bu sabit
+ * yalnızca şablon vermeyen eski çağrılar için varsayılandır.
+ */
 export const NIMBOT_OLCEK_MAX = 1.35;
 
 /**
@@ -205,6 +212,7 @@ export const NIMBOT_OLCEK_MAX = 1.35;
  */
 export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): HTMLCanvasElement {
   const olcu = nimbotOlcusu(etiketProfili);
+  const sablon = nimbotSablonu(etiketProfili);
   const tuval = document.createElement("canvas");
   tuval.width = olcu.genislik;
   tuval.height = olcu.yukseklik;
@@ -227,7 +235,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const planla = (katSayi: number): CizimParcasi[] =>
     icerik.map((satir) => {
       if (satir.tip === "islem") {
-        const punto = nimbotPunto("normal", olcu.olcek * katSayi);
+        const punto = nimbotPunto("normal", olcu.olcek * katSayi, sablon.rolPuntosu);
         ctx.font = yaziTipi(punto);
         const satirYuksekligi = Math.round(punto * 1.22);
         const islemSatirlari = satir.islemler.map((metin) => metniSar(ctx, metin, icGenislik));
@@ -242,7 +250,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
         };
       }
 
-      const punto = nimbotPunto(satir.rol ?? "normal", olcu.olcek * katSayi);
+      const punto = nimbotPunto(satir.rol ?? "normal", olcu.olcek * katSayi, sablon.rolPuntosu);
       ctx.font = yaziTipi(punto);
       const satirlar = metniSar(ctx, satir.metin, icGenislik);
       const satirYuksekligi = Math.round(punto * 1.22);
@@ -268,7 +276,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
     throw new Error("Etiket içeriği en küçük ölçekte bile sığmadı");
   }
   let alt = NIMBOT_OLCEK_MIN;
-  let ust = NIMBOT_OLCEK_MAX;
+  let ust = Math.max(NIMBOT_OLCEK_MIN, sablon.olcekMax);
   if (topla(planla(ust)) <= govdeAlani) {
     alt = ust;
   } else {
@@ -281,8 +289,27 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const katSayi = alt;
   const plan = planla(katSayi);
 
+  // Akış satırları (NOT hariç) gövde alanına dikey olarak yayılır: artan boşluk
+  // satırlar arasına eşit dağıtılır, böylece büyük etikette (ör. 50×50) içerik
+  // tepede yığılmaz. "dibe" işaretli satır (NOT) pay almaz, en altta kalır.
+  const akisParcalari = plan.filter((parca) => !dibeMi(parca));
+  const akisAlani = govdeAlani - dipToplami(plan);
+  // Yayma satır bazındadır: işlem bloğunun alt satırları da pay alır, böylece
+  // aralıklar blok aralarında değil tüm satırlar arasında eşit dağılır.
+  const akisSatirSayisi = akisParcalari.reduce(
+    (toplam, parca) =>
+      toplam +
+      (parca.satir.tip === "islem"
+        ? parca.islemSatirlari.reduce((s, grup) => s + grup.length, 0)
+        : parca.satirlar.length),
+    0
+  );
+  const akisAraligi =
+    sablon.yay && akisSatirSayisi > 1
+      ? Math.floor(Math.max(0, akisAlani - akisToplami(plan)) / (akisSatirSayisi - 1))
+      : 0;
+
   // İçerik, yazıcının basmaya başladığı satırdan itibaren üstten hizalı çizilir.
-  // "dibe" işaretli satırlar (NOT) etiketin en altına yaslanır.
   let akisY = ustBosluk;
   let dipY = tuval.height - kenar - dipToplami(plan);
   for (const parca of plan) {
@@ -293,7 +320,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       for (const grup of parca.islemSatirlari) {
         for (const metin of grup) {
           ctx.fillText(metin, kenar, Math.round(akisY));
-          akisY += parca.satirYuksekligi;
+          akisY += parca.satirYuksekligi + akisAraligi;
         }
       }
       continue;
@@ -313,7 +340,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       ctx.fillText(metin, Math.max(kenar, Math.round(x)), Math.round(ust + sira * parca.satirYuksekligi));
     });
     if (parca.satir.sagMetin) {
-      const sagPunto = nimbotPunto(parca.satir.sagRol ?? "kucuk", olcu.olcek * katSayi);
+      const sagPunto = nimbotPunto(parca.satir.sagRol ?? "kucuk", olcu.olcek * katSayi, sablon.rolPuntosu);
       ctx.font = yaziTipi(sagPunto);
       const genislik = ctx.measureText(parca.satir.sagMetin).width;
       const sagY = ust + Math.round((parca.satirYuksekligi - sagPunto * 1.22) / 2);
@@ -324,7 +351,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       );
     }
     if (dibe) dipY += parca.yukseklik;
-    else akisY += parca.yukseklik;
+    else akisY += parca.yukseklik + akisAraligi * parca.satirlar.length;
   }
 
   return tuval;

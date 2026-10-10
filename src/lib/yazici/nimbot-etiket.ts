@@ -37,10 +37,10 @@ export const VARSAYILAN_ESIK = 160;
 export type NimbotSatirRolu = "baslik" | "buyuk" | "vurgu" | "normal" | "kucuk";
 
 /**
- * Rol başına punto (384 nokta genişlik referansında).
+ * 50×30 mm rulo için rol başına punto (384 nokta genişlik referansı).
  *
- * Puntolar bilerek küçük tutuldu: 50×50 mm etikete taşmadan sığması gerekiyor
- * (bkz. `nimbotTuvale` ölçekleme ve güvenlik payı).
+ * Bu tablo operatör onaylı kompakt düzendir; 50×50 mm rulo için
+ * {@link NIMBOT_SABLONLARI} içindeki daha büyük tablo kullanılır.
  */
 export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
   baslik: 25,
@@ -49,6 +49,54 @@ export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
   normal: 16,
   kucuk: 12,
 };
+
+/**
+ * Etiket şablonu: rulo boyuna göre hedef puntolar.
+ *
+ * Şablon yalnızca puntoları belirler; `nimbotTuvale` bunları kendi ölçek
+ * aramasıyla ince ayarlar (sığmazsa küçültür, boşluk kalırsa yayarak doldurur).
+ * Böylece aynı içerik 50×30 ruloda kompakt, 50×50 ruloda ferah basılır.
+ */
+export interface NimbotSablonu {
+  /** Şablonun hangi rulo için tanımlandığı (arayüz/raporlama). */
+  ad: string;
+  rolPuntosu: Readonly<Record<NimbotSatirRolu, number>>;
+  /** Ölçek aramasının üst sınırı; büyük hedef puntolarda 1.00 yeterlidir. */
+  olcekMax: number;
+  /**
+   * Artan dikey boşluk satırlar arasına dağıtılsın mı?
+   *
+   * Kompakt 50×30 şablonu operatör onaylı hizalamayı koruduğu için kapalıdır;
+   * geniş 50×50 şablonu boşluğu yayarak etiketi doldurur.
+   */
+  yay: boolean;
+}
+
+export const NIMBOT_SABLONLARI: Readonly<Record<EtiketProfili, NimbotSablonu>> = {
+  NIMBOT_B1_50x30: {
+    ad: "Nimbot B1 · 50×30 mm",
+    rolPuntosu: NIMBOT_ROL_PUNTOSU,
+    olcekMax: 1.35,
+    yay: false,
+  },
+  NIMBOT_B1_50x50: {
+    ad: "Nimbot B1 · 50×50 mm",
+    rolPuntosu: { baslik: 32, buyuk: 42, vurgu: 24, normal: 24, kucuk: 16 },
+    olcekMax: 1,
+    yay: true,
+  },
+  TERMAL_80x70: {
+    ad: "Termal rulo · 80×70 mm",
+    rolPuntosu: { baslik: 32, buyuk: 42, vurgu: 24, normal: 24, kucuk: 16 },
+    olcekMax: 1,
+    yay: true,
+  },
+};
+
+/** Etiket profilinin şablonunu döndürür; bilinmeyen profilde 50×50 kullanılır. */
+export function nimbotSablonu(profil: EtiketProfili): NimbotSablonu {
+  return NIMBOT_SABLONLARI[profil] ?? NIMBOT_SABLONLARI.NIMBOT_B1_50x50;
+}
 
 export interface NimbotMetinSatiri {
   tip: "metin";
@@ -196,10 +244,19 @@ export function nimbotOlcusu(profil: EtiketProfili): NimbotOlcusu {
   return { genislik, yukseklik, olcek };
 }
 
-/** Rol punktosunu ölçeğe göre piksele çevirir (en az 9 px). */
-export function nimbotPunto(rol: NimbotSatirRolu, olcek = 1): number {
-  const taban = NIMBOT_ROL_PUNTOSU[rol] ?? NIMBOT_ROL_PUNTOSU.normal;
-  return Math.max(9, Math.round(taban * olcek));
+/**
+ * Rol punktosunu ölçeğe göre piksele çevirir (en az 9 px).
+ *
+ * `taban` verilmezse 50×30 şablonu kullanılır; çağıran taraf profil şablonunu
+ * ({@link nimbotSablonu}) geçerek rulo boyuna göre punto seçer.
+ */
+export function nimbotPunto(
+  rol: NimbotSatirRolu,
+  olcek = 1,
+  taban: Readonly<Record<NimbotSatirRolu, number>> = NIMBOT_ROL_PUNTOSU
+): number {
+  const punto = taban[rol] ?? taban.normal ?? NIMBOT_ROL_PUNTOSU.normal;
+  return Math.max(9, Math.round(punto * olcek));
 }
 
 // ─── Raster (1 bit) dönüşümü ────────────────────────────────

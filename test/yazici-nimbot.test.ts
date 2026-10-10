@@ -19,11 +19,13 @@ import {
   nimbotEtiketIcerigi,
   nimbotOlcusu,
   nimbotPunto,
+  nimbotSablonu,
   pikselParlakligi,
   qrMatrisiOlustur,
   qrNoktaOlcusu,
   type NimbotIslemSatiri,
   type NimbotMetinSatiri,
+  type NimbotSatirRolu,
 } from "../src/lib/yazici/nimbot-etiket";
 import {
   ETIKET_BASKI_DAVRANISLARI,
@@ -46,6 +48,9 @@ import {
   NimbotUsbIstemcisi,
 } from "../src/lib/yazici/nimbot";
 import type { EtiketVerisi } from "../src/lib/yazici/escpos";
+
+/** 50×50 şablonunda ölçek büyütmesinin beklenen üst sınırı. */
+const NIMBOT_ROL_MAX_BEKLEME = 1;
 
 const ORNEK: EtiketVerisi = {
   firmaAdi: "AKAYDIN TARIM",
@@ -138,6 +143,25 @@ test("Kopya bilgisi ve not yalnızca gerektiğinde eklenir", () => {
   }).map((s) => s.metin);
   assert.ok(coklu.includes("Kopya 2/3"));
   assert.ok(coklu.includes("NOT: Çuvallar ayrı teslim edilecek"));
+});
+
+test("Rulo şablonları ayrı punto tablosu ve yayma davranışı taşır", () => {
+  const kompakt = nimbotSablonu("NIMBOT_B1_50x30");
+  const genis = nimbotSablonu("NIMBOT_B1_50x50");
+
+  // Kompakt şablon operatör onaylı tabloyu ve hizalamayı korur.
+  assert.equal(kompakt.rolPuntosu.baslik, NIMBOT_ROL_PUNTOSU.baslik);
+  assert.equal(kompakt.yay, false);
+
+  // Geniş (50×50) şablonda her rol daha büyüktür ve gövde alanı yayılır.
+  for (const rol of Object.keys(NIMBOT_ROL_PUNTOSU) as NimbotSatirRolu[]) {
+    assert.ok(genis.rolPuntosu[rol] > kompakt.rolPuntosu[rol], rol + " büyümeli");
+  }
+  assert.equal(genis.yay, true);
+  assert.ok(genis.olcekMax <= NIMBOT_ROL_MAX_BEKLEME);
+
+  // Tanımsız profil sessizce 50×50 şablonuna düşer.
+  assert.equal(nimbotSablonu("YOK" as never).ad, genis.ad);
 });
 
 test("Başlık puntosu büyütüldü, diğer rollerden ayrışır", () => {
