@@ -88,7 +88,7 @@ export default async function AyarlarPage() {
     tanimGoruntuleYetkisi ? prisma.hizmetTipi.findMany({ where: { firmaId }, orderBy: { sira: "asc" } }) : Promise.resolve([]),
     ayarGoruntuleYetkisi ? getFirmaSmsAyarlari(firmaId) : Promise.resolve(null),
   ]);
-  const roller = kullaniciYonetYetkisi ? await prisma.yetkiRolu.findMany({ where: { firmaId, aktif: true }, select: { id: true, ad: true }, orderBy: { ad: "asc" } }) : [];
+  const roller = kullaniciYonetYetkisi ? await prisma.yetkiRolu.findMany({ where: { firmaId, aktif: true }, select: { id: true, ad: true, kod: true }, orderBy: { ad: "asc" } }) : [];
 
   return (
     <div>

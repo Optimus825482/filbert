@@ -22,7 +22,7 @@ export interface KullaniciSatir {
   /** ALIM | ISLEME — giriş sonrası açılacak modül. */
   varsayilanModul?: string;
 }
-export interface RolSecenek { id: string; ad: string }
+export interface RolSecenek { id: string; ad: string; kod?: string }
 
 type ModulKodu = "ALIM" | "ISLEME";
 
@@ -240,6 +240,21 @@ export function KullaniciTanim({ kullanicilar, roller = [] }: { kullanicilar: Ku
   );
 }
 
+/** Seçilen yetki grupları arasında Firma Sahibi sistemi rolü var mı? */
+function sahipRoluSeciliMi(roller: RolSecenek[], rolIds: string[]): boolean {
+  return roller.some((rol) => rol.kod === "FIRMA_SAHIBI" && rolIds.includes(rol.id));
+}
+
+/** Firma Sahibi rolü seçildiğinde gösterilen bilgi notu. */
+function SahipRoluNotu() {
+  return (
+    <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] font-semibold text-amber-200">
+      Firma Sahibi tüm yetkilere sahiptir ve firmada birden fazla firma sahibi bulunabilir.
+      Bu rolü yalnızca mevcut bir firma sahibi atayabilir.
+    </p>
+  );
+}
+
 function RolDuzenlemeForm({
   kullanici, roller, rolIds, varsayilanModul, pending, onKapat, onToggle, onModul, onKaydet,
 }: {
@@ -266,6 +281,7 @@ function RolDuzenlemeForm({
               {rol.ad}
             </label>
           ))}
+          {sahipRoluSeciliMi(roller, rolIds) && <SahipRoluNotu />}
         </div>
         <div className="mt-4 border-t border-[var(--surface-border)] pt-4">
           <ModulSecimi deger={varsayilanModul} onChange={onModul} />
@@ -322,6 +338,7 @@ function KullaniciForm({
                 {rol.ad}
               </label>
             ))}
+            {sahipRoluSeciliMi(roller, rolIds) && <SahipRoluNotu />}
           </div>
           <ModulSecimi deger={varsayilanModul} onChange={onModul} />
           <button

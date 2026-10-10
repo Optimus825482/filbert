@@ -27,7 +27,7 @@ const ALT_SEKMELER: { key: AltSekme; etiket: string; ikon: LucideIcon }[] = [
 export interface TanimlarVeri {
   depolar: DepoSatir[];
   subeler: SubeSecenek[];
-  roller: { id: string; ad: string }[];
+  roller: { id: string; ad: string; kod?: string }[];
   hesaplar: HesapSatir[];
   kullanicilar: KullaniciSatir[];
   araclar: AracSatir[];

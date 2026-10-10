@@ -197,7 +197,18 @@ export async function toggleKullaniciAktif(id: string): Promise<Sonuc> {
       const kullanici = await tx.kullanici.findFirst({ where: { id, firmaId: actor.firmaId }, include: { roller: { include: { rol: true } } } });
       if (!kullanici) throw new Error("KULLANICI_YOK");
       if (kullanici.id === actor.id && kullanici.aktif) throw new Error("KENDI_HESABI");
-      if (kullanici.aktif && kullanici.roller.some((atama) => atama.rol.sistemRolu && atama.rol.kod === "FIRMA_SAHIBI")) throw new Error("FIRMA_SAHIBI");
+      const sahipAtamasi = kullanici.roller.find((atama) => atama.rol.sistemRolu && atama.rol.kod === "FIRMA_SAHIBI");
+      if (kullanici.aktif && sahipAtamasi) {
+        // Firmada başka bir aktif firma sahibi varsa hesap pasifleştirilebilir;
+        // son firma sahibi kapatılırsa firma yönetimsiz kalır.
+        const digerSahip = await tx.kullaniciRol.count({
+          where: {
+            rolId: sahipAtamasi.rolId,
+            kullanici: { is: { firmaId: actor.firmaId, aktif: true, id: { not: kullanici.id } } },
+          },
+        });
+        if (digerSahip === 0) throw new Error("FIRMA_SAHIBI");
+      }
       await tx.kullanici.update({ where: { id: kullanici.id }, data: { aktif: !kullanici.aktif } });
       if (kullanici.aktif) await tx.oturum.updateMany({ where: { kullaniciId: kullanici.id, revokedAt: null }, data: { revokedAt: new Date() } });
       await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "KULLANICI_YONETIMI", eylem: "GUNCELLE", hedefTipi: "Kullanici", hedefId: kullanici.id, oncekiVeri: { ad: kullanici.ad, telefon: kullanici.telefon, rol: kullanici.rol, aktif: kullanici.aktif }, sonrakiVeri: { ad: kullanici.ad, telefon: kullanici.telefon, rol: kullanici.rol, aktif: !kullanici.aktif }, aciklama: kullanici.aktif ? "Kullanıcı pasifleştirildi ve açık oturumları kapatıldı" : "Kullanıcı aktifleştirildi" } });
@@ -207,7 +218,7 @@ export async function toggleKullaniciAktif(id: string): Promise<Sonuc> {
   } catch (e) {
     if (e instanceof Error && e.message === "KULLANICI_YOK") return { ok: false, hata: "Kullanıcı bulunamadı" };
     if (e instanceof Error && e.message === "KENDI_HESABI") return { ok: false, hata: "Kendi hesabınızı pasifleştiremezsiniz" };
-    if (e instanceof Error && e.message === "FIRMA_SAHIBI") return { ok: false, hata: "Firma Sahibi hesabı pasifleştirilemez" };
+    if (e instanceof Error && e.message === "FIRMA_SAHIBI") return { ok: false, hata: "Firmada tek firma sahibi kaldığı için hesap pasifleştirilemez; önce başka bir firma sahibi atayın" };
     console.error("toggleKullaniciAktif", e);
     return { ok: false, hata: "Kullanıcı durumu değiştirilemedi" };
   }

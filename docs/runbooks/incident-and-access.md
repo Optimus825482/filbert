@@ -5,7 +5,11 @@
 - Kullanıcıyı pasifleştirmek için **Ayarlar → Tanımlar → Kullanıcılar** ekranındaki aktiflik kontrolü kullanılır.
 - Kullanıcı parolası aynı ekrandan yenilenir. Yenileme sonrasında kullanıcının mevcut oturumları iptal edilir.
 - Rol izinleri **Ayarlar → Rol ve yetki yönetimi** ekranından güncellenir. Rol pasifleştirme, aktif bir kullanıcıyı izinsiz bırakacaksa engellenir.
-- Firma Sahibi sistem rolü pasifleştirilemez.
+- Firma Sahibi sistem rolü silinemez veya izinleri değiştirilemez; firmada birden fazla
+  firma sahibi bulunabilir. Rol, **Ayarlar → Tanımlar → Kullanıcılar** ekranından
+  yalnızca mevcut bir firma sahibi tarafından atanabilir.
+- Son firma sahibi korunur: Firma Sahibi rolünü kaldırmak veya bu hesabı pasifleştirmek,
+  firmada başka bir aktif firma sahibi yoksa engellenir.
 
 ## Platform yöneticisi erişim kaybı
 

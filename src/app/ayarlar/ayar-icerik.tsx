@@ -64,7 +64,7 @@ interface Props {
   sezonlar: SezonSatir[];
   subeler: SubeSecenek[];
   masrafTurleri: MasrafTuruSatir[];
-  roller: { id: string; ad: string }[];
+  roller: { id: string; ad: string; kod?: string }[];
   /** Modül sekmesi: şu an açık modül ve kullanıcının giriş varsayılanı. */
   aktifModul: ModulId;
   varsayilanModul: ModulId;

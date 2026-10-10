@@ -13,6 +13,11 @@ type VarsayilanModul = "ALIM" | "ISLEME";
 type Girdi = { ad: string; eposta: string; parola?: string; telefon?: string; rolIds: string[]; varsayilanModul?: VarsayilanModul };
 type Sonuc = { ok: boolean; hata?: string };
 
+/** Firma Sahibi sistem rolü firmadaki tüm yetkilere sahiptir. */
+function sahipRoluMu(roller: readonly { kod: string; sistemRolu: boolean }[]): boolean {
+  return roller.some((rol) => rol.sistemRolu && rol.kod === "FIRMA_SAHIBI");
+}
+
 function modulKodu(deger: VarsayilanModul | undefined): VarsayilanModul {
   return deger === "ISLEME" ? "ISLEME" : "ALIM";
 }
@@ -32,16 +37,19 @@ export async function kullaniciHesabiOlustur(g: Girdi): Promise<Sonuc> {
     await prisma.$transaction(async (tx) => {
       const roller = await tx.yetkiRolu.findMany({ where: { id: { in: g.rolIds }, firmaId: actor.firmaId, aktif: true }, select: { id: true, kod: true, sistemRolu: true } });
       if (roller.length !== new Set(g.rolIds).size) throw new Error("GECERSIZ_ROL");
-      // Firma Sahibi rolü yalnız platform provizyonu tarafından verilir; kullanıcı
-      // yönetimiyle kendine/başkasına TAM_YETKI atanarak root'a çıkılamaz.
-      if (roller.some((r) => r.sistemRolu && r.kod === "FIRMA_SAHIBI")) throw new Error("SAHIP_ATAMA");
+      // Firma Sahibi rolü tüm yetkilere sahiptir ve firmada birden fazla firma
+      // sahibi bulunabilir; ancak bu rolü yalnız mevcut bir firma sahibi
+      // atayabilir (kullanıcı yönetimiyle root yetkisi yükseltilemez).
+      if (sahipRoluMu(roller) && !sahipRoluMu(actor.roller.map((atama) => atama.rol))) {
+        throw new Error("SAHIP_ATAMA");
+      }
       const kullanici = await tx.kullanici.create({ data: { firmaId: actor.firmaId, ad: g.ad.trim(), eposta: g.eposta.trim().toLowerCase(), telefon: g.telefon?.trim() || null, sifreHash, varsayilanModul: modulKodu(g.varsayilanModul), roller: { createMany: { data: roller.map(r => ({ rolId: r.id })) } } } });
       await tx.auditKaydi.create({ data: { firmaId: actor.firmaId, kullaniciId: actor.id, modul: "KULLANICI_YONETIMI", eylem: "OLUSTUR", hedefTipi: "Kullanici", hedefId: kullanici.id, sonrakiVeri: { ad: kullanici.ad, eposta: kullanici.eposta, rolIds: g.rolIds, varsayilanModul: kullanici.varsayilanModul } } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     revalidatePath("/ayarlar"); return { ok: true };
   } catch (error) {
     if (error instanceof Error && error.message === "GECERSIZ_ROL") return { ok: false, hata: "Geçersiz veya pasif yetki grubu seçimi" };
-    if (error instanceof Error && error.message === "SAHIP_ATAMA") return { ok: false, hata: "Firma Sahibi rolü kullanıcı yönetiminden atanamaz" };
+    if (error instanceof Error && error.message === "SAHIP_ATAMA") return { ok: false, hata: "Firma Sahibi rolünü yalnızca mevcut bir firma sahibi atayabilir" };
     return { ok: false, hata: "Kullanıcı kaydedilemedi; e-posta daha önce kullanılmış olabilir" };
   }
 }
@@ -61,9 +69,21 @@ export async function kullaniciRolleriniGuncelle(kullaniciId: string, rolIds: st
       if (!target) throw new Error("KULLANICI_YOK");
       if (roller.length !== new Set(rolIds).size) throw new Error("GECERSIZ_ROL");
       const sahipRolu = target.roller.find((atama) => atama.rol.sistemRolu && atama.rol.kod === "FIRMA_SAHIBI");
-      if (sahipRolu && !rolIds.includes(sahipRolu.rolId)) throw new Error("SAHIP_ROLU");
-      // Firma Sahibi rolü yalnız platform provizyonuyla verilir; güncelleme yoluyla atanamaz.
-      if (roller.some((r) => r.sistemRolu && r.kod === "FIRMA_SAHIBI")) throw new Error("SAHIP_ATAMA");
+      // Firma Sahibi rolü sonradan da eklenebilir; ancak yalnız mevcut bir firma
+      // sahibi ekleyebilir (kullanıcı yönetimiyle root yetkisi yükseltilemez).
+      if (!sahipRolu && sahipRoluMu(roller) && !sahipRoluMu(actor.roller.map((atama) => atama.rol))) {
+        throw new Error("SAHIP_ATAMA");
+      }
+      // Rol kaldırılırken firmada en az bir aktif firma sahibi kalmalıdır.
+      if (sahipRolu && !rolIds.includes(sahipRolu.rolId)) {
+        const digerSahip = await tx.kullaniciRol.count({
+          where: {
+            rolId: sahipRolu.rolId,
+            kullanici: { is: { firmaId: actor.firmaId, aktif: true, id: { not: target.id } } },
+          },
+        });
+        if (digerSahip === 0) throw new Error("SAHIP_ROLU");
+      }
       await tx.kullaniciRol.deleteMany({ where: { kullaniciId: target.id } });
       await tx.kullaniciRol.createMany({ data: roller.map(r => ({ kullaniciId: target.id, rolId: r.id })) });
       if (varsayilanModul) {
@@ -75,8 +95,8 @@ export async function kullaniciRolleriniGuncelle(kullaniciId: string, rolIds: st
     const kod = error instanceof Error ? error.message : "";
     if (kod === "KULLANICI_YOK") return { ok: false, hata: "Kullanıcı bulunamadı" };
     if (kod === "GECERSIZ_ROL") return { ok: false, hata: "Geçersiz veya pasif yetki grubu seçimi" };
-    if (kod === "SAHIP_ROLU") return { ok: false, hata: "Firma Sahibi rolü bu kullanıcıdan kaldırılamaz" };
-    if (kod === "SAHIP_ATAMA") return { ok: false, hata: "Firma Sahibi rolü kullanıcı yönetiminden atanamaz" };
+    if (kod === "SAHIP_ROLU") return { ok: false, hata: "Firmada tek firma sahibi kaldı; bu kullanıcıdan Firma Sahibi rolü kaldırılamaz" };
+    if (kod === "SAHIP_ATAMA") return { ok: false, hata: "Firma Sahibi rolünü yalnızca mevcut bir firma sahibi atayabilir" };
     return { ok: false, hata: "Kullanıcı yetkileri güncellenemedi" };
   }
   revalidatePath("/ayarlar"); return { ok: true };

@@ -82,7 +82,7 @@ test("rol kodları Türkçe karakterleri kaybetmeden ortak kuralla üretilir", a
   assert.match(roller, /rolKoduOlustur\(g\.ad\)/);
 });
 
-test("kullanıcı yetki grupları sonradan düzenlenebilir ve firma sahibi rolü korunur", () => {
+test("kullanıcı yetki grupları sonradan düzenlenebilir, firma sahibi rolü atanabilir ve son sahip korunur", () => {
   const action = oku("src/lib/actions/kullanici-yonetim.ts");
   const rolAction = oku("src/lib/actions/roller.ts");
   const kullaniciAction = oku("src/lib/actions/tanimlar.ts");
@@ -90,11 +90,14 @@ test("kullanıcı yetki grupları sonradan düzenlenebilir ve firma sahibi rolü
 
   assert.match(action, /Kullanıcıya en az bir yetki grubu atanmalı/);
   assert.match(action, /kod === "FIRMA_SAHIBI"/);
-  assert.match(action, /Firma Sahibi rolü bu kullanıcıdan kaldırılamaz/);
+  assert.match(action, /Firmada tek firma sahibi kaldı; bu kullanıcıdan Firma Sahibi rolü kaldırılamaz/);
+  assert.match(action, /yalnızca mevcut bir firma sahibi atayabilir/);
+  assert.match(action, /digerSahip === 0/);
   assert.match(rolAction, /kullaniciRolleriniGuncelle/);
-  assert.match(kullaniciAction, /Firma Sahibi hesabı pasifleştirilemez/);
+  assert.match(kullaniciAction, /Firmada tek firma sahibi kaldığı için hesap pasifleştirilemez/);
   assert.match(arayuz, /kullaniciRolleriniGuncelle/);
   assert.match(arayuz, /Yetkileri düzenle/);
+  assert.match(arayuz, /Firma Sahibi tüm yetkilere sahiptir/);
 });
 
 test("kullanıcıya rol atama, aktif rolleri seri transaction içinde tekrar doğrular", () => {
