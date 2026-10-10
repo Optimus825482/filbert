@@ -36,13 +36,18 @@ export const VARSAYILAN_ESIK = 160;
 
 export type NimbotSatirRolu = "baslik" | "buyuk" | "vurgu" | "normal" | "kucuk";
 
-/** Rol başına punto (384 nokta genişlik referansında). */
+/**
+ * Rol başına punto (384 nokta genişlik referansında).
+ *
+ * Puntolar bilerek küçük tutuldu: 50×50 mm etikete taşmadan sığması gerekiyor
+ * (bkz. `nimbotTuvale` ölçekleme ve güvenlik payı).
+ */
 export const NIMBOT_ROL_PUNTOSU: Readonly<Record<NimbotSatirRolu, number>> = {
-  baslik: 22,
-  buyuk: 30,
-  vurgu: 20,
-  normal: 17,
-  kucuk: 13,
+  baslik: 20,
+  buyuk: 26,
+  vurgu: 18,
+  normal: 16,
+  kucuk: 12,
 };
 
 export interface NimbotMetinSatiri {
@@ -50,36 +55,31 @@ export interface NimbotMetinSatiri {
   metin: string;
   rol?: NimbotSatirRolu;
   hizala?: "sol" | "orta" | "sag";
-  /** Aynı satırın sağına yaslanan ikincil metin (ör. ödeme durumu). */
+  /** Aynı satırın sağına yaslanan ikincil metin (ör. tutar/ödeme durumu). */
   sagMetin?: string;
   /** Sağdaki metnin rolü (varsayılan: "kucuk"). */
   sagRol?: NimbotSatirRolu;
 }
 
-/**
- * Sol sütunda alt alta işlem satırları, sağında aynı yükseklikte QR kod.
- * Talep etiketinin ana gövdesi budur.
- */
-export interface NimbotIslemQrSatiri {
-  tip: "islemQr";
-  /** Sol sütunda alt alta yazılacak işlem satırları. */
+/** Alt alta yazılan işlem satırları bloğu (kırma / kavurma / paketleme). */
+export interface NimbotIslemSatiri {
+  tip: "islem";
   islemler: string[];
-  /** QR kodun içeriği. */
-  veri: string;
 }
 
-export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemQrSatiri;
+export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemSatiri;
 
 /**
- * Etiketin satır planını üretir. Sıralama operatörün istediği kompakt düzendir:
+ * Etiketin satır planını üretir. Kompakt düzen:
  *
  *   1) FİRMA #SIRA          (tek satır, ortada)
  *   2) Müşteri - Telefon    (tek satır)
  *   3) MİKTAR x KG          (solda; sağda tutar/ödeme durumu)
- *   4) İşlemler + QR        (solda üç işlem satırı, sağında QR kod)
+ *   4) İşlemler             (kırma / kavurma / paketleme, alt alta)
  *   5) NOT                  (tek satır, yalnızca varsa)
  *
- * Böylece 50×50 mm etikete taşma yapmadan sığar.
+ * QR kod operatör isteğiyle etiketten çıkarıldı; talep kimliği sıra numarası
+ * ile okunur.
  */
 export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
   const satirlar: NimbotSatiri[] = [
@@ -120,7 +120,7 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     const adet = veri.paketAdedi ? `${veri.paketAdedi}x ` : "";
     islemler.push(`${adet}${paket}`);
   }
-  satirlar.push({ tip: "islemQr", islemler, veri: `FILBERT-HIZMET:${veri.siraNo}` });
+  satirlar.push({ tip: "islem", islemler });
 
   const not = veri.notlar?.trim();
   if (not) {
@@ -152,6 +152,17 @@ export interface NimbotOlcusu {
   olcek: number;
 }
 
+/**
+ * Baskı yüksekliğinden güvenlik için düşülen pay (nokta).
+ *
+ * Ölçüldü: içerik etiketin alt kenarına kadar uzatıldığında son satırlar
+ * alttaki etikete taşıyor. Görüntü bu yüzden etiketten kısa tutulur.
+ */
+export const NIMBOT_ALT_EMNIYETI = 28;
+
+/** Güvenlik payı düşüldükten sonra kalabilecek en küçük baskı yüksekliği. */
+export const NIMBOT_ASGARI_YUKSEKLIK = 120;
+
 function mmNoktaya(mm: number): number {
   return Math.round((mm * NIMBOT_DPI) / 25.4);
 }
@@ -164,7 +175,10 @@ function mmNoktaya(mm: number): number {
 export function nimbotOlcusu(profil: EtiketProfili): NimbotOlcusu {
   const bilgi = etiketProfiliGetir(profil);
   const genislik = NIMBOT_BASLIK_NOKTASI;
-  const yukseklik = Math.min(mmNoktaya(bilgi.yukseklikMm), NIMBOT_BASLIK_NOKTASI);
+  const tam = Math.min(mmNoktaya(bilgi.yukseklikMm), NIMBOT_BASLIK_NOKTASI);
+  // Görüntü etiketin tamamına yayılırsa son satırlar alttaki etikete taşıyor
+  // (ölçüldü); bu yüzden alt kenarda güvenlik payı bırakılır.
+  const yukseklik = Math.max(NIMBOT_ASGARI_YUKSEKLIK, tam - NIMBOT_ALT_EMNIYETI);
   const olcek = genislik / NIMBOT_BASLIK_NOKTASI;
   return { genislik, yukseklik, olcek };
 }

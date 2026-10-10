@@ -11,6 +11,7 @@ import {
 } from "@mmote/niimbluelib";
 
 import {
+  NIMBOT_ALT_EMNIYETI,
   NIMBOT_BASLIK_NOKTASI,
   esikliNoktaKaynagi,
   nimbotEtiketIcerigi,
@@ -19,7 +20,7 @@ import {
   pikselParlakligi,
   qrMatrisiOlustur,
   qrNoktaOlcusu,
-  type NimbotIslemQrSatiri,
+  type NimbotIslemSatiri,
   type NimbotMetinSatiri,
 } from "../src/lib/yazici/nimbot-etiket";
 import {
@@ -63,12 +64,12 @@ function metinSatirlari(veri: EtiketVerisi): NimbotMetinSatiri[] {
   return nimbotEtiketIcerigi(veri).flatMap((satir) => (satir.tip === "metin" ? [satir] : []));
 }
 
-/** Etiket planındaki işlem + QR bloğu. */
-function islemQrBlogu(veri: EtiketVerisi): NimbotIslemQrSatiri {
+/** Etiket planındaki işlem bloğu. */
+function islemBlogu(veri: EtiketVerisi): NimbotIslemSatiri {
   const blok = nimbotEtiketIcerigi(veri).find(
-    (satir): satir is NimbotIslemQrSatiri => satir.tip === "islemQr"
+    (satir): satir is NimbotIslemSatiri => satir.tip === "islem"
   );
-  assert.ok(blok, "işlem + QR bloğu bulunamadı");
+  assert.ok(blok, "işlem bloğu bulunamadı");
   return blok;
 }
 
@@ -99,17 +100,16 @@ test("Etiket içeriği kompakt düzeni izler (50×50 etikete taşmaz)", () => {
   assert.equal(duz.some((m) => m.startsWith("YAPILACAK")), false);
 });
 
-test("İşlem satırları ile QR kod aynı blokta yer alır", () => {
-  const blok = islemQrBlogu(ORNEK);
-  assert.equal(blok.veri, "FILBERT-HIZMET:0042");
+test("İşlem satırları tek blokta alt alta yer alır, QR kod basılmaz", () => {
+  const blok = islemBlogu(ORNEK);
   assert.deepEqual(blok.islemler, [
     "[X] Kırma",
     "[X] Kavurma",
     "[ ] Vakumlu Paketleme",
     "25x 1 KG",
   ]);
-  // Ayrı bir QR satırı kalmaz; QR yalnızca işlem bloğunun içindedir.
-  assert.equal(nimbotEtiketIcerigi(ORNEK).filter((s) => s.tip === "islemQr").length, 1);
+  // Etikette QR kod artık yok.
+  assert.equal(nimbotEtiketIcerigi(ORNEK).some((s) => "veri" in s), false);
 });
 
 test("Ödeme durumu ve tutar miktar satırının sağında özetlenir", () => {
@@ -140,13 +140,14 @@ test("Kopya bilgisi ve not yalnızca gerektiğinde eklenir", () => {
 test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {
   const b1 = nimbotOlcusu("NIMBOT_B1_50x50");
   assert.equal(b1.genislik, NIMBOT_BASLIK_NOKTASI);
-  assert.equal(b1.yukseklik, 384);
+  // Alt kenarda güvenlik payı bırakılır; alttaki etikete taşma önlenir.
+  assert.equal(b1.yukseklik, 384 - NIMBOT_ALT_EMNIYETI);
   assert.equal(b1.olcek, 1);
 
   // 80×70 mm profil B1'e sığacak biçimde küçültülür.
   const termal = nimbotOlcusu("TERMAL_80x70");
   assert.equal(termal.genislik, NIMBOT_BASLIK_NOKTASI);
-  assert.equal(termal.yukseklik, NIMBOT_BASLIK_NOKTASI);
+  assert.equal(termal.yukseklik, 384 - NIMBOT_ALT_EMNIYETI);
 });
 
 test("Punto rol başına ölçeklenir ve okunabilir alt sınırın altına inmez", () => {

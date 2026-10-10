@@ -46,10 +46,7 @@ import {
   nimbotEtiketIcerigi,
   nimbotOlcusu,
   nimbotPunto,
-  qrMatrisiOlustur,
-  qrNoktaOlcusu,
   type NimbotSatiri,
-  type QrMatrisi,
 } from "@/lib/yazici/nimbot-etiket";
 
 /** Yazıcı seçim penceresinde gösterilecek Nimbot model adı önekleri. */
@@ -182,6 +179,7 @@ function metniSar(
 }
 
 /** Tek bir çizim parçası: satır planı ölçekle hesaplandıktan sonraki hâli. */
+/** Tek bir çizim parçası: satır planı ölçekle hesaplandıktan sonraki hâli. */
 interface CizimParcasi {
   satir: NimbotSatiri;
   punto: number;
@@ -189,33 +187,20 @@ interface CizimParcasi {
   yukseklik: number;
   /** Metin satırının sarılmış hâli. */
   satirlar: string[];
-  /** İşlem sütununun sarılmış hâli (tip: "islemQr"). */
+  /** İşlem bloğunun sarılmış hâli (tip: "islem"). */
   islemSatirlari: string[][];
-  /** İşlem sütununun toplam yüksekliği (tip: "islemQr"). */
-  islemYukseklik: number;
-  /** QR matrisi ve nokta ölçüsü (tip: "islemQr"). */
-  qrMatris: QrMatrisi | null;
-  qrModulNokta: number;
-  qrKenarNokta: number;
 }
 
 /** Etiket ölçeklemesinin alt ve üst sınırı (taşmayı önlemek / boşluğu doldurmak). */
 export const NIMBOT_OLCEK_MIN = 0.55;
-export const NIMBOT_OLCEK_MAX = 1.7;
-
-/** QR kodun etiket genişliğinden alacağı pay ve işlem sütunuyla arası (nokta). */
-export const NIMBOT_QR_ORANI = 0.42;
-export const NIMBOT_QR_ARALIGI = 8;
-
-function qrAlaniGenisligi(icGenislik: number): number {
-  return Math.max(48, Math.round(icGenislik * NIMBOT_QR_ORANI));
-}
+export const NIMBOT_OLCEK_MAX = 1.35;
 
 /**
  * Etiketi B1 baskı alanına (384 nokta genişlik) çizer.
  *
- * İçerik yüksekliği etikete sığmazsa ölçek küçültülür; boşluk kalırsa ölçek
- * büyütülür. Böylece içerik ne taşar ne de etiketin yarısı boş kalır.
+ * İçerik yüksekliği etikete sığmazsa ölçek küçültülür; boşluk kalırsa en fazla
+ * {@link NIMBOT_OLCEK_MAX} sınırına kadar büyütülür. İçerik dikey olarak
+ * ortalanır, böylece alt kenara yapışmaz ve alttaki etikete taşmaz.
  */
 export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): HTMLCanvasElement {
   const olcu = nimbotOlcusu(etiketProfili);
@@ -234,32 +219,23 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
 
   const kenar = NIMBOT_KENAR_BOSLUGU;
   const icGenislik = tuval.width - kenar * 2;
-  const qrAlan = qrAlaniGenisligi(icGenislik);
   const govdeAlani = tuval.height - kenar * 2;
 
   const planla = (katSayi: number): CizimParcasi[] =>
     icerik.map((satir) => {
-      if (satir.tip === "islemQr") {
+      if (satir.tip === "islem") {
         const punto = nimbotPunto("normal", olcu.olcek * katSayi);
         ctx.font = yaziTipi(punto);
         const satirYuksekligi = Math.round(punto * 1.22);
-        const solGenislik = icGenislik - qrAlan - NIMBOT_QR_ARALIGI;
-        const islemSatirlari = satir.islemler.map((metin) => metniSar(ctx, metin, solGenislik));
+        const islemSatirlari = satir.islemler.map((metin) => metniSar(ctx, metin, icGenislik));
         const satirSayisi = islemSatirlari.reduce((t, p) => t + p.length, 0);
-        const islemYukseklik = satirSayisi * satirYuksekligi;
-        const matris = qrMatrisiOlustur(satir.veri);
-        const qr = qrNoktaOlcusu(matris, qrAlan);
         return {
           satir,
           punto,
           satirYuksekligi,
-          yukseklik: Math.max(islemYukseklik, qr.kenarNokta),
+          yukseklik: satirSayisi * satirYuksekligi,
           satirlar: [],
           islemSatirlari,
-          islemYukseklik,
-          qrMatris: matris,
-          qrModulNokta: qr.modulNokta,
-          qrKenarNokta: qr.kenarNokta,
         };
       }
 
@@ -274,18 +250,15 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
         yukseklik: satirYuksekligi * satirlar.length,
         satirlar,
         islemSatirlari: [],
-        islemYukseklik: 0,
-        qrMatris: null,
-        qrModulNokta: 0,
-        qrKenarNokta: 0,
       };
     });
 
   const topla = (parcalar: CizimParcasi[]) => parcalar.reduce((t, p) => t + p.yukseklik, 0);
 
   // Sığdıran en büyük ölçeği ikili aramayla bul.
-  const altSinir = topla(planla(NIMBOT_OLCEK_MIN)) <= govdeAlani ? NIMBOT_OLCEK_MIN : null;
-  if (altSinir === null) throw new Error("Etiket içeriği en küçük ölçekte bile sığmadı");
+  if (topla(planla(NIMBOT_OLCEK_MIN)) > govdeAlani) {
+    throw new Error("Etiket içeriği en küçük ölçekte bile sığmadı");
+  }
   let alt = NIMBOT_OLCEK_MIN;
   let ust = NIMBOT_OLCEK_MAX;
   if (topla(planla(ust)) <= govdeAlani) {
@@ -300,45 +273,19 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const katSayi = alt;
   const plan = planla(katSayi);
 
-  // İçerik etiketi tam doldurmuyorsa dikey olarak ortalanır; alt/üst boşluk
-  // dengeli kalır, taşma olmaz.
+  // İçerik etiketi tam doldurmuyorsa dikey olarak ortalanır; alt kenara yapışmaz.
   let y = kenar + Math.max(0, Math.round((govdeAlani - topla(plan)) / 2));
   for (const parca of plan) {
     ctx.font = yaziTipi(parca.punto);
     ctx.fillStyle = "#000000";
 
-    if (parca.satir.tip === "islemQr") {
-      let sy = y + Math.round((parca.yukseklik - parca.islemYukseklik) / 2);
+    if (parca.satir.tip === "islem") {
       for (const grup of parca.islemSatirlari) {
         for (const metin of grup) {
-          ctx.fillText(metin, kenar, Math.round(sy));
-          sy += parca.satirYuksekligi;
+          ctx.fillText(metin, kenar, Math.round(y));
+          y += parca.satirYuksekligi;
         }
       }
-
-      const boyut = parca.qrKenarNokta;
-      const sol = kenar + icGenislik - boyut;
-      const ustKenar = y + Math.round((parca.yukseklik - boyut) / 2);
-      // Sessiz bölge: QR çevresinde beyaz boşluk bırakılır.
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(sol - 6, ustKenar - 6, boyut + 12, boyut + 12);
-      ctx.fillStyle = "#000000";
-      const matris = parca.qrMatris;
-      if (matris) {
-        for (let satirNo = 0; satirNo < matris.boyut; satirNo++) {
-          for (let sutunNo = 0; sutunNo < matris.boyut; sutunNo++) {
-            if (matris.koyu(satirNo, sutunNo)) {
-              ctx.fillRect(
-                sol + sutunNo * parca.qrModulNokta,
-                ustKenar + satirNo * parca.qrModulNokta,
-                parca.qrModulNokta,
-                parca.qrModulNokta
-              );
-            }
-          }
-        }
-      }
-      y += parca.yukseklik;
       continue;
     }
 
