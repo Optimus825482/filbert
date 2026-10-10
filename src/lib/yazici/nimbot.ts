@@ -221,6 +221,13 @@ interface CizimParcasi {
 export const NIMBOT_OLCEK_MIN = 0.55;
 /** Sağdaki ikincil metinle ana metin arasında bırakılan boşluk (nokta). */
 export const NIMBOT_SAG_METIN_BOSLUGU = 8;
+/**
+ * Dibe yaslanan bloğun alt kenardan bırakacağı boşluk (nokta).
+ *
+ * `NIMBOT_KENAR_BOSLUGU`'ndan küçüktür: imza bloğu etiketin dibine iner,
+ * altta kullanılmayan boş satır kalmaz (ölçüldü).
+ */
+export const NIMBOT_DIP_ALT_BOSLUGU = 2;
 /** Sığdırma sırasında ana metne bırakılan en küçük genişlik (nokta). */
 export const NIMBOT_ASGARI_METIN_GENISLIGI = 60;
 /** Ölçü satırı küçültülürken inilebilecek en küçük punto. */
@@ -262,8 +269,15 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
   const ustBosluk = NIMBOT_UST_BOSLUGU;
   const govdeAlani = tuval.height - ustBosluk - kenar;
 
+  // En alttaki yazılı satır mürekkep yüksekliğiyle hizalanır; böylece satır
+  // kutusunun alt boşluğu (descender) etiketin dibinde boş satır bırakmaz.
+  const sonDibeIndeksi = icerik.reduce(
+    (son, satir, sira) => (satir.tip === "metin" && satir.dibe ? sira : son),
+    -1
+  );
+
   const planla = (katSayi: number): CizimParcasi[] =>
-    icerik.map((satir) => {
+    icerik.map((satir, sira) => {
       if (satir.tip === "islem") {
         const punto = nimbotPunto("normal", olcu.olcek * katSayi, sablon.rolPuntosu);
         ctx.font = yaziTipi(punto);
@@ -277,6 +291,20 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
           yukseklik: satirSayisi * satirYuksekligi,
           satirlar: [],
           islemSatirlari,
+          sagGenislik: 0,
+        };
+      }
+
+      if (satir.tip === "bosluk") {
+        const punto = nimbotPunto(satir.rol ?? "kucuk", olcu.olcek * katSayi, sablon.rolPuntosu);
+        const satirYuksekligi = Math.round(punto * 1.22);
+        return {
+          satir,
+          punto,
+          satirYuksekligi,
+          yukseklik: satirYuksekligi * Math.max(1, satir.satirSayisi),
+          satirlar: [],
+          islemSatirlari: [],
           sagGenislik: 0,
         };
       }
@@ -304,18 +332,29 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
       }
       const satirlar = metniSar(ctx, satir.metin, anaGenislik);
       const satirYuksekligi = Math.round(punto * 1.22);
+      let yukseklik = satirYuksekligi * satirlar.length;
+      if (sira === sonDibeIndeksi && satirlar.length > 0) {
+        const olcum = ctx.measureText(satirlar[satirlar.length - 1]);
+        const murekkep = Math.ceil(
+          olcum.actualBoundingBoxAscent + olcum.actualBoundingBoxDescent
+        );
+        if (Number.isFinite(murekkep) && murekkep > 0) {
+          yukseklik = satirYuksekligi * (satirlar.length - 1) + murekkep;
+        }
+      }
       return {
         satir,
         punto,
         satirYuksekligi,
-        yukseklik: satirYuksekligi * satirlar.length,
+        yukseklik,
         satirlar,
         islemSatirlari: [],
         sagGenislik,
       };
     });
 
-  const dibeMi = (parca: CizimParcasi) => parca.satir.tip === "metin" && Boolean(parca.satir.dibe);
+  const dibeMi = (parca: CizimParcasi) =>
+    (parca.satir.tip === "metin" || parca.satir.tip === "bosluk") && Boolean(parca.satir.dibe);
   const akisToplami = (parcalar: CizimParcasi[]) =>
     parcalar.reduce((t, p) => t + (dibeMi(p) ? 0 : p.yukseklik), 0);
   const dipToplami = (parcalar: CizimParcasi[]) =>
@@ -362,7 +401,7 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
 
   // İçerik, yazıcının basmaya başladığı satırdan itibaren üstten hizalı çizilir.
   let akisY = ustBosluk;
-  let dipY = tuval.height - kenar - dipToplami(plan);
+  let dipY = tuval.height - NIMBOT_DIP_ALT_BOSLUGU - dipToplami(plan);
   for (const parca of plan) {
     ctx.font = yaziTipi(parca.punto);
     ctx.fillStyle = "#000000";
@@ -379,6 +418,13 @@ export function nimbotTuvale(veri: EtiketVerisi, etiketProfili: EtiketProfili): 
           akisY += parca.satirYuksekligi + akisAraligi;
         }
       }
+      continue;
+    }
+
+    // Boş alan (NOT için ayrılan satırlar): çizim yok, yalnızca yer ilerler.
+    if (parca.satir.tip === "bosluk") {
+      if (dibeMi(parca)) dipY += parca.yukseklik;
+      else akisY += parca.yukseklik;
       continue;
     }
 

@@ -13,6 +13,7 @@ import {
 import {
   NIMBOT_ALT_EMNIYETI,
   NIMBOT_BASLIK_NOKTASI,
+  NIMBOT_NOT_SATIR_SAYISI,
   NIMBOT_ROL_PUNTOSU,
   NIMBOT_UST_BOSLUGU,
   esikliNoktaKaynagi,
@@ -41,6 +42,7 @@ import {
   type FindikIslemeAyarlari,
 } from "../src/lib/findik-isleme";
 import {
+  NIMBOT_DIP_ALT_BOSLUGU,
   NIMBOT_SERI_BAGLANTI_DENEMESI,
   NIMBOT_SERI_BILGI_ZAMAN_ASIMI,
   NIMBOT_SERI_PAKET_ARALIGI,
@@ -185,22 +187,53 @@ test("Başlık puntosu büyütüldü, diğer rollerden ayrışır", () => {
   assert.ok(NIMBOT_ROL_PUNTOSU.baslik > NIMBOT_ROL_PUNTOSU.normal);
 });
 
-test("NOT, sıra no ve firma adı planın sonunda etiketin dibine yaslanır", () => {
+test("NOT alanı iki satır ayrılır, kimlik ve firma adı dibe yaslanır", () => {
+  // Not yazılmasa da NOT alanı iki satır olarak ayrılır (elle not için).
+  const bossuz = nimbotEtiketIcerigi(ORNEK);
+  const bosluklar = bossuz.filter((s) => s.tip === "bosluk");
+  assert.equal(bosluklar.length, 1);
+  assert.equal(bosluklar[0].tip === "bosluk" && bosluklar[0].satirSayisi, NIMBOT_NOT_SATIR_SAYISI);
+  assert.equal(bosluklar[0].tip === "bosluk" && bosluklar[0].dibe, true);
+
   const veri: EtiketVerisi = { ...ORNEK, notlar: "Çuvallar ayrı teslim edilecek" };
   const plan = nimbotEtiketIcerigi(veri);
   const firma = plan[plan.length - 1];
   const sira = plan[plan.length - 2];
-  const not = plan[plan.length - 3];
+  const kalan = plan[plan.length - 3];
+  const not = plan[plan.length - 4];
 
-  // En altta firma adı, üstünde sıra no, onun üstünde NOT satırı durur.
+  // En altta firma adı, üstünde sıra no, onun üstünde NOT alanı durur.
   assert.equal(firma.tip === "metin" && firma.metin, "AKAYDIN TARIM");
   assert.equal(firma.tip === "metin" && firma.dibe, true);
   assert.equal(sira.tip === "metin" && sira.metin, "#0042");
   assert.equal(sira.tip === "metin" && sira.dibe, true);
+  // Not yazıldığında kalan satır elle yazı için boş bırakılır.
+  assert.equal(kalan.tip === "bosluk" && kalan.satirSayisi, NIMBOT_NOT_SATIR_SAYISI - 1);
   assert.equal(not.tip === "metin" && not.metin, "NOT: Çuvallar ayrı teslim edilecek");
   assert.equal(not.tip === "metin" && not.dibe, true);
-  // Diğer satırlar akışta kalır; dibe işareti bu üç satıra aittir.
+  // Diğer satırlar akışta kalır; dibe işareti bu satırlara aittir.
   assert.equal(plan.filter((s) => s.tip === "metin" && s.dibe).length, 3);
+  assert.equal(plan.filter((s) => s.tip === "bosluk" && s.dibe).length, 1);
+});
+
+test("Çok satırlı not ayrılan alanı doldurur, boş satır bırakmaz", () => {
+  const plan = nimbotEtiketIcerigi({
+    ...ORNEK,
+    notlar: "Birinci satır\nİkinci satır\nÜçüncü satır",
+  });
+  const notlar = plan.filter((s) => s.tip === "metin" && s.metin.startsWith("NOT: "));
+  assert.deepEqual(
+    notlar.map((s) => s.tip === "metin" && s.metin),
+    ["NOT: Birinci satır", "NOT: İkinci satır"]
+  );
+  assert.equal(plan.some((s) => s.tip === "bosluk"), false);
+});
+
+test("Dibe yaslanan blok etiketin dibine iner, altta boş satır kalmaz", () => {
+  // Dibe yaslanan blok alt kenardan yalnızca ince bir boşluk bırakır.
+  assert.ok(NIMBOT_DIP_ALT_BOSLUGU >= 0);
+  assert.ok(NIMBOT_DIP_ALT_BOSLUGU <= 4);
+  assert.ok(NIMBOT_DIP_ALT_BOSLUGU < NIMBOT_UST_BOSLUGU);
 });
 
 test("Tuval ölçüsü B1 baskı kafasına (384 nokta) sabitlenir", () => {

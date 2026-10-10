@@ -119,7 +119,23 @@ export interface NimbotIslemSatiri {
   hizala?: "sol" | "orta" | "sag";
 }
 
-export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemSatiri;
+/**
+ * Elle yazı için ayrılan boş alan.
+ *
+ * Etiketin dibinde NOT alanı bu blokla ayrılır: not yazılmasa da satır(lar)
+ * boş kalır, üzerine kalemle not alınabilir.
+ */
+export interface NimbotBoslukSatiri {
+  tip: "bosluk";
+  /** Ayrılacak satır sayısı. */
+  satirSayisi: number;
+  /** Satır yüksekliği hesabında kullanılacak punto rolü (varsayılan: "kucuk"). */
+  rol?: NimbotSatirRolu;
+  /** true ise akışta değil, etiketin en altına yaslanarak yerleşir. */
+  dibe?: boolean;
+}
+
+export type NimbotSatiri = NimbotMetinSatiri | NimbotIslemSatiri | NimbotBoslukSatiri;
 
 /**
  * Seçili hizmetleri tek satırda özetler: "Kırma - Kavurma - 25x 1 KG".
@@ -142,13 +158,21 @@ export function seciliHizmetlerMetni(
 }
 
 /**
+ * Etiketin dibinde not (ve elle yazı) için ayrılan satır sayısı.
+ *
+ * Not varsa bu alana yazılır; kalan satırlar boş bırakılır ki teslim
+ * sırasında kalemle not alınabilsin.
+ */
+export const NIMBOT_NOT_SATIR_SAYISI = 2;
+
+/**
  * Etiketin satır planını üretir. Düzen (üstten alta):
  *
  *   1) Müşteri adı         (en büyük punto, ortada)
  *   2) Telefon             (aynı punto, ortada)
  *   3) Seçili hizmetler    (Kırma - Kavurma - Paketleme, ortada)
  *   4) Miktar              ("100.00 KG" ortada; sağda ödeme durumu)
- *   5) NOT                 (yalnızca varsa, ortada, en alta yaslı)
+ *   5) NOT alanı           (iki satır: not varsa yazılır, kalanı boş kalır)
  *   6) #SIRA               (etiket kimliği, büyük punto, ortada)
  *   7) FİRMA ADI           (en alt satır, ortada)
  *
@@ -183,11 +207,25 @@ export function nimbotEtiketIcerigi(veri: EtiketVerisi): NimbotSatiri[] {
     });
   }
 
-  // NOT ve etiket kimliği akışa katılmaz: etiketin en altına yaslanır.
-  // Sıra numarası büyük puntoyla ortalanır, firma adı en alt satırda kalır.
-  const not = veri.notlar?.trim();
-  if (not) {
+  // NOT, etiket kimliği ve firma adı akışa katılmaz: etiketin en altına
+  // yaslanır. NOT alanı her zaman iki satırdır; not yazılmayan satırlar
+  // teslim sırasında elle not alınmak üzere boş bırakılır.
+  const notlar = (veri.notlar ?? "")
+    .split("\n")
+    .map((satir) => satir.trim())
+    .filter(Boolean)
+    .slice(0, NIMBOT_NOT_SATIR_SAYISI);
+  for (const not of notlar) {
     satirlar.push({ tip: "metin", metin: `NOT: ${not}`, rol: "kucuk", hizala: "orta", dibe: true });
+  }
+  const kalanNotSatiri = NIMBOT_NOT_SATIR_SAYISI - notlar.length;
+  if (kalanNotSatiri > 0) {
+    satirlar.push({
+      tip: "bosluk",
+      satirSayisi: kalanNotSatiri,
+      rol: "kucuk",
+      dibe: true,
+    });
   }
   satirlar.push({
     tip: "metin",
