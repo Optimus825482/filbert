@@ -4,6 +4,7 @@ import { getCurrentFirma } from "@/lib/auth";
 import { izinVar, requirePagePermission } from "@/lib/rbac/guard";
 import { getModulHesapBakiyeleri } from "@/lib/queries";
 import { paraBirim, tarihSaat } from "@/lib/format";
+import type { Prisma, FinansTip } from "@/generated/prisma/client";
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Wallet } from "lucide-react";
 import { IslemeKasaYonetimi, type IslemeKasaSatir } from "./isleme-kasa-yonetimi";
 
@@ -16,9 +17,34 @@ export const dynamic = "force-dynamic";
  * ISLEME`). Bu ekran hesap tanımlarını, bakiyeleri ve kasa hareketlerini
  * yönetir; alım modülünün `/kasa` ekranı aynı hesapları yalnızca görüntüler.
  */
-export default async function IslemeKasaPage() {
+export default async function IslemeKasaPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    hesapId?: string;
+    tip?: string;
+    q?: string;
+    limit?: string;
+  }>;
+}) {
   const actor = await requirePagePermission("HIZMET", "GORUNTULE");
   const firma = await getCurrentFirma();
+  const sp = searchParams ? await searchParams : {};
+  const limit = Math.min(500, Math.max(10, parseInt(sp.limit || "200", 10) || 200));
+
+  const hareketWhere: Prisma.FinansHareketWhereInput = {
+    hesap: { firmaId: firma.id, modul: "ISLEME" },
+  };
+
+  if (sp.hesapId) {
+    hareketWhere.hesapId = sp.hesapId;
+  }
+  if (sp.tip) {
+    hareketWhere.tip = sp.tip as FinansTip;
+  }
+  if (sp.q && sp.q.trim()) {
+    hareketWhere.aciklama = { contains: sp.q.trim(), mode: "insensitive" };
+  }
 
   const [hesaplar, bakiyeler, hareketler] = await Promise.all([
     prisma.kasaHesap.findMany({
@@ -27,9 +53,9 @@ export default async function IslemeKasaPage() {
     }),
     getModulHesapBakiyeleri("ISLEME"),
     prisma.finansHareket.findMany({
-      where: { hesap: { firmaId: firma.id, modul: "ISLEME" } },
+      where: hareketWhere,
       orderBy: { createdAt: "desc" },
-      take: 40,
+      take: limit,
       include: { hesap: { select: { ad: true, tip: true } } },
     }),
   ]);
@@ -102,9 +128,21 @@ export default async function IslemeKasaPage() {
       />
 
       <section className="space-y-2">
-        <h2 className="text-sm font-extrabold tracking-wide text-sky-200">Son Kasa Hareketleri</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-extrabold tracking-wide text-sky-200">
+            Son Kasa Hareketleri {sp.limit ? `(Limit: ${limit})` : ""}
+          </h2>
+          {(sp.q || sp.hesapId || sp.tip) && (
+            <Link
+              href="/hizmet/kasa"
+              className="text-[11px] font-bold text-amber-300 hover:underline"
+            >
+              Filtreleri Temizle
+            </Link>
+          )}
+        </div>
         {hareketler.length === 0 ? (
-          <div className="ozet-kart text-sm text-sky-100">Bu kasada henüz hareket yok.</div>
+          <div className="ozet-kart text-sm text-sky-100">Bu kriterlere uygun kasa hareketi yok.</div>
         ) : (
           <div className="space-y-1.5">
             {hareketler.map((hareket) => {

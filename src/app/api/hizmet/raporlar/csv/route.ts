@@ -4,7 +4,7 @@ import { getCurrentFirma } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac/guard";
 import { TALEP_DURUM_ADLARI } from "@/lib/findik-isleme";
 import { tarihSaat } from "@/lib/format";
-import type { HizmetDurumu, Prisma } from "@/generated/prisma/client";
+import { buildHizmetWhere } from "@/lib/hizmet-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,14 @@ function sayi(deger: unknown): string {
 }
 
 /**
- * Fındık İşleme Modülü — durum bazlı talep raporu (CSV).
+ * Fındık İşleme Modülü — durum ve arama bazlı talep raporu (CSV).
  *   ?durum=KIRIM      → tek aşama
  *   ?liste=teslimat   → hazırlanmış, teslim alınmamış talepler (eski ad: hazir)
  *   ?liste=kuyruk     → henüz işleme alınmamış bekleyen talepler
+ *   ?liste=hazirlaniyor → işleme alınmış üretimdeki talepler
  *   ?liste=sms        → tamamlandı bildirimi gönderilmemiş talepler
  *   ?liste=tahsilat   → teslim edilmiş, tahsilatı bekleyen talepler
+ *   ?q=...            → sıra no, müşteri, telefon veya not arama metni
  */
 export async function GET(request: Request) {
   try {
@@ -38,33 +40,32 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const durum = url.searchParams.get("durum");
     const liste = url.searchParams.get("liste");
+    const q = url.searchParams.get("q");
 
-    const where: Prisma.HizmetIslemiWhereInput = { firmaId: firma.id };
+    const where = buildHizmetWhere(firma.id, { durum, liste, q });
     let dosyaEtiketi = "tum-talepler";
 
     if (liste === "teslimat" || liste === "hazir") {
-      where.durum = "TAMAMLANDI";
       dosyaEtiketi = "teslimat-hazirlananlar";
     } else if (liste === "kuyruk") {
-      where.durum = "SIRAYA_ALINDI";
       dosyaEtiketi = "talep-kuyrugu";
+    } else if (liste === "hazirlaniyor") {
+      dosyaEtiketi = "hazirlananlar";
     } else if (liste === "sms") {
-      where.durum = "TAMAMLANDI";
-      where.tamamlandiSmsGonderildi = false;
       dosyaEtiketi = "sms-bekleyenler";
     } else if (liste === "tahsilat") {
-      where.durum = "TESLIM_EDILDI";
-      where.odemeDurumu = { not: "ODENDI" };
       dosyaEtiketi = "tahsilat-bekleyenler";
     } else if (durum && durum !== "HEPSI") {
-      where.durum = durum as HizmetDurumu;
       dosyaEtiketi = durum.toLowerCase();
+    }
+    if (q && q.trim()) {
+      dosyaEtiketi += "-filtreli";
     }
 
     const kayitlar = await prisma.hizmetIslemi.findMany({
       where,
       orderBy: [{ createdAt: "asc" }, { siraSayisi: "asc" }],
-      take: 5000,
+      take: 50000,
     });
 
     const satirlar: string[] = [];

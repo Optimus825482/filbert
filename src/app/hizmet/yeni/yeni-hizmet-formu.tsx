@@ -30,8 +30,8 @@ import type { EtiketVerisi } from "@/lib/yazici/escpos";
 import { nimbotEtiketiYazdir, nimbotSeriEtiketiYazdir } from "@/lib/yazici/nimbot";
 import { EtiketBaskiOnayi } from "./etiket-baski-onayi";
 
-/** Müşteri önerisi: adın ilk 4 harfi girildiğinde en yakın 5 kayıt önerilir. */
-const ONERI_MIN_HARF = 4;
+/** Müşteri önerisi: adın ilk 3 harfi veya telefonun 3 rakamı girildiğinde en yakın 5 kayıt önerilir. */
+const ONERI_MIN_HARF = 3;
 const ONERI_LIMIT = 5;
 
 interface HizmetTipiSecenek {
@@ -88,10 +88,41 @@ export function YeniHizmetFormu({
   const [musteriAdi, setMusteriAdi] = useState("");
   const [telefon, setTelefon] = useState("");
   const [aramaOdak, setAramaOdak] = useState(false);
+  const [dinamikMusteriler, setDinamikMusteriler] = useState<MusteriOneri[]>([]);
+  const [araniyor, setAraniyor] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Canlı müşteri önerisi — kayıtlı müşteriler arasından ilk 4 harf
-  // girildiğinde en yakın 5 kaydı (ad soyad + telefon) sıralı önerir.
+  // Dinamik Müşteri Arama (500 sınırı olmadan tüm veritabanında arama)
+  useEffect(() => {
+    const q = musteriAdi.trim();
+    const qRakam = q.replace(/\D/g, "");
+    if (q.length < ONERI_MIN_HARF && qRakam.length < 3) return;
+
+    let aktif = true;
+    const timer = setTimeout(async () => {
+      setAraniyor(true);
+      try {
+        const res = await fetch(`/api/musteri-ara?q=${encodeURIComponent(q)}`);
+        if (res.ok && aktif) {
+          const data = await res.json();
+          if (Array.isArray(data.musteriler) && aktif) {
+            setDinamikMusteriler(data.musteriler);
+          }
+        }
+      } catch (e) {
+        console.error("Müşteri arama hatası:", e);
+      } finally {
+        if (aktif) setAraniyor(false);
+      }
+    }, 250);
+
+    return () => {
+      aktif = false;
+      clearTimeout(timer);
+    };
+  }, [musteriAdi]);
+
+  // Canlı müşteri önerisi — kayıtlı müşteriler ve canlı API arama sonuçlarını birleştirir
   const filtrelenmisOneriler = useMemo(() => {
     const q = musteriAdi.trim().toLocaleLowerCase("tr-TR");
     const qRakam = q.replace(/\D/g, "");
@@ -99,7 +130,19 @@ export function YeniHizmetFormu({
     const telAramasi = qRakam.length >= 3;
     if (!adAramasi && !telAramasi) return [];
 
-    return musteriler
+    const birlesikMap = new Map<string, MusteriOneri>();
+    for (const m of dinamikMusteriler) {
+      birlesikMap.set(m.id || `${m.ad}-${m.telefon}`, m);
+    }
+    for (const m of musteriler) {
+      const key = m.id || `${m.ad}-${m.telefon}`;
+      if (!birlesikMap.has(key)) {
+        birlesikMap.set(key, m);
+      }
+    }
+    const tumHavuz = Array.from(birlesikMap.values());
+
+    return tumHavuz
       .map((m) => {
         const ad = m.ad.toLocaleLowerCase("tr-TR");
         const kelimeler = ad.split(/\s+/);
@@ -124,7 +167,7 @@ export function YeniHizmetFormu({
       )
       .slice(0, ONERI_LIMIT)
       .map((satir) => satir.musteri);
-  }, [musteriAdi, musteriler]);
+  }, [musteriAdi, musteriler, dinamikMusteriler]);
 
   // Tıklama dışı algılama (Açılır listeyi kapatmak için)
   useEffect(() => {
@@ -479,7 +522,14 @@ export function YeniHizmetFormu({
               {aramaOdak && filtrelenmisOneriler.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-sky-400/30 bg-[#081226]/98 p-1.5 shadow-2xl backdrop-blur-md">
                   <div className="mb-1 flex items-center justify-between border-b border-white/10 px-2 py-1 text-[11px] font-bold text-sky-300">
-                    <span>En Yakın {filtrelenmisOneriler.length} Müşteri Önerisi</span>
+                    <span className="flex items-center gap-1.5">
+                      <span>En Yakın {filtrelenmisOneriler.length} Müşteri Önerisi</span>
+                      {araniyor && (
+                        <span className="animate-pulse text-[10px] font-normal text-amber-300">
+                          (aranıyor...)
+                        </span>
+                      )}
+                    </span>
                     <span className="text-[10px] text-sky-400/70">
                       Seçince ad ve telefon otomatik dolar
                     </span>

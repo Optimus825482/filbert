@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -100,6 +100,18 @@ interface Props {
   varsayilanKasaId?: string | null;
   /** Modül menüsünden gelen hızlı liste başlangıcı. */
   baslangicHizliFiltre?: HizliFiltre;
+  toplamKayit?: number;
+  toplamSayfa?: number;
+  aktifSayfa?: number;
+  sayfaBoyutu?: number;
+  aktifArama?: string;
+  aktifDurum?: string;
+  hizliFiltreSayilari?: {
+    kuyruk: number;
+    hazirlaniyor: number;
+    teslimat: number;
+    smsBekleyen: number;
+  };
 }
 
 export function HizmetTablosu({
@@ -109,16 +121,65 @@ export function HizmetTablosu({
   firmaAdi = "",
   varsayilanKasaId = null,
   baslangicHizliFiltre = "HEPSI",
+  toplamKayit,
+  toplamSayfa = 1,
+  aktifSayfa = 1,
+  sayfaBoyutu = 50,
+  aktifArama = "",
+  aktifDurum = "HEPSI",
+  hizliFiltreSayilari,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   // Arama & Filtre State
-  const [arama, setArama] = useState("");
-  const [durumFiltresi, setDurumFiltresi] = useState<string>("HEPSI");
+  const [arama, setArama] = useState(aktifArama);
+  const [durumFiltresi, setDurumFiltresi] = useState<string>(aktifDurum);
   // Talep kuyruğu, hazırlananlar, hazır ama teslim alınmayanlar ve bildirimi
   // gönderilmemiş tamamlananlar için tek dokunuşla açılan hızlı listeler.
   const [hizliFiltre, setHizliFiltre] = useState<HizliFiltre>(baslangicHizliFiltre);
+
+  // Dışarıdan gelen parametre değişimlerini render sırasında senkronize et
+  const [oncekiArama, setOncekiArama] = useState(aktifArama);
+  if (oncekiArama !== aktifArama) {
+    setOncekiArama(aktifArama);
+    if (arama === oncekiArama) {
+      setArama(aktifArama);
+    }
+  }
+
+  const [oncekiDurum, setOncekiDurum] = useState(aktifDurum);
+  if (oncekiDurum !== aktifDurum) {
+    setOncekiDurum(aktifDurum);
+    setDurumFiltresi(aktifDurum);
+  }
+
+  const [oncekiHizliFiltre, setOncekiHizliFiltre] = useState(baslangicHizliFiltre);
+  if (oncekiHizliFiltre !== baslangicHizliFiltre) {
+    setOncekiHizliFiltre(baslangicHizliFiltre);
+    setHizliFiltre(baslangicHizliFiltre);
+  }
+
+  // Arama kutusu için debounced URL senkronizasyonu
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (arama !== aktifArama) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("page");
+        if (arama.trim()) {
+          params.set("q", arama.trim());
+        } else {
+          params.delete("q");
+        }
+        params.set("sayfa", "1");
+        startTransition(() => {
+          router.push(`/hizmet?${params.toString()}`);
+        });
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [arama, aktifArama, router]);
 
   // Toplu Seçim State
   const [seciliIds, setSeciliIds] = useState<string[]>([]);
@@ -190,34 +251,102 @@ export function HizmetTablosu({
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(metin)}`, "_blank");
   }
 
-  // Filtrelenmiş Liste
-  const filtrelenmis = kayitlar.filter((k) => {
-    if (hizliFiltre === "KUYRUK") {
-      // Talep Kuyruğu: henüz işleme alınmamış, bekleyen talepler.
-      if (k.durum !== "SIRAYA_ALINDI") return false;
-    } else if (hizliFiltre === "HAZIRLANIYOR") {
-      // İşleme alınmış talepler: kırım, kavurma veya paketleme aşamasında.
-      if (!["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)) return false;
-    } else if (hizliFiltre === "TESLIM_ALINMADI") {
-      // İşi bitmiş (TAMAMLANDI) ama müşteri henüz teslim almamış talepler.
-      if (k.durum !== "TAMAMLANDI") return false;
-    } else if (hizliFiltre === "SMS_BEKLEYEN") {
-      // Tamamlandı fakat tamamlandı bildirimi gönderilmemiş talepler.
-      if (k.durum !== "TAMAMLANDI" || k.tamamlandiSmsGonderildi) return false;
-    } else if (durumFiltresi !== "HEPSI" && k.durum !== durumFiltresi) {
-      return false;
+  // Filtrelenmiş Liste: Sunucu tarafı sayfalama aktifse sunucu verisi doğrudan kullanılır.
+  const filtrelenmis =
+    toplamKayit !== undefined
+      ? kayitlar
+      : kayitlar.filter((k) => {
+          if (hizliFiltre === "KUYRUK") {
+            // Talep Kuyruğu: henüz işleme alınmamış, bekleyen talepler.
+            if (k.durum !== "SIRAYA_ALINDI") return false;
+          } else if (hizliFiltre === "HAZIRLANIYOR") {
+            // İşleme alınmış talepler: kırım, kavurma veya paketleme aşamasında.
+            if (!["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)) return false;
+          } else if (hizliFiltre === "TESLIM_ALINMADI") {
+            // İşi bitmiş (TAMAMLANDI) ama müşteri henüz teslim almamış talepler.
+            if (k.durum !== "TAMAMLANDI") return false;
+          } else if (hizliFiltre === "SMS_BEKLEYEN") {
+            // Tamamlandı fakat tamamlandı bildirimi gönderilmemiş talepler.
+            if (k.durum !== "TAMAMLANDI" || k.tamamlandiSmsGonderildi) return false;
+          } else if (durumFiltresi !== "HEPSI" && k.durum !== durumFiltresi) {
+            return false;
+          }
+          // Arama metni
+          if (arama.trim()) {
+            const q = arama.trim().toLowerCase();
+            const siraNoEslesir = k.siraNo.toLowerCase().includes(q);
+            const adEslesir = k.musteriAdi.toLowerCase().includes(q);
+            const telEslesir = k.telefon.toLowerCase().includes(q);
+            const notEslesir = k.notlar?.toLowerCase().includes(q) ?? false;
+            return siraNoEslesir || adEslesir || telEslesir || notEslesir;
+          }
+          return true;
+        });
+
+  function handleDurumSekmeSec(sekmeKey: string) {
+    setDurumFiltresi(sekmeKey);
+    setHizliFiltre("HEPSI");
+    const params = new URLSearchParams(window.location.search);
+    params.delete("liste");
+    if (sekmeKey !== "HEPSI") {
+      params.set("durum", sekmeKey);
+    } else {
+      params.delete("durum");
     }
-    // Arama metni
-    if (arama.trim()) {
-      const q = arama.trim().toLowerCase();
-      const siraNoEslesir = k.siraNo.toLowerCase().includes(q);
-      const adEslesir = k.musteriAdi.toLowerCase().includes(q);
-      const telEslesir = k.telefon.toLowerCase().includes(q);
-      const notEslesir = k.notlar?.toLowerCase().includes(q) ?? false;
-      return siraNoEslesir || adEslesir || telEslesir || notEslesir;
-    }
-    return true;
-  });
+    params.set("sayfa", "1");
+    startTransition(() => {
+      router.push(`/hizmet?${params.toString()}`);
+    });
+  }
+
+  function handleHizliFiltreSec(hedef: HizliFiltre) {
+    const yeniFiltre = hizliFiltre === hedef ? "HEPSI" : hedef;
+    setHizliFiltre(yeniFiltre);
+    setDurumFiltresi("HEPSI");
+    const params = new URLSearchParams(window.location.search);
+    params.delete("durum");
+    if (yeniFiltre === "KUYRUK") params.set("liste", "kuyruk");
+    else if (yeniFiltre === "HAZIRLANIYOR") params.set("liste", "hazirlaniyor");
+    else if (yeniFiltre === "TESLIM_ALINMADI") params.set("liste", "teslimat");
+    else if (yeniFiltre === "SMS_BEKLEYEN") params.set("liste", "sms");
+    else params.delete("liste");
+    params.set("sayfa", "1");
+    startTransition(() => {
+      router.push(`/hizmet?${params.toString()}`);
+    });
+  }
+
+  function handleSayfaDegistir(yeniSayfa: number) {
+    if (yeniSayfa < 1 || yeniSayfa > (toplamSayfa || 1)) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("page");
+    params.set("sayfa", String(yeniSayfa));
+    startTransition(() => {
+      router.push(`/hizmet?${params.toString()}`);
+    });
+  }
+
+  function handleSayfaBoyutuDegistir(yeniBoyut: number) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("page");
+    params.set("limit", String(yeniBoyut));
+    params.set("sayfa", "1");
+    startTransition(() => {
+      router.push(`/hizmet?${params.toString()}`);
+    });
+  }
+
+  const csvUrl = (() => {
+    const params = new URLSearchParams();
+    if (durumFiltresi !== "HEPSI") params.set("durum", durumFiltresi);
+    if (hizliFiltre === "KUYRUK") params.set("liste", "kuyruk");
+    else if (hizliFiltre === "HAZIRLANIYOR") params.set("liste", "hazirlaniyor");
+    else if (hizliFiltre === "TESLIM_ALINMADI") params.set("liste", "teslimat");
+    else if (hizliFiltre === "SMS_BEKLEYEN") params.set("liste", "sms");
+    if (arama.trim()) params.set("q", arama.trim());
+    const qs = params.toString();
+    return `/api/hizmet/raporlar/csv${qs ? `?${qs}` : ""}`;
+  })();
 
   // Çoklu Seçim Fonksiyonları
   function toggleSecim(id: string) {
@@ -226,11 +355,17 @@ export function HizmetTablosu({
     );
   }
 
+  const seciliSayfadakiAdet = filtrelenmis.filter((k) => seciliIds.includes(k.id)).length;
+  const sayfaTamamiSecili = filtrelenmis.length > 0 && seciliSayfadakiAdet === filtrelenmis.length;
+
   function toggleTumunuSec() {
-    if (seciliIds.length === filtrelenmis.length) {
-      setSeciliIds([]);
+    const sayfaIdleri = filtrelenmis.map((k) => k.id);
+    const hepsiSecili =
+      sayfaIdleri.length > 0 && sayfaIdleri.every((id) => seciliIds.includes(id));
+    if (hepsiSecili) {
+      setSeciliIds((onceki) => onceki.filter((id) => !sayfaIdleri.includes(id)));
     } else {
-      setSeciliIds(filtrelenmis.map((k) => k.id));
+      setSeciliIds((onceki) => Array.from(new Set([...onceki, ...sayfaIdleri])));
     }
   }
 
@@ -344,15 +479,23 @@ export function HizmetTablosu({
     });
   }
 
-  // Hızlı liste sayaçları — kuyruk, hazırlananlar, teslimat ve bildirim.
-  const kuyrukAdet = kayitlar.filter((k) => k.durum === "SIRAYA_ALINDI").length;
-  const hazirlananAdet = kayitlar.filter((k) =>
-    ["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)
-  ).length;
-  const teslimAlinmayanAdet = kayitlar.filter((k) => k.durum === "TAMAMLANDI").length;
-  const smsBekleyenAdet = kayitlar.filter(
-    (k) => k.durum === "TAMAMLANDI" && !k.tamamlandiSmsGonderildi
-  ).length;
+  // Hızlı liste sayaçları — sunucu genel sayaçları varsa tüm veri tabanını yansıtır
+  const kuyrukAdet =
+    hizliFiltreSayilari?.kuyruk ??
+    kayitlar.filter((k) => k.durum === "SIRAYA_ALINDI").length;
+  const hazirlananAdet =
+    hizliFiltreSayilari?.hazirlaniyor ??
+    kayitlar.filter((k) =>
+      ["KIRIM", "KAVURMA", "PAKETLEME"].includes(k.durum)
+    ).length;
+  const teslimAlinmayanAdet =
+    hizliFiltreSayilari?.teslimat ??
+    kayitlar.filter((k) => k.durum === "TAMAMLANDI").length;
+  const smsBekleyenAdet =
+    hizliFiltreSayilari?.smsBekleyen ??
+    kayitlar.filter(
+      (k) => k.durum === "TAMAMLANDI" && !k.tamamlandiSmsGonderildi
+    ).length;
 
   return (
     <div className="space-y-4">
@@ -397,10 +540,7 @@ export function HizmetTablosu({
             <button
               key={sekme.key}
               type="button"
-              onClick={() => {
-                setDurumFiltresi(sekme.key);
-                setHizliFiltre("HEPSI");
-              }}
+              onClick={() => handleDurumSekmeSec(sekme.key)}
               className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                 hizliFiltre === "HEPSI" && durumFiltresi === sekme.key
                   ? "bg-[#f5c518] text-[#081226] shadow-sm"
@@ -412,21 +552,31 @@ export function HizmetTablosu({
           ))}
         </div>
 
-        {/* Yeni Kayıt Butonu */}
-        <Link
-          href="/hizmet/yeni"
-          className="flex items-center justify-center gap-2 rounded-xl bg-[#f5c518] px-4 py-2 text-sm font-extrabold text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95"
-        >
-          <Plus className="h-4 w-4" />
-          Yeni Hizmet Kaydı
-        </Link>
+        {/* Aksiyon Butonları (CSV İndir & Yeni Kayıt) */}
+        <div className="flex items-center gap-2">
+          <a
+            href={csvUrl}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-sky-200 transition-all hover:bg-white/10 hover:text-white"
+            title="Aktif filtreye göre kayıtları CSV olarak indirir"
+          >
+            <Download className="h-4 w-4" />
+            CSV İndir
+          </a>
+          <Link
+            href="/hizmet/yeni"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#f5c518] px-4 py-2 text-sm font-extrabold text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            Yeni Hizmet Kaydı
+          </Link>
+        </div>
       </div>
 
       {/* ─── Hızlı Listeler: kuyruk → hazırlanıyor → teslimat ─── */}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setHizliFiltre((o) => (o === "KUYRUK" ? "HEPSI" : "KUYRUK"))}
+          onClick={() => handleHizliFiltreSec("KUYRUK")}
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "KUYRUK"
               ? "border-sky-400/50 bg-sky-500/25 text-white"
@@ -440,7 +590,7 @@ export function HizmetTablosu({
 
         <button
           type="button"
-          onClick={() => setHizliFiltre((o) => (o === "HAZIRLANIYOR" ? "HEPSI" : "HAZIRLANIYOR"))}
+          onClick={() => handleHizliFiltreSec("HAZIRLANIYOR")}
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "HAZIRLANIYOR"
               ? "border-amber-400/50 bg-amber-500/25 text-white"
@@ -454,9 +604,7 @@ export function HizmetTablosu({
 
         <button
           type="button"
-          onClick={() =>
-            setHizliFiltre((o) => (o === "TESLIM_ALINMADI" ? "HEPSI" : "TESLIM_ALINMADI"))
-          }
+          onClick={() => handleHizliFiltreSec("TESLIM_ALINMADI")}
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "TESLIM_ALINMADI"
               ? "border-purple-400/50 bg-purple-500/25 text-white"
@@ -470,9 +618,7 @@ export function HizmetTablosu({
 
         <button
           type="button"
-          onClick={() =>
-            setHizliFiltre((o) => (o === "SMS_BEKLEYEN" ? "HEPSI" : "SMS_BEKLEYEN"))
-          }
+          onClick={() => handleHizliFiltreSec("SMS_BEKLEYEN")}
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "SMS_BEKLEYEN"
               ? "border-amber-400/50 bg-amber-500/25 text-white"
@@ -497,6 +643,11 @@ export function HizmetTablosu({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/30 bg-sky-950/80 p-3 shadow-lg backdrop-blur">
           <div className="text-xs font-bold text-sky-200">
             <span className="font-mono text-sm text-[#f5c518]">{seciliIds.length}</span> kayıt seçildi
+            {toplamSayfa > 1 && seciliSayfadakiAdet > 0 && (
+              <span className="ml-1 text-[11px] font-normal text-sky-300">
+                (bu sayfada {seciliSayfadakiAdet})
+              </span>
+            )}
             <span className="ml-2 hidden font-semibold text-sky-300 sm:inline">
               Akış: Talep Kuyruğu → Hazırlanıyor → Tamamlandı → Teslimat
             </span>
@@ -553,7 +704,7 @@ export function HizmetTablosu({
             </button>
 
             <a
-              href="/api/hizmet/raporlar/csv?durum=HEPSI"
+              href={csvUrl}
               className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 hover:text-white"
               title="Fındık işleme taleplerini durum bilgileriyle CSV olarak indir"
             >
@@ -579,10 +730,12 @@ export function HizmetTablosu({
               <th className="w-10 px-3 py-3 text-center">
                 <input
                   type="checkbox"
-                  checked={
-                    filtrelenmis.length > 0 &&
-                    seciliIds.length === filtrelenmis.length
-                  }
+                  checked={sayfaTamamiSecili}
+                  ref={(el) => {
+                    if (el) {
+                      el.indeterminate = seciliSayfadakiAdet > 0 && !sayfaTamamiSecili;
+                    }
+                  }}
                   onChange={toggleTumunuSec}
                   className="h-4 w-4 rounded accent-[#f5c518]"
                 />
@@ -818,6 +971,124 @@ export function HizmetTablosu({
           </tbody>
         </table>
       </div>
+
+      {/* ─── Sayfalama Kontrolleri ─── */}
+      {toplamKayit !== undefined && (
+        <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] px-4 py-3 sm:flex-row">
+          {/* Kayıt Aralığı Bilgisi */}
+          <div className="text-xs text-sky-200">
+            Toplam <span className="font-mono font-bold text-white">{toplamKayit}</span> kayıttan{" "}
+            {toplamKayit === 0 || filtrelenmis.length === 0 ? (
+              <span>0 gösteriliyor</span>
+            ) : (
+              <span>
+                <span className="font-mono font-bold text-[#f5c518]">
+                  {Math.min((aktifSayfa - 1) * sayfaBoyutu + 1, toplamKayit)}
+                </span>{" "}
+                -{" "}
+                <span className="font-mono font-bold text-[#f5c518]">
+                  {Math.min((aktifSayfa - 1) * sayfaBoyutu + filtrelenmis.length, toplamKayit)}
+                </span>{" "}
+                arası gösteriliyor
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Sayfa Boyutu Seçici */}
+            <div className="flex items-center gap-1.5 text-xs text-sky-200">
+              <span className="text-[11px] font-medium text-sky-300">Sayfa Boyutu:</span>
+              <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-0.5">
+                {[25, 50, 100, 200].map((boyut) => (
+                  <button
+                    key={boyut}
+                    type="button"
+                    onClick={() => handleSayfaBoyutuDegistir(boyut)}
+                    className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-bold transition-all ${
+                      sayfaBoyutu === boyut
+                        ? "bg-[#f5c518] text-[#081226]"
+                        : "text-sky-300 hover:text-white"
+                    }`}
+                  >
+                    {boyut}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sayfa Butonları */}
+            <div className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                disabled={aktifSayfa <= 1 || isPending}
+                onClick={() => handleSayfaDegistir(1)}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30"
+                title="İlk Sayfa"
+              >
+                « İlk
+              </button>
+              <button
+                type="button"
+                disabled={aktifSayfa <= 1 || isPending}
+                onClick={() => handleSayfaDegistir(aktifSayfa - 1)}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30"
+                title="Önceki Sayfa"
+              >
+                ‹ Önceki
+              </button>
+
+              {/* Sayfa numaraları */}
+              {(() => {
+                const sayfalar: number[] = [];
+                const maxGosterim = 5;
+                let baslangic = Math.max(1, aktifSayfa - Math.floor(maxGosterim / 2));
+                let bitis = baslangic + maxGosterim - 1;
+                if (bitis > (toplamSayfa || 1)) {
+                  bitis = toplamSayfa || 1;
+                  baslangic = Math.max(1, bitis - maxGosterim + 1);
+                }
+                for (let i = baslangic; i <= bitis; i++) {
+                  sayfalar.push(i);
+                }
+                return sayfalar.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleSayfaDegistir(s)}
+                    className={`rounded-lg px-2.5 py-1 font-mono text-xs font-bold transition-all ${
+                      s === aktifSayfa
+                        ? "bg-[#f5c518] text-[#081226] shadow-sm"
+                        : "border border-white/10 text-sky-200 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ));
+              })()}
+
+              <button
+                type="button"
+                disabled={aktifSayfa >= (toplamSayfa || 1) || isPending}
+                onClick={() => handleSayfaDegistir(aktifSayfa + 1)}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30"
+                title="Sonraki Sayfa"
+              >
+                Sonraki ›
+              </button>
+              <button
+                type="button"
+                disabled={aktifSayfa >= (toplamSayfa || 1) || isPending}
+                onClick={() => handleSayfaDegistir(toplamSayfa || 1)}
+                className="rounded-lg border border-white/10 px-2 py-1 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30"
+                title="Son Sayfa"
+              >
+                Son »
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Tamamlandı SMS Gönderilsin mi? Onay Modalı ─── */}
       <Dialog open={smsOnayModalAcik} onOpenChange={setSmsOnayModalAcik}>

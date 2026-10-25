@@ -45,7 +45,7 @@ export default async function HizmetRaporlariPage() {
   const kayitlar = await prisma.hizmetIslemi.findMany({
     where: { firmaId: firma.id },
     orderBy: [{ createdAt: "desc" }],
-    take: 2000,
+    take: 20000,
   });
 
   const ozetler = new Map<string, DurumOzeti>();
