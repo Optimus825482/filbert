@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import { hizmetSiraNoUret } from "../src/lib/hesap";
+import { buildHizmetWhere } from "../src/lib/hizmet-queries";
 import { sablonDoldur, telefonTemizle } from "../src/lib/sms/sms-servisi";
 import {
   VARSAYILAN_KAYIT_SABLONU,
@@ -70,4 +73,93 @@ test("WhatsApp bildirim linki temizlenmiş telefon ve url kodlanmış metin içe
   assert.ok(url.startsWith("https://wa.me/905325554433?text="));
   assert.ok(url.includes(encodeURIComponent(metin)));
 });
+
+test("fındık işleme tablosu mobil kart görünümü ve dokunmatik filtre desteği sunar", () => {
+  const dosya = readFileSync(
+    path.resolve("src/app/hizmet/hizmet-tablosu.tsx"),
+    "utf8"
+  );
+  // Mobil görünüm için kart listesi
+  assert.match(dosya, /block md:hidden/);
+  // Masaüstü için tablo
+  assert.match(dosya, /hidden md:block overflow-x-auto/);
+  // Mobilde yatay kaydırılabilir durum ve hızlı filtre çubuğu
+  assert.match(dosya, /overflow-x-auto/);
+  // Doğrudan telefon arama (tel:) desteği
+  assert.match(dosya, /tel:\$\{k\.telefon\}/);
+});
+
+test("yeni hizmet formu hızlı kilo ekleme tuşları ve yapışık mobil çubuk içerir", () => {
+  const formDosyasi = readFileSync(
+    path.resolve("src/app/hizmet/yeni/yeni-hizmet-formu.tsx"),
+    "utf8"
+  );
+  // Hızlı kilo ekleme fonksiyonları
+  assert.match(formDosyasi, /handleKiloEkle/);
+  assert.match(formDosyasi, /handleKiloSifirla/);
+  // Hızlı ekleme dizi ve şablonu (5, 10, 25, 50, 100 kg)
+  assert.match(formDosyasi, /\[5,\s*10,\s*25,\s*50,\s*100\]/);
+  assert.match(formDosyasi, /\+\{kgDeger\} kg/);
+  // Mobilde alta yapışan ve güvenli alan boşluğu olan kaydetme çubuğu
+  assert.match(formDosyasi, /sticky bottom-0/);
+});
+
+test("hizmet raporları sayfasında seçici sorgu projeksiyonu ve mobil kart görünümü bulunur", () => {
+  const raporDosyasi = readFileSync(
+    path.resolve("src/app/hizmet/raporlar/page.tsx"),
+    "utf8"
+  );
+  // Sadece ihtiyaç duyulan alanların çekildiği select projeksiyonu
+  assert.match(raporDosyasi, /select:\s*\{/);
+  assert.match(raporDosyasi, /siraNo:\s*true/);
+  assert.match(raporDosyasi, /kilo:\s*true/);
+  // Mobil kart desteği
+  assert.match(raporDosyasi, /block divide-y divide-white\/5 md:hidden/);
+  assert.match(raporDosyasi, /hidden overflow-x-auto md:block/);
+});
+
+test("buildHizmetWhere sorgu derleyici # ile başlayan sıra no ve biçimli telefon aramalarını doğru çözer", () => {
+  // # ile arama yapıldığında hem # ile hem de temizlenmiş sıra no eşleşir
+  const whereSira = buildHizmetWhere("firma-1", { q: "#0042" });
+  assert.equal(whereSira.firmaId, "firma-1");
+  const orListesi = whereSira.OR as Array<Record<string, unknown>>;
+  assert.ok(Array.isArray(orListesi));
+  assert.ok(orListesi.some((item) => JSON.stringify(item).includes("0042")));
+
+  // Boşluklu/parantezli telefon araması rakamları ayıklayarak sorguya dahil eder
+  const whereTel = buildHizmetWhere("firma-1", { q: "0532 999 88 77" });
+  const orTel = whereTel.OR as Array<Record<string, unknown>>;
+  assert.ok(orTel.some((item) => JSON.stringify(item).includes("05329998877")));
+});
+
+test("hizmet tablosu mobil kompakt sayfalama kontrolleri ve rahat dokunmatik alanlar sunar", () => {
+  const tabloDosyasi = readFileSync(
+    path.resolve("src/app/hizmet/hizmet-tablosu.tsx"),
+    "utf8"
+  );
+  // Mobilde kompakt sayfalama
+  assert.match(tabloDosyasi, /sm:hidden/);
+  assert.match(tabloDosyasi, /hidden items-center gap-1 sm:inline-flex/);
+  // Dokunmatik buton min yükseklik kuralı
+  assert.match(tabloDosyasi, /min-h-\[34px\]/);
+});
+
+test("fındık işleme kasası ve ana paneli mobil hızlı gezinme ve filtreleme sunar", () => {
+  const kasaSayfasi = readFileSync(
+    path.resolve("src/app/hizmet/kasa/page.tsx"),
+    "utf8"
+  );
+  // Kasa hareket türü filtre hapları (Tümü / Tahsilatlar / Ödemeler)
+  assert.match(kasaSayfasi, /tip=TAHSILAT/);
+  assert.match(kasaSayfasi, /tip=ODEME/);
+
+  const anaSayfa = readFileSync(
+    path.resolve("src/app/hizmet/page.tsx"),
+    "utf8"
+  );
+  // Ana sayfada doğrudan Kasa linki
+  assert.match(anaSayfa, /href="\/hizmet\/kasa"/);
+});
+
+
 

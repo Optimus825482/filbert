@@ -14,6 +14,7 @@ import {
   FileText,
   MessageSquare,
   CheckCircle2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { createHizmetKaydi } from "@/lib/actions/hizmet";
@@ -224,6 +225,22 @@ export function YeniHizmetFormu({
     const k = parseFloat(val.replace(",", ".")) || 0;
     const f = parseFloat(birimFiyatStr.replace(",", ".")) || 0;
     tutariGuncelle(k, f);
+  }
+
+  // Hızlı kilo ekleme (mobil/dokunmatik kullanım)
+  function handleKiloEkle(miktar: number) {
+    const mevcut = parseFloat(kiloStr.replace(",", ".")) || 0;
+    const yeni = Math.max(0, Math.round((mevcut + miktar) * 100) / 100);
+    const yeniStr = String(yeni);
+    setKiloStr(yeniStr);
+    const f = parseFloat(birimFiyatStr.replace(",", ".")) || 0;
+    tutariGuncelle(yeni, f);
+  }
+
+  function handleKiloSifirla() {
+    setKiloStr("");
+    const f = parseFloat(birimFiyatStr.replace(",", ".")) || 0;
+    tutariGuncelle(0, f);
   }
 
   // Birim Fiyat değiştiğinde
@@ -503,20 +520,35 @@ export function YeniHizmetFormu({
                   </span>
                 )}
               </div>
-              <input
-                type="text"
-                required
-                autoComplete="off"
-                placeholder="Müşteri adının ilk 4 harfi (örn: Ahme)..."
-                value={musteriAdi}
-                onFocus={() => setAramaOdak(true)}
-                onChange={(e) => {
-                  setMusteriAdi(e.target.value);
-                  setAramaOdak(true);
-                  if (seciliMusteriId) setSeciliMusteriId("");
-                }}
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  autoComplete="off"
+                  placeholder="Müşteri adının ilk 4 harfi (örn: Ahme)..."
+                  value={musteriAdi}
+                  onFocus={() => setAramaOdak(true)}
+                  onChange={(e) => {
+                    setMusteriAdi(e.target.value);
+                    setAramaOdak(true);
+                    if (seciliMusteriId) setSeciliMusteriId("");
+                  }}
+                  className="w-full rounded-xl border border-white/10 bg-black/20 py-2.5 pl-3.5 pr-8 text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
+                />
+                {musteriAdi && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMusteriAdi("");
+                      setSeciliMusteriId("");
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-sky-400 hover:text-white"
+                    title="Temizle"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
 
               {/* Canlı Eşleşen Müşteriler Listesi */}
               {aramaOdak && filtrelenmisOneriler.length > 0 && (
@@ -539,6 +571,10 @@ export function YeniHizmetFormu({
                       key={m.id || `${m.ad}-${m.telefon}-${idx}`}
                       type="button"
                       onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleMusteriSec(m);
+                      }}
+                      onPointerDown={(e) => {
                         e.preventDefault();
                         handleMusteriSec(m);
                       }}
@@ -570,14 +606,26 @@ export function YeniHizmetFormu({
               <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-200">
                 <Phone className="h-3.5 w-3.5 text-[#f5c518]" /> Telefon Numarası *
               </label>
-              <input
-                type="tel"
-                required
-                placeholder="0532 000 00 00"
-                value={telefon}
-                onChange={(e) => setTelefon(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 font-mono text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  required
+                  placeholder="0532 000 00 00"
+                  value={telefon}
+                  onChange={(e) => setTelefon(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/20 py-2.5 pl-3.5 pr-8 font-mono text-sm font-semibold text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
+                />
+                {telefon && (
+                  <button
+                    type="button"
+                    onClick={() => setTelefon("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-sky-400 hover:text-white"
+                    title="Temizle"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -600,6 +648,30 @@ export function YeniHizmetFormu({
             <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm font-black text-sky-300">
               KG
             </span>
+          </div>
+
+          {/* Hızlı Kilo Seçiciler / Ekleme Tuşları */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-bold text-sky-300">Hızlı Ekle:</span>
+            {[5, 10, 25, 50, 100].map((kgDeger) => (
+              <button
+                key={kgDeger}
+                type="button"
+                onClick={() => handleKiloEkle(kgDeger)}
+                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-xs font-bold text-sky-200 transition-colors hover:bg-white/15 hover:text-white active:scale-95"
+              >
+                +{kgDeger} kg
+              </button>
+            ))}
+            {kiloStr && (
+              <button
+                type="button"
+                onClick={handleKiloSifirla}
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-bold text-red-300 hover:bg-red-500/20 active:scale-95"
+              >
+                Sıfırla
+              </button>
+            )}
           </div>
         </div>
 
@@ -828,13 +900,13 @@ export function YeniHizmetFormu({
           </div>
         )}
 
-        {/* ─── Butonlar ─── */}
-        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+        {/* ─── Butonlar (Mobilde alta yapışık erişilebilir çubuk) ─── */}
+        <div className="sticky bottom-0 z-20 -mx-5 -mb-5 flex flex-wrap items-center justify-end gap-2.5 rounded-b-2xl border-t border-white/10 bg-[#081226]/95 p-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0">
           <button
             type="button"
             disabled={isPending}
             onClick={() => handleSubmit(false)}
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/10 active:scale-95 disabled:opacity-50"
+            className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-white/10 active:scale-95 disabled:opacity-50"
           >
             <Save className="h-4 w-4 text-sky-300" />
             Sadece Kaydet
@@ -844,7 +916,7 @@ export function YeniHizmetFormu({
             type="button"
             disabled={isPending}
             onClick={() => handleSubmit(true)}
-            className="flex items-center gap-2 rounded-xl bg-[#f5c518] px-5 py-2.5 text-sm font-black text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95 disabled:opacity-50"
+            className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-[#f5c518] px-5 py-2.5 text-sm font-black text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95 disabled:opacity-50"
           >
             <Printer className="h-4 w-4" />
             Kaydet ve Etiket Yazdır

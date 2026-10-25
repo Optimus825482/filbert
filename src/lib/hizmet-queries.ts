@@ -67,13 +67,22 @@ export function buildHizmetWhere(
     where.durum = durum as HizmetDurumu;
   }
 
-  // Arama filtresi: Sıra No, Müşteri Adı, Telefon, Notlar
+  // Arama filtresi: Sıra No (# ile veya # olmadan), Müşteri Adı, Telefon, Notlar
   if (q && q.trim()) {
     const arama = q.trim();
+    const siraArama = arama.replace(/^#/, "").trim();
+    const rakamlar = arama.replace(/\D/g, "");
+
     where.OR = [
       { siraNo: { contains: arama, mode: "insensitive" } },
+      ...(siraArama && siraArama !== arama
+        ? [{ siraNo: { contains: siraArama, mode: "insensitive" as const } }]
+        : []),
       { musteriAdi: { contains: arama, mode: "insensitive" } },
       { telefon: { contains: arama } },
+      ...(rakamlar && rakamlar.length >= 3
+        ? [{ telefon: { contains: rakamlar } }]
+        : []),
       { notlar: { contains: arama, mode: "insensitive" } },
     ];
   }

@@ -20,6 +20,7 @@ import {
   Download,
   Clock,
   Truck,
+  X,
 } from "lucide-react";
 import {
   updateHizmetDurumu,
@@ -274,9 +275,15 @@ export function HizmetTablosu({
           // Arama metni
           if (arama.trim()) {
             const q = arama.trim().toLowerCase();
-            const siraNoEslesir = k.siraNo.toLowerCase().includes(q);
+            const qTemiz = q.replace(/^#/, "");
+            const qRakam = q.replace(/\D/g, "");
+            const siraNoEslesir =
+              k.siraNo.toLowerCase().includes(q) ||
+              (Boolean(qTemiz) && k.siraNo.toLowerCase().includes(qTemiz));
             const adEslesir = k.musteriAdi.toLowerCase().includes(q);
-            const telEslesir = k.telefon.toLowerCase().includes(q);
+            const telEslesir =
+              k.telefon.toLowerCase().includes(q) ||
+              (qRakam.length >= 3 && k.telefon.replace(/\D/g, "").includes(qRakam));
             const notEslesir = k.notlar?.toLowerCase().includes(q) ?? false;
             return siraNoEslesir || adEslesir || telEslesir || notEslesir;
           }
@@ -500,7 +507,7 @@ export function HizmetTablosu({
   return (
     <div className="space-y-4">
       {/* ─── Kontrol & Filtre Çubuğu ─── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         {/* Arama Kutusu ve SMS Durumu */}
         <div className="flex flex-1 items-center gap-2 sm:max-w-md">
           <div className="relative flex-1">
@@ -510,24 +517,34 @@ export function HizmetTablosu({
               placeholder="Sıra No, Müşteri, Telefon..."
               value={arama}
               onChange={(e) => setArama(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 py-2 pl-9 pr-4 text-sm text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-black/20 py-2 pl-9 pr-8 text-sm text-white placeholder:text-sky-300/50 focus:border-[#f5c518] focus:outline-none"
             />
+            {arama && (
+              <button
+                type="button"
+                onClick={() => setArama("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-sky-400 hover:text-white"
+                title="Aramayı Temizle"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           {smsAktif ? (
-            <span className="hidden items-center gap-1 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 text-[11px] font-bold text-emerald-400 md:inline-flex" title="Otomatik SMS Bildirimi Aktif">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 text-[11px] font-bold text-emerald-400" title="Otomatik SMS Bildirimi Aktif">
               <MessageSquare className="h-3 w-3" />
-              SMS Aktif
+              <span className="hidden xs:inline">SMS</span> Aktif
             </span>
           ) : (
-            <span className="hidden items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] font-bold text-sky-300 md:inline-flex" title="SMS Servisi Pasif veya Test Modunda">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[11px] font-bold text-sky-300" title="SMS Servisi Pasif veya Test Modunda">
               <MessageSquare className="h-3 w-3" />
-              SMS Pasif
+              <span className="hidden xs:inline">SMS</span> Pasif
             </span>
           )}
         </div>
 
-        {/* Durum Sekmeleri / Filtreler */}
-        <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+        {/* Durum Sekmeleri / Filtreler (Mobilde yatay kaydırılabilir) */}
+        <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-1 no-scrollbar">
           {[
             { key: "HEPSI", etiket: "Tümü" },
             { key: "SIRAYA_ALINDI", etiket: "Bekliyor" },
@@ -541,7 +558,7 @@ export function HizmetTablosu({
               key={sekme.key}
               type="button"
               onClick={() => handleDurumSekmeSec(sekme.key)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                 hizliFiltre === "HEPSI" && durumFiltresi === sekme.key
                   ? "bg-[#f5c518] text-[#081226] shadow-sm"
                   : "text-sky-200 hover:bg-white/5 hover:text-white"
@@ -556,15 +573,15 @@ export function HizmetTablosu({
         <div className="flex items-center gap-2">
           <a
             href={csvUrl}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-sky-200 transition-all hover:bg-white/10 hover:text-white"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-sky-200 transition-all hover:bg-white/10 hover:text-white shrink-0"
             title="Aktif filtreye göre kayıtları CSV olarak indirir"
           >
             <Download className="h-4 w-4" />
-            CSV İndir
+            CSV
           </a>
           <Link
             href="/hizmet/yeni"
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#f5c518] px-4 py-2 text-sm font-extrabold text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95"
+            className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-[#f5c518] px-4 py-2 text-sm font-extrabold text-[#081226] shadow-lg shadow-[#f5c518]/20 transition-all hover:bg-[#e5b508] active:scale-95"
           >
             <Plus className="h-4 w-4" />
             Yeni Hizmet Kaydı
@@ -572,12 +589,12 @@ export function HizmetTablosu({
         </div>
       </div>
 
-      {/* ─── Hızlı Listeler: kuyruk → hazırlanıyor → teslimat ─── */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ─── Hızlı Listeler: kuyruk → hazırlanıyor → teslimat (Mobilde yatay kaydırma) ─── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         <button
           type="button"
           onClick={() => handleHizliFiltreSec("KUYRUK")}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "KUYRUK"
               ? "border-sky-400/50 bg-sky-500/25 text-white"
               : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
@@ -591,7 +608,7 @@ export function HizmetTablosu({
         <button
           type="button"
           onClick={() => handleHizliFiltreSec("HAZIRLANIYOR")}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "HAZIRLANIYOR"
               ? "border-amber-400/50 bg-amber-500/25 text-white"
               : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
@@ -605,7 +622,7 @@ export function HizmetTablosu({
         <button
           type="button"
           onClick={() => handleHizliFiltreSec("TESLIM_ALINMADI")}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "TESLIM_ALINMADI"
               ? "border-purple-400/50 bg-purple-500/25 text-white"
               : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
@@ -619,7 +636,7 @@ export function HizmetTablosu({
         <button
           type="button"
           onClick={() => handleHizliFiltreSec("SMS_BEKLEYEN")}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
             hizliFiltre === "SMS_BEKLEYEN"
               ? "border-amber-400/50 bg-amber-500/25 text-white"
               : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
@@ -629,18 +646,18 @@ export function HizmetTablosu({
           Tamamlandı · Bildirimi Gönderilmemiş
           <span className="rounded-full bg-black/30 px-1.5 font-mono">{smsBekleyenAdet}</span>
         </button>
-
-        {hizliFiltre !== "HEPSI" && (
-          <span className="text-[11px] font-semibold text-sky-300">
-            Hızlı liste açık — kayıtları seçip toplu durum güncelleyebilir veya &quot;Seçilenlere SMS
-            Gönder&quot; ile bildirim yapabilirsiniz.
-          </span>
-        )}
       </div>
+
+      {hizliFiltre !== "HEPSI" && (
+        <div className="text-[11px] font-semibold text-sky-300">
+          Hızlı liste açık — kayıtları seçip toplu durum güncelleyebilir veya &quot;Seçilenlere SMS
+          Gönder&quot; ile bildirim yapabilirsiniz.
+        </div>
+      )}
 
       {/* ─── Toplu İşlem Çubuğu (Seçim Varsa) ─── */}
       {seciliIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/30 bg-sky-950/80 p-3 shadow-lg backdrop-blur">
+        <div className="sticky bottom-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/40 bg-sky-950/95 p-3 shadow-2xl backdrop-blur">
           <div className="text-xs font-bold text-sky-200">
             <span className="font-mono text-sm text-[#f5c518]">{seciliIds.length}</span> kayıt seçildi
             {toplamSayfa > 1 && seciliSayfadakiAdet > 0 && (
@@ -648,82 +665,294 @@ export function HizmetTablosu({
                 (bu sayfada {seciliSayfadakiAdet})
               </span>
             )}
-            <span className="ml-2 hidden font-semibold text-sky-300 sm:inline">
-              Akış: Talep Kuyruğu → Hazırlanıyor → Tamamlandı → Teslimat
-            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => handleTopluDurum("KIRIM")}
-              className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-500/30"
-              title="Seçili talepleri işleme alır: kırım aşamasına geçer (hazırlanıyor)."
+              className="flex items-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/20 px-2.5 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-500/30"
+              title="Seçili talepleri kırım aşamasına alır."
             >
-              <Play className="h-3.5 w-3.5" /> Hazırlanıyor Yap
+              <Play className="h-3 w-3" /> Hazırlanıyor
             </button>
 
             <button
               type="button"
               onClick={() => handleTopluDurum("KAVURMA")}
-              className="rounded-xl border border-orange-500/40 bg-orange-500/20 px-3 py-1.5 text-xs font-bold text-orange-200 hover:bg-orange-500/30"
+              className="rounded-xl border border-orange-500/40 bg-orange-500/20 px-2.5 py-1.5 text-xs font-bold text-orange-200 hover:bg-orange-500/30"
             >
-              Kavurmaya Al
+              Kavurma
             </button>
 
             <button
               type="button"
               onClick={() => handleTopluDurum("PAKETLEME")}
-              className="rounded-xl border border-sky-500/40 bg-sky-500/20 px-3 py-1.5 text-xs font-bold text-sky-200 hover:bg-sky-500/30"
+              className="rounded-xl border border-sky-500/40 bg-sky-500/20 px-2.5 py-1.5 text-xs font-bold text-sky-200 hover:bg-sky-500/30"
             >
-              Paketlemeye Al
+              Paketleme
             </button>
 
             <button
               type="button"
               onClick={() => handleTopluDurum("TAMAMLANDI")}
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/30"
+              className="flex items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 px-2.5 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/30"
             >
-              <CheckCircle2 className="h-3.5 w-3.5" /> Tamamlandı Yap
+              <CheckCircle2 className="h-3 w-3" /> Tamamlandı
             </button>
 
             <button
               type="button"
               onClick={() => handleTopluDurum("TESLIM_EDILDI")}
-              className="rounded-xl border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs font-bold text-purple-200 hover:bg-purple-500/30"
+              className="rounded-xl border border-purple-500/40 bg-purple-500/20 px-2.5 py-1.5 text-xs font-bold text-purple-200 hover:bg-purple-500/30"
             >
-              Teslim Edildi Yap
+              Teslim
             </button>
 
             <button
               type="button"
               onClick={() => setTopluSmsModalAcik(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-500"
+              className="flex items-center gap-1 rounded-xl bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white shadow hover:bg-sky-500"
             >
-              <Send className="h-3.5 w-3.5" /> Seçilenlere SMS Gönder
+              <Send className="h-3 w-3" /> SMS Gönder
             </button>
-
-            <a
-              href={csvUrl}
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 hover:text-white"
-              title="Fındık işleme taleplerini durum bilgileriyle CSV olarak indir"
-            >
-              <Download className="h-3.5 w-3.5" /> CSV İndir
-            </a>
 
             <button
               type="button"
               onClick={() => setSeciliIds([])}
-              className="rounded-xl border border-white/10 px-2.5 py-1.5 text-xs text-sky-200 hover:bg-white/10"
+              className="rounded-xl border border-white/10 px-2 py-1.5 text-xs text-sky-200 hover:bg-white/10"
             >
-              Seçimi Kaldır
+              Kaldır
             </button>
           </div>
         </div>
       )}
 
-      {/* ─── Liste Tablosu ─── */}
-      <div className="overflow-x-auto rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-xl">
+      {/* ─── Mobil Kart Görünümü (MD altı ekranlar) ─── */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobil Toplu Seçim Çubuğu */}
+        {filtrelenmis.length > 0 && (
+          <div className="flex items-center justify-between rounded-xl border border-white/5 bg-black/20 px-3 py-2 text-xs text-sky-200">
+            <label className="flex items-center gap-2 cursor-pointer font-bold">
+              <input
+                type="checkbox"
+                checked={sayfaTamamiSecili}
+                ref={(el) => {
+                  if (el) {
+                    el.indeterminate = seciliSayfadakiAdet > 0 && !sayfaTamamiSecili;
+                  }
+                }}
+                onChange={toggleTumunuSec}
+                className="h-4 w-4 rounded accent-[#f5c518]"
+              />
+              <span>Tümünü Seç ({filtrelenmis.length} kayıt)</span>
+            </label>
+            {seciliIds.length > 0 && (
+              <span className="font-mono text-xs font-black text-[#f5c518]">
+                {seciliIds.length} seçildi
+              </span>
+            )}
+          </div>
+        )}
+
+        {filtrelenmis.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-[var(--surface)] p-8 text-center text-sm text-sky-400">
+            Kayıt bulunamadı.
+          </div>
+        ) : (
+          filtrelenmis.map((k) => {
+            const secili = seciliIds.includes(k.id);
+
+            return (
+              <div
+                key={k.id}
+                className={`rounded-2xl border p-3.5 shadow-md transition-all space-y-3 ${
+                  secili
+                    ? "border-sky-500/50 bg-sky-950/40 ring-1 ring-sky-500/30"
+                    : "border-white/10 bg-[var(--surface)]"
+                }`}
+              >
+                {/* 1. Üst Bar: Checkbox, Sıra No, Tarih ve Durum Seçici */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={secili}
+                      onChange={() => toggleSecim(k.id)}
+                      className="h-4 w-4 rounded accent-[#f5c518]"
+                    />
+                    <div className="inline-flex items-center rounded-lg bg-[#f5c518]/15 px-2.5 py-0.5 font-mono text-sm font-black text-[#f5c518] ring-1 ring-[#f5c518]/30">
+                      #{k.siraNo}
+                    </div>
+                    <span className="text-[10px] text-sky-400">{k.tarihSaatStr}</span>
+                  </div>
+                  <div>
+                    <DurumSecici
+                      durum={k.durum}
+                      onChange={(yeniDurum) => handleDurumDegistir(k, yeniDurum)}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Müşteri Bilgileri, Telefon ve Miktar */}
+                <div className="flex items-start justify-between gap-2 border-t border-b border-white/5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-bold text-base text-white">{k.musteriAdi}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <a
+                        href={`tel:${k.telefon}`}
+                        className="inline-flex items-center gap-1 font-mono text-xs text-sky-300 hover:text-white"
+                      >
+                        <Phone className="h-3 w-3 text-sky-400" />
+                        {k.telefon}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppGonder(k)}
+                        className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25"
+                      >
+                        <MessageCircle className="h-3 w-3 text-emerald-400" />
+                        WhatsApp
+                      </button>
+                    </div>
+                    {k.notlar && (
+                      <div className="mt-1.5 line-clamp-2 text-xs italic text-amber-200/80 bg-amber-500/5 rounded-lg px-2 py-1 border border-amber-500/15">
+                        {k.notlar}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Kilo */}
+                  <div className="text-right shrink-0">
+                    <div className="font-mono text-xl font-black text-[#f5c518]">
+                      {k.kilo} <span className="text-xs text-sky-300">KG</span>
+                    </div>
+                    <div className="font-mono text-[11px] text-sky-400">{k.birimFiyat} ₺/kg</div>
+                  </div>
+                </div>
+
+                {/* 3. Hizmetler ve Aşama */}
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {k.kirma && (
+                      <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/20">
+                        Kırma
+                      </span>
+                    )}
+                    {k.kavurma && (
+                      <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/20">
+                        Kavurma
+                      </span>
+                    )}
+                    {k.paketleme && (
+                      <span className="rounded bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-300 border border-sky-500/20">
+                        Vakumlu Paket
+                      </span>
+                    )}
+                    {k.paketTipi && (
+                      <span className="font-mono text-[10px] font-extrabold text-sky-200">
+                        📦 {k.paketAdedi ? `${k.paketAdedi}× ` : ""}{k.paketTipi.replace("_", " ")}
+                      </span>
+                    )}
+                  </div>
+                  <AsamaIlerlemesi kayit={k} />
+                </div>
+
+                {/* 4. Alt Bar: Tutar, Tahsilat Durumu, SMS ve Yazdır */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-base font-black text-[#f5c518]">
+                      {k.toplamTutar} ₺
+                    </span>
+                    {k.odemeDurumu === "ODENDI" ? (
+                      <span className="inline-flex min-h-[34px] items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-300 border border-emerald-500/30">
+                        <Check className="h-3 w-3" />
+                        {k.odemeYontemi || "Ödendi"}
+                      </span>
+                    ) : k.odemeDurumu === "VERESIYE" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleTahsilatAc(k)}
+                        className="inline-flex min-h-[34px] items-center gap-1 rounded-lg bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 active:scale-95"
+                      >
+                        Veresiye
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleTahsilatAc(k)}
+                        className="inline-flex min-h-[34px] items-center gap-1 rounded-lg border border-[#f5c518]/30 bg-[#f5c518]/15 px-2.5 py-1 text-xs font-bold text-[#f5c518] hover:bg-[#f5c518]/25 active:scale-95"
+                      >
+                        <Banknote className="h-3.5 w-3.5" />
+                        Tahsil Et
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Kayıt SMS */}
+                    <button
+                      type="button"
+                      onClick={() => handleTekrarSms(k.id, "KAYIT")}
+                      title="Kayıt SMS Gönder"
+                      className={`min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg p-1.5 transition-colors border active:scale-95 ${
+                        k.girisSmsGonderildi
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                          : "border-white/10 bg-white/5 text-sky-400"
+                      }`}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Tamamlandı SMS */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleTekrarSms(
+                          k.id,
+                          k.tamamlandiSmsGonderildi ? "TESLIM_HATIRLATMA" : "TAMAMLANDI"
+                        )
+                      }
+                      title="Tamamlandı SMS Gönder"
+                      className={`min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg p-1.5 transition-colors border active:scale-95 ${
+                        k.tamamlandiSmsGonderildi
+                          ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                          : "border-white/10 bg-white/5 text-sky-400"
+                      }`}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Termal Etiket Yazdır */}
+                    <Link
+                      href={`/hizmet/${k.id}/etiket`}
+                      className="min-h-[34px] flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-bold text-sky-200 hover:bg-white/10 hover:text-white active:scale-95"
+                    >
+                      <Printer className="h-3.5 w-3.5 text-[#f5c518]" />
+                      <span>Yazdır</span>
+                    </Link>
+
+                    {/* İptal */}
+                    {k.durum !== "IPTAL" && (
+                      <button
+                        type="button"
+                        onClick={() => handleIptal(k)}
+                        title="İptal Et"
+                        className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg p-1.5 text-sky-400 hover:bg-red-500/10 hover:text-red-400 active:scale-95"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ─── Liste Tablosu (MD ve üzeri ekranlar) ─── */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-xl">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-white/10 bg-white/5 text-[11px] font-black uppercase tracking-wider text-sky-200">
             <tr>
@@ -1016,8 +1245,31 @@ export function HizmetTablosu({
               </div>
             </div>
 
-            {/* Sayfa Butonları */}
-            <div className="inline-flex items-center gap-1">
+            {/* Mobil Compact Sayfa Butonları */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <button
+                type="button"
+                disabled={aktifSayfa <= 1 || isPending}
+                onClick={() => handleSayfaDegistir(aktifSayfa - 1)}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30 active:scale-95"
+              >
+                ‹ Önceki
+              </button>
+              <span className="font-mono text-xs font-bold text-sky-200">
+                <span className="text-[#f5c518]">{aktifSayfa}</span> / {toplamSayfa || 1}
+              </span>
+              <button
+                type="button"
+                disabled={aktifSayfa >= (toplamSayfa || 1) || isPending}
+                onClick={() => handleSayfaDegistir(aktifSayfa + 1)}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/5 disabled:opacity-30 active:scale-95"
+              >
+                Sonraki ›
+              </button>
+            </div>
+
+            {/* Masaüstü Geniş Sayfa Butonları */}
+            <div className="hidden items-center gap-1 sm:inline-flex">
               <button
                 type="button"
                 disabled={aktifSayfa <= 1 || isPending}
@@ -1329,7 +1581,7 @@ function DurumSecici({
     <select
       value={durum}
       onChange={(e) => onChange(e.target.value as HizmetSatir["durum"])}
-      className={`rounded-lg border px-2 py-1 text-xs font-black focus:outline-none ${renkler[durum]}`}
+      className={`min-h-[34px] cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-black focus:outline-none ${renkler[durum]}`}
     >
       <option value="SIRAYA_ALINDI" className="bg-[#081226] text-blue-300">
         Bekliyor

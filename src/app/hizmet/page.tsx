@@ -129,11 +129,11 @@ export default async function HizmetPage({
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* ─── Başlık ─── */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-white">
+          <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">
             Fındık İşleme Atölyesi — Kırma · Kavurma · Paketleme
           </h1>
           <p className="mt-0.5 text-xs font-semibold text-sky-200">
@@ -143,10 +143,16 @@ export default async function HizmetPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {metrikler.smsBekleyenAdet > 0 && (
-            <span className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-300">
+            <span className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
               {metrikler.smsBekleyenAdet} tamamlandı · bildirimi gönderilmedi
             </span>
           )}
+          <Link
+            href="/hizmet/kasa"
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            Kasa
+          </Link>
           <Link
             href="/hizmet/raporlar"
             className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-sky-200 transition-colors hover:bg-white/10 hover:text-white"
@@ -163,76 +169,76 @@ export default async function HizmetPage({
       </div>
 
       {/* ─── Metrik Kartları (Tüm Veritabanı Sayaçları) ─── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
         {/* Sırada Bekleyenler */}
-        <div className="rounded-2xl border border-blue-500/30 bg-blue-950/30 p-4 shadow-sm">
+        <div className="rounded-2xl border border-blue-500/30 bg-blue-950/30 p-3 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-blue-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 sm:text-[11px]">
               Sırada Bekleyen
             </span>
             <Clock className="h-4 w-4 text-blue-400" />
           </div>
-          <div className="mt-2 font-mono text-2xl font-black text-white">
+          <div className="mt-1.5 font-mono text-xl font-black text-white sm:text-2xl">
             {metrikler.siradaAdet} <span className="text-xs font-normal text-blue-300">sipariş</span>
           </div>
-          <div className="mt-1 font-mono text-xs font-extrabold text-[#f5c518]">
+          <div className="mt-0.5 font-mono text-xs font-extrabold text-[#f5c518]">
             {kg(metrikler.siradaKg)}
           </div>
         </div>
 
         {/* Hazırlanıyor */}
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-4 shadow-sm">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-3 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 sm:text-[11px]">
               Üretimde (Kırım/Kavurma/Paket)
             </span>
             <Play className="h-4 w-4 text-amber-400" />
           </div>
-          <div className="mt-2 font-mono text-2xl font-black text-white">
+          <div className="mt-1.5 font-mono text-xl font-black text-white sm:text-2xl">
             {metrikler.hazirlaniyorAdet} <span className="text-xs font-normal text-amber-300">sipariş</span>
           </div>
-          <div className="mt-1 font-mono text-xs font-extrabold text-[#f5c518]">
+          <div className="mt-0.5 font-mono text-xs font-extrabold text-[#f5c518]">
             {kg(metrikler.hazirlaniyorKg)}
           </div>
         </div>
 
         {/* Tamamlandı (Teslim Bekleyen) */}
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4 shadow-sm">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-3 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 sm:text-[11px]">
               Hazır (Teslim Bekliyor)
             </span>
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           </div>
-          <div className="mt-2 font-mono text-2xl font-black text-white">
+          <div className="mt-1.5 font-mono text-xl font-black text-white sm:text-2xl">
             {metrikler.tamamlandiAdet} <span className="text-xs font-normal text-emerald-300">sipariş</span>
           </div>
-          <div className="mt-1 font-mono text-xs font-extrabold text-[#f5c518]">
+          <div className="mt-0.5 font-mono text-xs font-extrabold text-[#f5c518]">
             {kg(metrikler.tamamlandiKg)}
           </div>
         </div>
 
         {/* Teslim Edildi */}
-        <div className="rounded-2xl border border-purple-500/30 bg-purple-950/30 p-4 shadow-sm">
+        <div className="rounded-2xl border border-purple-500/30 bg-purple-950/30 p-3 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-purple-300">
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-300 sm:text-[11px]">
               Teslim Edilen
             </span>
             <PackageCheck className="h-4 w-4 text-purple-400" />
           </div>
-          <div className="mt-2 font-mono text-2xl font-black text-white">
+          <div className="mt-1.5 font-mono text-xl font-black text-white sm:text-2xl">
             {metrikler.teslimAdet} <span className="text-xs font-normal text-purple-300">sipariş</span>
           </div>
-          <div className="mt-1 font-mono text-xs font-extrabold text-sky-200">
+          <div className="mt-0.5 font-mono text-xs font-extrabold text-sky-200">
             {kg(metrikler.teslimKg)}
           </div>
         </div>
       </div>
 
       {/* ─── Hacim & Ciro Rapor Paneli ─── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {/* İşlem Dağılımı */}
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-3.5 sm:p-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sky-200">
             <Scale className="h-4 w-4 text-[#f5c518]" />
             Toplam İşlem Hacmi (Kabuklu Fındık)

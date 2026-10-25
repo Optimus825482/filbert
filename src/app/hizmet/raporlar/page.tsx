@@ -46,6 +46,24 @@ export default async function HizmetRaporlariPage() {
     where: { firmaId: firma.id },
     orderBy: [{ createdAt: "desc" }],
     take: 20000,
+    select: {
+      id: true,
+      siraNo: true,
+      durum: true,
+      musteriAdi: true,
+      telefon: true,
+      kilo: true,
+      toplamTutar: true,
+      odemeDurumu: true,
+      tamamlandiSmsGonderildi: true,
+      teslimSmsSayisi: true,
+      createdAt: true,
+      kirimAt: true,
+      kavurmaAt: true,
+      paketlemeAt: true,
+      tamamlandiAt: true,
+      teslimAt: true,
+    },
   });
 
   const ozetler = new Map<string, DurumOzeti>();
@@ -117,7 +135,7 @@ export default async function HizmetRaporlariPage() {
       <section className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] shadow-xl">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <h2 className="text-sm font-extrabold text-white">Durum Dağılımı</h2>
-          <span className="text-xs font-bold text-sky-300">{kayitlar.length} talep (son 2000)</span>
+          <span className="text-xs font-bold text-sky-300">{kayitlar.length} talep incelendi</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -187,7 +205,51 @@ export default async function HizmetRaporlariPage() {
             </a>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobil Kart Görünümü */}
+        <div className="block divide-y divide-white/5 md:hidden">
+          {teslimBekleyenler.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-sky-400">
+              Teslim bekleyen hazır talep yok.
+            </div>
+          ) : (
+            teslimBekleyenler.slice(0, 50).map((k) => (
+              <div key={k.id} className="space-y-2 p-3.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm font-black text-[#f5c518]">#{k.siraNo}</span>
+                  {k.tamamlandiSmsGonderildi ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {k.teslimSmsSayisi}× gönderildi
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300">
+                      <BellRing className="h-3.5 w-3.5" /> Gönderilmedi
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-bold text-white">{k.musteriAdi}</div>
+                    <a href={`tel:${k.telefon}`} className="font-mono text-xs text-sky-300 hover:text-white">
+                      {k.telefon}
+                    </a>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono font-bold text-white">{kg(Number(k.kilo))}</div>
+                    <div className="font-mono text-xs font-black text-[#f5c518]">{paraTL(Number(k.toplamTutar))}</div>
+                  </div>
+                </div>
+                {k.tamamlandiAt && (
+                  <div className="text-[11px] text-sky-300">
+                    Tamamlandı: {tarihSaat(k.tamamlandiAt)}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Masaüstü Tablo Görünümü */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-white/10 bg-white/5 text-[11px] font-black uppercase tracking-wider text-sky-200">
               <tr>
@@ -275,13 +337,15 @@ export default async function HizmetRaporlariPage() {
             </div>
           ) : (
             teslimEdilipTahsilEdilmeyenler.slice(0, 25).map((k) => (
-              <div key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-black text-[#f5c518]">#{k.siraNo}</span>
+              <div key={k.id} className="flex flex-col gap-1.5 px-4 py-2.5 transition-colors hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-xs font-black text-[#f5c518]">#{k.siraNo}</span>
                   <span className="font-bold text-white">{k.musteriAdi}</span>
-                  <span className="font-mono text-xs text-sky-300">{k.telefon}</span>
+                  <a href={`tel:${k.telefon}`} className="font-mono text-xs text-sky-300 hover:text-white">
+                    {k.telefon}
+                  </a>
                 </div>
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center justify-between gap-3 text-xs sm:justify-end">
                   <span className="font-mono text-sky-200">{kg(Number(k.kilo))}</span>
                   <span className="font-mono font-bold text-[#f5c518]">{paraTL(Number(k.toplamTutar))}</span>
                   <span className="rounded bg-amber-500/20 px-2 py-0.5 font-bold text-amber-300">
@@ -312,15 +376,17 @@ export default async function HizmetRaporlariPage() {
             </div>
           ) : (
             uzunBekleyenler.slice(0, 25).map((k) => (
-              <div key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-black text-[#f5c518]">#{k.siraNo}</span>
+              <div key={k.id} className="flex flex-col gap-1.5 px-4 py-2.5 transition-colors hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-xs font-black text-[#f5c518]">#{k.siraNo}</span>
                   <span className="font-bold text-white">{k.musteriAdi}</span>
-                  <span className="font-mono text-xs text-sky-300">{k.telefon}</span>
+                  <a href={`tel:${k.telefon}`} className="font-mono text-xs text-sky-300 hover:text-white">
+                    {k.telefon}
+                  </a>
                 </div>
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center justify-between gap-3 text-xs sm:justify-end">
                   <span className="font-mono text-sky-200">{kg(Number(k.kilo))}</span>
-                  <span className="text-amber-300">
+                  <span className="font-semibold text-amber-300">
                     {Math.floor((simdiMs - k.createdAt.getTime()) / GUN_MS)} gündür bekliyor
                   </span>
                 </div>

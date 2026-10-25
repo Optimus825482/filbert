@@ -141,6 +141,42 @@ export default async function IslemeKasaPage({
             </Link>
           )}
         </div>
+
+        {/* Hareket Türü Filtreleri (Mobilde yatay kaydırılabilir) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          <Link
+            href="/hizmet/kasa"
+            className={`rounded-xl border px-3 py-1 text-xs font-bold transition-colors ${
+              !sp.tip
+                ? "border-[#f5c518] bg-[#f5c518]/15 text-[#f5c518]"
+                : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+            }`}
+          >
+            Tümü
+          </Link>
+          <Link
+            href="/hizmet/kasa?tip=TAHSILAT"
+            className={`flex items-center gap-1 rounded-xl border px-3 py-1 text-xs font-bold transition-colors ${
+              sp.tip === "TAHSILAT"
+                ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
+                : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+            }`}
+          >
+            <ArrowDownLeft className="h-3 w-3 text-emerald-400" />
+            Tahsilatlar (+)
+          </Link>
+          <Link
+            href="/hizmet/kasa?tip=ODEME"
+            className={`flex items-center gap-1 rounded-xl border px-3 py-1 text-xs font-bold transition-colors ${
+              sp.tip === "ODEME"
+                ? "border-red-500/50 bg-red-500/20 text-red-300"
+                : "border-white/10 bg-white/5 text-sky-200 hover:bg-white/10"
+            }`}
+          >
+            <ArrowUpRight className="h-3 w-3 text-red-400" />
+            Ödemeler (−)
+          </Link>
+        </div>
         {hareketler.length === 0 ? (
           <div className="ozet-kart text-sm text-sky-100">Bu kriterlere uygun kasa hareketi yok.</div>
         ) : (
